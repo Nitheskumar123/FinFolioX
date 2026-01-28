@@ -25,11 +25,12 @@ from ml_engine.regime_agent import RegimeAgent
 from ml_engine.risk_engine import RiskEngine
 from ml_engine.correlation_agent import CorrelationDivergenceDetector
 from ml_engine.uncertainty_agent import UncertaintyAgent
+from ml_engine.explainability_agent import ExplainabilityAgent # <--- PHASE 10
 
 # ==============================================================================
 # SYSTEM CONSTANTS & CONFIGURATION
 # ==============================================================================
-SYSTEM_VERSION = "9.5.0 (Bayesian-Systemic)"
+SYSTEM_VERSION = "10.0 (SHAP-Explainable)"
 DEFAULT_CAPITAL = 10000.0
 MAX_RISK_PER_TRADE = 0.20  # 20% Hard Cap
 NEWS_LOOKBACK_ITEMS = 5
@@ -46,9 +47,9 @@ class FinFolioSystem:
     """
     The Master Orchestrator for FinFolio-X AI Trading System.
     
-    This system integrates 7 specialized AI agents into a single coherent
+    This system integrates 8 specialized AI agents into a single coherent
     decision-making pipeline. It uses a voting mechanism weighted by an
-    attention network to produce final buy/sell signals.
+    attention network to produce final buy/sell signals with full explainability.
     
     Architecture:
     1. Technical Agent (LSTM): Analyzes price trends and patterns.
@@ -56,8 +57,9 @@ class FinFolioSystem:
     3. Regime Agent (HMM): Detects hidden market states (Bull/Bear).
     4. Correlation Agent (Graph): Detects systemic risk and anomalies.
     5. Uncertainty Agent (Bayesian): Quantifies model confidence/guessing.
-    6. Fusion Agent (Attention): Weighs all inputs to make a decision.
-    7. Risk Engine (Kelly): Calculates optimal position sizing.
+    6. Explainability Agent (SHAP): Explains WHY the model made a prediction.
+    7. Fusion Agent (Attention): Weighs all inputs to make a decision.
+    8. Risk Engine (Kelly): Calculates optimal position sizing.
     """
 
     def __init__(self):
@@ -73,7 +75,7 @@ class FinFolioSystem:
         # ------------------------------------------------------------------
         # 1. Initialize Technical Agent (The Chart Analyst)
         # ------------------------------------------------------------------
-        print("\n   🔹 [1/7] Loading Technical Agent (LSTM Chart Reader)...")
+        print("\n   🔹 [1/8] Loading Technical Agent (LSTM Chart Reader)...")
         try:
             self.tech_agent = TechnicalAgent(
                 model_path=os.path.join(MODELS_DIR, "lstm_technical.pth"),
@@ -87,7 +89,7 @@ class FinFolioSystem:
         # ------------------------------------------------------------------
         # 2. Initialize Sentiment Agent (The News Analyst)
         # ------------------------------------------------------------------
-        print("   🔹 [2/7] Loading Sentiment Agent (FinBERT Language Model)...")
+        print("   🔹 [2/8] Loading Sentiment Agent (FinBERT Language Model)...")
         try:
             self.sent_agent = SentimentAgent()
             print("      ✅ FinBERT Model Loaded Successfully.")
@@ -97,7 +99,7 @@ class FinFolioSystem:
         # ------------------------------------------------------------------
         # 3. Initialize Regime Agent (The Market Weather Station)
         # ------------------------------------------------------------------
-        print("   🔹 [3/7] Loading Regime Agent (HMM Market Detector)...")
+        print("   🔹 [3/8] Loading Regime Agent (HMM Market Detector)...")
         try:
             self.regime_agent = RegimeAgent(
                 model_path=os.path.join(MODELS_DIR, "hmm_regime.pkl")
@@ -109,7 +111,7 @@ class FinFolioSystem:
         # ------------------------------------------------------------------
         # 4. Initialize Correlation Agent (Systemic Risk Detector)
         # ------------------------------------------------------------------
-        print("   🔹 [4/7] Loading Correlation Agent (Statistical Graph)...")
+        print("   🔹 [4/8] Loading Correlation Agent (Statistical Graph)...")
         try:
             self.corr_agent = CorrelationDivergenceDetector()
             print("      ✅ Market Graph Engine Initialized.")
@@ -117,9 +119,9 @@ class FinFolioSystem:
             print(f"      ⚠️ Warning: Correlation Agent failed ({e}).")
 
         # ------------------------------------------------------------------
-        # 5. Initialize Uncertainty Agent (The Lie Detector) - PHASE 9
+        # 5. Initialize Uncertainty Agent (The Lie Detector)
         # ------------------------------------------------------------------
-        print("   🔹 [5/7] Loading Uncertainty Agent (Bayesian Wrapper)...")
+        print("   🔹 [5/8] Loading Uncertainty Agent (Bayesian Wrapper)...")
         try:
             self.uncertainty_agent = UncertaintyAgent(self.tech_agent)
             print("      ✅ Monte Carlo Dropout Engine Initialized.")
@@ -129,7 +131,7 @@ class FinFolioSystem:
         # ------------------------------------------------------------------
         # 6. Initialize Fusion Agent (The Decision Maker)
         # ------------------------------------------------------------------
-        print("   🔹 [6/7] Loading Fusion Agent (Multi-Head Attention)...")
+        print("   🔹 [6/8] Loading Fusion Agent (Multi-Head Attention)...")
         try:
             self.fusion_agent = FusionAgent(
                 model_path=os.path.join(MODELS_DIR, "attention_fusion.pth")
@@ -142,9 +144,18 @@ class FinFolioSystem:
         # ------------------------------------------------------------------
         # 7. Initialize Risk Engine (The Wallet Manager)
         # ------------------------------------------------------------------
-        print("   🔹 [7/7] Loading Risk Engine (Kelly Criterion)...")
+        print("   🔹 [7/8] Loading Risk Engine (Kelly Criterion)...")
         self.risk_engine = RiskEngine(default_account_size=DEFAULT_CAPITAL)
         print(f"      ✅ Risk Manager Online (Account: ${DEFAULT_CAPITAL:,.2f}).")
+        
+        # ------------------------------------------------------------------
+        # 8. Initialize Explainability Agent (SHAP Engine) - PHASE 10
+        # ------------------------------------------------------------------
+        # Note: We perform "Lazy Initialization" for this agent.
+        # We need actual historical data to create the SHAP background dataset.
+        # We will initialize it during the first call to `analyze_stock`.
+        print("   🔹 [8/8] Preparing Explainability Agent (SHAP)...")
+        self.explainability_agent = None 
         
         # Load Regime Scaler (Critical for correct HMM inputs)
         self.regime_scaler_path = os.path.join(MODELS_DIR, "regime_scaler.pkl")
@@ -158,11 +169,11 @@ class FinFolioSystem:
 
     def _print_startup_banner(self):
         print("\n" + "█" * 72)
-        print("🚀 INITIALIZING FINFOLIO-X: CROSS-ASSET INTELLIGENT TRADING SYSTEM")
+        print("🚀 INITIALIZING FINFOLIO-X: EXPLAINABLE AI TRADING SYSTEM")
         print("█" * 72)
         print(f"   • Version: {SYSTEM_VERSION}")
         print("   • Mode: Live Inference (Real-Time Data)")
-        print("   • Architecture: Multi-Agent Mixture of Experts (MoE)")
+        print("   • Architecture: Multi-Agent Mixture of Experts (MoE) + XAI")
         print("   • Copyright © 2026 FinFolio Team")
         print("-" * 72)
 
@@ -366,12 +377,24 @@ class FinFolioSystem:
             return None, f"❌ Data Connection Error: {e}"
 
     def _analyze_technicals_and_uncertainty(self, hist):
-        """Runs LSTM and Bayesian Uncertainty Analysis."""
+        """Runs LSTM, Bayesian Uncertainty, and SHAP Explainability."""
         last_60_days = hist[['Close', 'Volume', 'SMA_50', 'SMA_200', 'RSI', 'MACD']].tail(60)
         
         print("\n   📈 [Technical Analysis] Reading Charts (LSTM v2)...")
         lstm_signal = self.tech_agent.predict(last_60_days)
         print(f"      - Standard LSTM Signal: {lstm_signal:.4f}")
+        
+        # Phase 10: Explainability (Lazy Init)
+        if self.explainability_agent is None:
+            self.explainability_agent = ExplainabilityAgent(self.tech_agent, hist)
+            
+        print("   🔍 [Explainability] Running SHAP Analysis...")
+        shap_scores, top_driver = self.explainability_agent.explain_prediction(last_60_days)
+        if shap_scores:
+            print(f"      - Top Driver: {top_driver} (Impact: {shap_scores[top_driver]:.4f})")
+            # Show top 3 features
+            sorted_feats = sorted(shap_scores.items(), key=lambda x: abs(x[1]), reverse=True)[:3]
+            print(f"      - Key Factors: {', '.join([f'{k}={v:.3f}' for k,v in sorted_feats])}")
         
         # Phase 9: Bayesian Check
         print("   🎲 [Uncertainty Agent] Running Monte Carlo Simulation (50 runs)...")
@@ -384,7 +407,7 @@ class FinFolioSystem:
         print(f"      - Bayesian Mean: {mc_mean:.4f}")
         print(f"      - Uncertainty (StdDev): {mc_std:.4f} ({uncertainty_status})")
         
-        return lstm_signal, mc_mean, mc_std, uncertainty_status
+        return lstm_signal, mc_mean, mc_std, uncertainty_status, top_driver
 
     def _analyze_sentiment_module(self, ticker, stock_obj, lstm_signal):
         """Runs News Scraping and FinBERT Analysis."""
@@ -462,6 +485,9 @@ class FinFolioSystem:
     def analyze_stock(self, ticker="AAPL"):
         """
         Main entry point for analysis. Orchestrates the flow of data between agents.
+        
+        Returns:
+            None (Prints detailed report to console)
         """
         print(f"📊 STARTING DEEP DIVE ANALYSIS FOR: {ticker}")
         
@@ -472,8 +498,8 @@ class FinFolioSystem:
             
         last_price = hist['Close'].iloc[-1]
 
-        # 2. Run Technical & Uncertainty Agents
-        lstm_signal, mc_mean, mc_std, uncertainty_status = self._analyze_technicals_and_uncertainty(hist)
+        # 2. Run Technical, Uncertainty & SHAP
+        lstm_signal, mc_mean, mc_std, uncertainty_status, top_driver = self._analyze_technicals_and_uncertainty(hist)
 
         # 3. Run Sentiment Agent
         sent_score = self._analyze_sentiment_module(ticker, stock_obj, lstm_signal)
@@ -534,6 +560,7 @@ class FinFolioSystem:
         print(f"   🎲 Model Uncertainty   : {mc_std:.4f} ({uncertainty_status})")
         print(f"   ⛈️  Market Regime       : {regime_label} (Vol: {current_vol:.4f})")
         print(f"   🕸️  Systemic Risk       : {risk_score:.4f} ({div_status})")
+        print(f"   🔍 Primary SHAP Driver : {top_driver}")
         print("-" * 72)
         
         # 2. The Decision Logic
