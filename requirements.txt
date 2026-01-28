@@ -1,0 +1,22 @@
+# Web Framework
+django>=5.0
+djangorestframework
+django-cors-headers
+
+# Data Handling
+numpy
+pandas
+yfinance
+
+# Machine Learning Support
+torch
+scikit-learn
+transformers
+joblib
+
+# Utilities
+matplotlib
+beautifulsoup4
+requests
+celery
+redis
