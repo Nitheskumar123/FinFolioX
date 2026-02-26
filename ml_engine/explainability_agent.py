@@ -108,7 +108,7 @@ class ExplainabilityAgent:
             # 4. Map to Feature Names
             importance_dict = {}
             for i, feat in enumerate(self.feature_names):
-                importance_dict[feat] = float(weighted_shap[i])
+                importance_dict[feat] = float(np.array(weighted_shap[i]).item())
                 
             # 5. Identify Top Driver
             # Find feature with max ABSOLUTE impact

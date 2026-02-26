@@ -38,7 +38,23 @@ UNCERTAINTY_THRESHOLD_HIGH = 0.15
 UNCERTAINTY_THRESHOLD_MODERATE = 0.05
 DIVERGENCE_THRESHOLD_CRITICAL = 0.70
 DIVERGENCE_THRESHOLD_MINOR = 0.40
-
+# ... other imports ...
+# ==============================================================================
+# PHASE 11 IMPORT FIX (Copy and Replace this section)
+# ==============================================================================
+try:
+    # Attempt 1: Standard Import (Works if running inside ml_engine)
+    from adversarial_tester import AdversarialTester
+    print("   ✅ Phase 11 (Red Team) Loaded via direct import.")
+except ImportError:
+    try:
+        # Attempt 2: Package Import (Works if running from root D:\FinFolioX)
+        from ml_engine.adversarial_tester import AdversarialTester
+        print("   ✅ Phase 11 (Red Team) Loaded via package import.")
+    except ImportError:
+        # Attempt 3: Final check - File missing?
+        print("   ⚠️ Phase 11 Module missing or failed to import. Red Team Disabled.")
+        AdversarialTester = None
 # ==============================================================================
 # FINFOLIO-X MASTER SYSTEM CLASS
 # ==============================================================================
@@ -166,6 +182,11 @@ class FinFolioSystem:
             print("      ⚠️ Warning: Regime Scaler not found. HMM accuracy may be reduced.")
         
         print("\n✅ SYSTEM INITIALIZATION COMPLETE. ALL ENGINES ONLINE.\n")
+    # --- PHASE 11 HOOK ---
+        if AdversarialTester:
+            self.red_team = AdversarialTester(self)
+        else:
+            self.red_team = None
 
     def _print_startup_banner(self):
         print("\n" + "█" * 72)
@@ -509,6 +530,40 @@ class FinFolioSystem:
 
         # 5. Run Correlation Agent
         risk_score, div_status = self._analyze_correlation_module(ticker)
+        # ==================================================================
+        # ➕ NEW: PHASE 11 INTEGRATION (The Red Team Live Check)
+        # ==================================================================
+        robustness_penalty = 0.0
+        
+        if self.red_team:
+            print(f"\n   🛡️  [Red Team] Running Live Robustness Check...")
+            try:
+                # We run a "Mini" stress test (Flash Crash simulation)
+                # This checks if the model is currently "Overfitted" to the trend
+                crashed_df = self.red_team.generate_flash_crash(hist, drop_pct=0.20) # 20% drop simulation
+                
+                # Get the "Crashed" score
+                input_crashed = self.red_team._prepare_data_for_ai(crashed_df)
+                
+                # Predict on crashed data
+                if hasattr(self.tech_agent, 'predict_signal'):
+                     crashed_score = self.tech_agent.predict_signal(input_crashed)
+                else:
+                     crashed_score = self.tech_agent.predict(input_crashed)
+
+                # Calculate Delta (Normal Score vs Crashed Score)
+                robustness_delta = lstm_signal - crashed_score
+                
+                if robustness_delta < 0.02:
+                    print(f"      ❌ WARNING: Model is stubborn! (Delta: {robustness_delta:.4f})")
+                    print(f"      ⚠️  Applying Safety Penalty to Fusion Score.")
+                    # We will penalize the final score later in Fusion
+                    robustness_penalty = 0.2
+                else:
+                    print(f"      ✅ PASS: Model detected the crash. (Delta: {robustness_delta:.4f})")
+            except Exception as e:
+                print(f"      ⚠️ Red Team check failed slightly: {e}")
+        # ==================================================================
         
         # ------------------------------------------------------------------
         # STEP F: FUSION & OVERRIDE LOGIC
@@ -601,9 +656,18 @@ class FinFolioSystem:
             focus_msg = "The AI is prioritizing News/Sentiment."
         else:
             focus_msg = "The AI is prioritizing Risk Management (Defensive)."
+    
             
         print(f"      👉 Insight: {focus_msg}")
         print("█" * 72)
         print("\n   Disclaimer: This tool is for educational purposes only.")
         print("   It does not constitute financial advice. Trading involves risk.")
         print("   © FinFolio-X Team 2026")
+    def run_stress_test(self, ticker="AAPL"):
+        """
+        Manually triggers the Phase 11 stress test.
+        """
+        if self.red_team:
+            self.red_team.run_robustness_test(ticker)
+        else:
+            print("❌ Cannot run stress test: Phase 11 module not loaded.")

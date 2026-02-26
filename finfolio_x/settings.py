@@ -121,3 +121,24 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/6.0/howto/static-files/
 
 STATIC_URL = "static/"
+import os
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
+
+# System Configuration
+SYSTEM_VERSION = "12.0 (LangGraph + Groq Orchestration)"
+DEFAULT_CAPITAL = 10000.0
+
+# API Keys
+GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+
+# LLM Supervisor Configuration
+LLM_MODEL_NAME = "llama-3.3-70b-versatile"  # Groq's high-performance open-source model
+LLM_TEMPERATURE = 0.2               # Low temperature for analytical, deterministic reasoning
+LLM_MAX_TOKENS = 512
+
+# Thresholds
+UNCERTAINTY_THRESHOLD_HIGH = 0.15
+DIVERGENCE_THRESHOLD_CRITICAL = 0.70
