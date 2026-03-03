@@ -11,9 +11,17 @@ class RiskEngine:
         self.account_size = default_account_size
         self.max_risk = max_risk_per_trade
 
-    def calculate_position_size(self, confidence_score, volatility):
+    def calculate_position_size(self, confidence_score, volatility,
+                                disagreement_penalty=1.0):
         """
         Calculates the optimal % of portfolio to invest.
+        
+        Args:
+            confidence_score: AI fusion confidence (0.0 to 1.0)
+            volatility:       Market volatility (daily std dev)
+            disagreement_penalty: Phase 16 GDI penalty multiplier (0.25 to 1.0).
+                                  Applied after Half-Kelly and Vol scaling.
+                                  Default 1.0 = no penalty.
         
         Returns:
         1. allocation_pct (Float): % of portfolio to invest (0.0 to 1.0)
@@ -34,7 +42,7 @@ class RiskEngine:
         # 3. SAFETY ADJUSTMENTS
         # If Kelly is negative (Expected Value is negative), DO NOT TRADE.
         if kelly_fraction <= 0:
-            return 0.0, 0.0  # <--- FIXED: Returns exactly 2 values now.
+            return 0.0, 0.0
 
         # "Half-Kelly" Rule: Professional standard to reduce volatility drag.
         safe_kelly = kelly_fraction * 0.5
@@ -42,6 +50,10 @@ class RiskEngine:
         # Volatility Scaling: If market is crazy (>2% daily moves), cut size in half again.
         if volatility > 0.02:
             safe_kelly = safe_kelly * 0.5 
+
+        # Phase 16: Disagreement Penalty (Boardroom Tension)
+        # If agents disagree heavily, shrink the position even further.
+        safe_kelly = safe_kelly * disagreement_penalty
 
         # 4. HARD CAPS
         # - Max Risk: Never exceed 20% of portfolio (0.20)

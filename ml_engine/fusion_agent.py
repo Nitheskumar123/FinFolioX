@@ -86,7 +86,26 @@ class FusionAgent:
         }
         return focus_map
 
-    def predict(self, lstm_p, sent_s, vol_v):
+    def predict(self, lstm_p, sent_s, vol_v, trust_scores=None):
+        """
+        Predict final confidence by fusing agent signals via attention.
+
+        Args:
+            lstm_p: Technical agent prediction (0-1)
+            sent_s: Sentiment agent score (-1 to +1)
+            vol_v:  Volatility/regime input (0-1)
+            trust_scores: Optional dict from Phase 14 Meta-Agent.
+                          Keys: 'technical', 'sentiment', 'regime'
+                          Values: Trust multipliers (0.5 - 1.5)
+                          If None, no scaling is applied (backward-compatible).
+        """
+        # Phase 14: Scale inputs by trust multipliers before attention
+        if trust_scores:
+            lstm_p = lstm_p * trust_scores.get("technical", 1.0)
+            sent_s = sent_s * trust_scores.get("sentiment", 1.0)
+            # Regime trust applied to volatility input
+            vol_v = vol_v * trust_scores.get("regime", 1.0)
+
         t_lstm = torch.tensor([[lstm_p]], dtype=torch.float32).to(self.device)
         t_sent = torch.tensor([[sent_s]], dtype=torch.float32).to(self.device)
         t_vol = torch.tensor([[vol_v]], dtype=torch.float32).to(self.device)

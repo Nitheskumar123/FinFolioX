@@ -30,7 +30,7 @@ from ml_engine.explainability_agent import ExplainabilityAgent # <--- PHASE 10
 # ==============================================================================
 # SYSTEM CONSTANTS & CONFIGURATION
 # ==============================================================================
-SYSTEM_VERSION = "10.0 (SHAP-Explainable)"
+SYSTEM_VERSION = "16.0 (Disagreement Heatmap)"
 DEFAULT_CAPITAL = 10000.0
 MAX_RISK_PER_TRADE = 0.20  # 20% Hard Cap
 NEWS_LOOKBACK_ITEMS = 5
@@ -56,6 +56,45 @@ except ImportError:
         print("   ⚠️ Phase 11 Module missing or failed to import. Red Team Disabled.")
         AdversarialTester = None
 # ==============================================================================
+# PHASE 13 IMPORT (Conflict Resolution Engine)
+# ==============================================================================
+try:
+    from conflict_resolver import ConflictResolver
+    print("   ✅ Phase 13 (Conflict Arbitrator) Loaded via direct import.")
+except ImportError:
+    try:
+        from ml_engine.conflict_resolver import ConflictResolver
+        print("   ✅ Phase 13 (Conflict Arbitrator) Loaded via package import.")
+    except ImportError:
+        print("   ⚠️ Phase 13 Module missing. Conflict Resolution Disabled.")
+        ConflictResolver = None
+# ==============================================================================
+# PHASE 14 IMPORT (Self-Correcting Meta-Agent)
+# ==============================================================================
+try:
+    from meta_agent import MetaAgent
+    print("   [+] Phase 14 (Meta-Agent) Loaded via direct import.")
+except ImportError:
+    try:
+        from ml_engine.meta_agent import MetaAgent
+        print("   [+] Phase 14 (Meta-Agent) Loaded via package import.")
+    except ImportError:
+        print("   [!] Phase 14 Module missing. Meta-Agent Disabled.")
+        MetaAgent = None
+# ==============================================================================
+# PHASE 16 IMPORT (Agent Disagreement Heatmap)
+# ==============================================================================
+try:
+    from heatmap_agent import HeatmapAgent
+    print("   [+] Phase 16 (Heatmap Agent) Loaded via direct import.")
+except ImportError:
+    try:
+        from ml_engine.heatmap_agent import HeatmapAgent
+        print("   [+] Phase 16 (Heatmap Agent) Loaded via package import.")
+    except ImportError:
+        print("   [!] Phase 16 Module missing. Heatmap Agent Disabled.")
+        HeatmapAgent = None
+# ==============================================================================
 # FINFOLIO-X MASTER SYSTEM CLASS
 # ==============================================================================
 
@@ -63,9 +102,10 @@ class FinFolioSystem:
     """
     The Master Orchestrator for FinFolio-X AI Trading System.
     
-    This system integrates 8 specialized AI agents into a single coherent
+    This system integrates 9 specialized AI agents into a single coherent
     decision-making pipeline. It uses a voting mechanism weighted by an
-    attention network to produce final buy/sell signals with full explainability.
+    attention network, with a Neuro-Symbolic Arbitrator to resolve agent
+    conflicts, producing final buy/sell signals with full explainability.
     
     Architecture:
     1. Technical Agent (LSTM): Analyzes price trends and patterns.
@@ -76,6 +116,7 @@ class FinFolioSystem:
     6. Explainability Agent (SHAP): Explains WHY the model made a prediction.
     7. Fusion Agent (Attention): Weighs all inputs to make a decision.
     8. Risk Engine (Kelly): Calculates optimal position sizing.
+    9. Conflict Resolver (Phase 13): Arbitrates agent disagreements.
     """
 
     def __init__(self):
@@ -110,8 +151,8 @@ class FinFolioSystem:
             self.sent_agent = SentimentAgent()
             print("      ✅ FinBERT Model Loaded Successfully.")
         except Exception as e:
-            print(f"      ⚠️ Warning: Sentiment Agent failed ({e}). using fallback.")
-
+            print(f"      Warning: Sentiment Agent failed ({e}). Using fallback.")
+            self.sent_agent = None
         # ------------------------------------------------------------------
         # 3. Initialize Regime Agent (The Market Weather Station)
         # ------------------------------------------------------------------
@@ -187,6 +228,24 @@ class FinFolioSystem:
             self.red_team = AdversarialTester(self)
         else:
             self.red_team = None
+
+    # --- PHASE 13 HOOK ---
+        if ConflictResolver:
+            self.conflict_resolver = ConflictResolver()
+        else:
+            self.conflict_resolver = None
+
+    # --- PHASE 14 HOOK ---
+        if MetaAgent:
+            self.meta_agent = MetaAgent()
+        else:
+            self.meta_agent = None
+
+    # --- PHASE 16 HOOK ---
+        if HeatmapAgent:
+            self.heatmap_agent = HeatmapAgent()
+        else:
+            self.heatmap_agent = None
 
     def _print_startup_banner(self):
         print("\n" + "█" * 72)
@@ -460,6 +519,11 @@ class FinFolioSystem:
             print("         " + "-"*30)
             ai_input_texts.append(f"{item['title']}. {item['summary']}")
 
+        # Fallback if Sentiment Agent failed to load
+        if self.sent_agent is None:
+            print("      [!] Sentiment Agent unavailable. Using neutral score.")
+            return 0.0
+
         sent_label, sent_score = self.sent_agent.analyze_daily_headlines(ai_input_texts)
         print(f"      - FinBERT Score: {sent_score:.4f} ({sent_label})")
         
@@ -519,6 +583,12 @@ class FinFolioSystem:
             
         last_price = hist['Close'].iloc[-1]
 
+        # Phase 14: Load Trust Scores
+        trust_scores = None
+        if self.meta_agent:
+            trust_scores = self.meta_agent.get_trust_scores()
+            self.meta_agent.print_trust_report(trust_scores)
+
         # 2. Run Technical, Uncertainty & SHAP
         lstm_signal, mc_mean, mc_std, uncertainty_status, top_driver = self._analyze_technicals_and_uncertainty(hist)
 
@@ -576,31 +646,66 @@ class FinFolioSystem:
         else: vol_input = 0.5
             
         # Use Bayesian Mean instead of Single LSTM prediction for better robustness
+        # Phase 14: Pass trust scores to scale agent inputs before attention
         final_conf, weights = self.fusion_agent.predict(
             lstm_p=mc_mean, 
             sent_s=sent_score, 
-            vol_v=vol_input
+            vol_v=vol_input,
+            trust_scores=trust_scores
         )
         print(f"      - Raw Fusion Confidence: {final_conf:.4f}")
 
-        # --- SYSTEMIC RISK OVERRIDE ---
-        if risk_score > DIVERGENCE_THRESHOLD_CRITICAL:
-            print(f"      🔻 OVERRIDE TRIGGERED: Penalty applied due to high systemic divergence.")
-            final_conf = final_conf * 0.5 
-            print(f"      - Adjusted Confidence: {final_conf:.4f}")
+        # ==================================================================
+        # ⚖️  PHASE 13: CONFLICT RESOLUTION ENGINE (The Arbitrator)
+        # ==================================================================
+        # All systemic risk and uncertainty overrides are now consolidated
+        # inside the ConflictResolver. The old hard-coded if-checks have
+        # been removed from here.
+        # ==================================================================
+        if self.conflict_resolver:
+            # Phase 14: Pass trust scores to arbitrator for extra tie-breaking
+            arbitration_result = self.conflict_resolver.arbitrate(
+                tech_score=lstm_signal,
+                sent_score=sent_score,
+                mc_std=mc_std,
+                regime_label=regime_label,
+                risk_score=risk_score,
+                fusion_confidence=final_conf,
+                trust_scores=trust_scores
+            )
+            # Override confidence with the arbitrator's ruling
+            final_conf = arbitration_result["adjusted_confidence"]
+            # Print the detailed arbitration report
+            self.conflict_resolver.print_report(arbitration_result)
+        else:
+            # Fallback: old-style simple overrides if Phase 13 module missing
+            if risk_score > DIVERGENCE_THRESHOLD_CRITICAL:
+                final_conf = final_conf * 0.5
+            if mc_std > 0.10:
+                final_conf = final_conf * 0.8
 
-        # --- BAYESIAN UNCERTAINTY OVERRIDE ---
-        if mc_std > 0.10:
-             print(f"      🔻 OVERRIDE TRIGGERED: Penalty applied due to high model uncertainty.")
-             final_conf = final_conf * 0.8
-             print(f"      - Adjusted Confidence: {final_conf:.4f}")
+        # ==================================================================
+        # PHASE 16: AGENT DISAGREEMENT HEATMAP
+        # ==================================================================
+        gdi_penalty = 1.0  # default: no penalty
+        if self.heatmap_agent:
+            heatmap_result = self.heatmap_agent.analyze(
+                lstm_score=lstm_signal,
+                sent_score=sent_score,
+                regime_label=regime_label,
+                regime_vol=current_vol
+            )
+            self.heatmap_agent.print_heatmap(heatmap_result)
+            gdi_penalty = heatmap_result["penalty"]
 
         # ------------------------------------------------------------------
         # STEP G: RISK MANAGEMENT (KELLY CRITERION)
         # ------------------------------------------------------------------
-        print("\n   ⚖️  [Risk Engine] Calculating Position Sizing (Kelly)...")
+        print("\n   [Risk Engine] Calculating Position Sizing (Kelly)...")
         
-        alloc_pct, kelly_debug = self.risk_engine.calculate_position_size(final_conf, current_vol)
+        alloc_pct, kelly_debug = self.risk_engine.calculate_position_size(
+            final_conf, current_vol, disagreement_penalty=gdi_penalty
+        )
         num_shares, cash_value = self.risk_engine.get_shares_amount(last_price, alloc_pct)
         
         # ------------------------------------------------------------------
@@ -662,7 +767,25 @@ class FinFolioSystem:
         print("█" * 72)
         print("\n   Disclaimer: This tool is for educational purposes only.")
         print("   It does not constitute financial advice. Trading involves risk.")
-        print("   © FinFolio-X Team 2026")
+        print("   (c) FinFolio-X Team 2026")
+
+        # ==================================================================
+        # PHASE 14: LOG DECISION TO META-AGENT LEDGER
+        # ==================================================================
+        if self.meta_agent:
+            try:
+                self.meta_agent.log_decision(
+                    ticker=ticker,
+                    lstm_score=lstm_signal,
+                    sent_score=sent_score,
+                    regime_label=regime_label,
+                    risk_score=risk_score,
+                    fusion_confidence=final_conf,
+                    final_decision=decision,
+                    price_at_decision=last_price
+                )
+            except Exception as e:
+                print(f"   [!] Meta-Agent logging failed: {e}")
     def run_stress_test(self, ticker="AAPL"):
         """
         Manually triggers the Phase 11 stress test.

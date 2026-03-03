@@ -43,6 +43,19 @@ class AgentState(TypedDict):
     cash_value: float
     final_decision: str
     
+    # Phase 13: Conflict Resolution
+    conflict_detected: bool
+    conflict_ruling: str
+    conflict_reasoning: str
+    
+    # Phase 14: Meta-Agent Trust Scores
+    trust_scores: Dict[str, float]
+    
+    # Phase 16: Agent Disagreement Heatmap
+    gdi: float
+    gdi_tension: str
+    gdi_penalty: float
+    
     # Red Team
     red_team_passed: bool
     red_team_delta: float
@@ -82,10 +95,16 @@ class FinFolioGraphOrchestrator:
         print(f" [Node: Data Ingestion] Fetching data for {state['ticker']}...")
         stock_obj, hist = self.master._fetch_stock_data(state['ticker'])
         
+        # Phase 14: Load trust scores from Meta-Agent (before error check)
+        trust_scores = {"technical": 1.0, "sentiment": 1.0, "regime": 1.0}
+        if hasattr(self.master, 'meta_agent') and self.master.meta_agent:
+            trust_scores = self.master.meta_agent.get_trust_scores()
+            self.master.meta_agent.print_trust_report(trust_scores)
+        
         if stock_obj is None:
-            return {"error": hist} # 'hist' holds the error string here
-            
-        return {"stock_obj": stock_obj, "hist_data": hist, "error": None}
+            return {"error": hist, "trust_scores": trust_scores}
+
+        return {"stock_obj": stock_obj, "hist_data": hist, "error": None, "trust_scores": trust_scores}
 
     # --------------------------------------------------------------------------
     # NODE 2: Market Context (Regime & Correlation)
@@ -135,32 +154,106 @@ class FinFolioGraphOrchestrator:
         # Volatility mapping
         vol_input = 0.9 if state['regime_label'] == "Bear" else 0.2 if state['regime_label'] == "Bull" else 0.5
             
+        # Phase 14: Pass trust scores to scale agent inputs
+        trust_scores = state.get('trust_scores', None)
         final_conf, weights = self.master.fusion_agent.predict(
             lstm_p=state['mc_mean'], 
             sent_s=state['sent_score'], 
-            vol_v=vol_input
+            vol_v=vol_input,
+            trust_scores=trust_scores
         )
         
-        # Apply Overrides
-        if state['risk_score'] > 0.70: final_conf *= 0.5
-        if state['mc_std'] > 0.10: final_conf *= 0.8
-            
-        # Kelly Criterion Sizing
-        last_price = state['hist_data']['Close'].iloc[-1]
-        alloc_pct, _ = self.master.risk_engine.calculate_position_size(final_conf, state['current_vol'])
-        num_shares, cash_value = self.master.risk_engine.get_shares_amount(last_price, alloc_pct)
-        
-        decision = "BUY" if alloc_pct > 0.0 and final_conf > 0.6 else "SELL / HOLD"
-        
+        # NOTE: Old systemic risk / uncertainty overrides have been moved
+        # to the Phase 13 Conflict Resolution node (see node_conflict_resolution).
+        # Raw fusion confidence is passed through so the Arbitrator can
+        # see the un-modified value.
+
         return {
             "fusion_confidence": final_conf,
             "attention_weights": weights,
+            # Defaults — will be finalised by conflict_resolution node
+            "alloc_pct": 0.0,
+            "recommended_shares": 0,
+            "cash_value": 0.0,
+            "final_decision": "PENDING",
+            "conflict_detected": False,
+            "conflict_ruling": "PENDING",
+            "conflict_reasoning": "",
+            "red_team_passed": True,
+            "red_team_delta": 0.0
+        }
+
+    # --------------------------------------------------------------------------
+    # NODE 5.5: Conflict Resolution (Phase 13 – The Arbitrator)
+    # --------------------------------------------------------------------------
+    def node_conflict_resolution(self, state: AgentState) -> AgentState:
+        print(" [Node: Conflict Resolution] Phase 13 — Arbitrating agent signals...")
+        
+        fusion_conf = state['fusion_confidence']
+        
+        if self.master.conflict_resolver:
+            # Phase 14: Pass trust scores for additional tie-breaking
+            trust_scores = state.get('trust_scores', None)
+            result = self.master.conflict_resolver.arbitrate(
+                tech_score=state['lstm_signal'],
+                sent_score=state['sent_score'],
+                mc_std=state['mc_std'],
+                regime_label=state['regime_label'],
+                risk_score=state['risk_score'],
+                fusion_confidence=fusion_conf,
+                trust_scores=trust_scores
+            )
+            self.master.conflict_resolver.print_report(result)
+            adj_conf = result["adjusted_confidence"]
+            conflict_detected = result["arbitrated"]
+            conflict_ruling = result["ruling"]
+            conflict_reasoning = "; ".join(result["reasoning"])
+        else:
+            # Fallback if Phase 13 module is missing
+            adj_conf = fusion_conf
+            if state['risk_score'] > 0.70: adj_conf *= 0.5
+            if state['mc_std'] > 0.10: adj_conf *= 0.8
+            conflict_detected = False
+            conflict_ruling = "NO_MODULE"
+            conflict_reasoning = "Phase 13 module not loaded; legacy overrides applied."
+        
+        # Phase 16: Run Disagreement Heatmap
+        gdi = 0.0
+        gdi_tension = "HARMONY"
+        gdi_penalty = 1.0
+        if hasattr(self.master, 'heatmap_agent') and self.master.heatmap_agent:
+            heatmap_result = self.master.heatmap_agent.analyze(
+                lstm_score=state['lstm_signal'],
+                sent_score=state['sent_score'],
+                regime_label=state['regime_label'],
+                regime_vol=state.get('current_vol', 0.5)
+            )
+            self.master.heatmap_agent.print_heatmap(heatmap_result)
+            gdi = heatmap_result['gdi']
+            gdi_tension = heatmap_result['tension']
+            gdi_penalty = heatmap_result['penalty']
+
+        # Now compute Kelly sizing with the (possibly adjusted) confidence
+        last_price = state['hist_data']['Close'].iloc[-1]
+        alloc_pct, _ = self.master.risk_engine.calculate_position_size(
+            adj_conf, state['current_vol'], disagreement_penalty=gdi_penalty
+        )
+        num_shares, cash_value = self.master.risk_engine.get_shares_amount(last_price, alloc_pct)
+        
+        decision = "BUY" if alloc_pct > 0.0 and adj_conf > 0.6 else "SELL / HOLD"
+        
+        return {
+            "fusion_confidence": adj_conf,
             "alloc_pct": alloc_pct,
             "recommended_shares": num_shares,
             "cash_value": cash_value,
             "final_decision": decision,
-            "red_team_passed": True, # Default until tested
-            "red_team_delta": 0.0
+            "conflict_detected": conflict_detected,
+            "conflict_ruling": conflict_ruling,
+            "conflict_reasoning": conflict_reasoning,
+            "gdi": gdi,
+            "gdi_tension": gdi_tension,
+            "gdi_penalty": gdi_penalty,
         }
 
     # --------------------------------------------------------------------------
@@ -209,6 +302,10 @@ class FinFolioGraphOrchestrator:
         Uncertainty: {state['uncertainty_status']} (StdDev: {state['mc_std']:.4f})
         Sentiment: {state['sent_score']:.4f}
         Fusion Confidence: {state['fusion_confidence']:.4f}
+        Conflict Detected: {state['conflict_detected']}
+        Conflict Ruling: {state['conflict_ruling']}
+        Trust Scores: Technical={state.get('trust_scores', {}).get('technical', 1.0):.2f}, Sentiment={state.get('trust_scores', {}).get('sentiment', 1.0):.2f}, Regime={state.get('trust_scores', {}).get('regime', 1.0):.2f}
+        Disagreement Index (GDI): {state.get('gdi', 0.0)*100:.1f}% ({state.get('gdi_tension', 'N/A')}), Kelly Penalty: {state.get('gdi_penalty', 1.0):.2f}x
         Final Decision: {state['final_decision']}
         Capital Allocation: {state['alloc_pct']*100:.2f}%
         Red Team Passed: {state['red_team_passed']}
@@ -224,6 +321,23 @@ class FinFolioGraphOrchestrator:
         except Exception as e:
             summary = f"⚠️ LLM Synthesis failed due to API Error: {e}"
             
+        # Phase 14: Log the decision to the Meta-Agent Ledger
+        if hasattr(self.master, 'meta_agent') and self.master.meta_agent:
+            try:
+                last_price = state['hist_data']['Close'].iloc[-1]
+                self.master.meta_agent.log_decision(
+                    ticker=state['ticker'],
+                    lstm_score=state['lstm_signal'],
+                    sent_score=state['sent_score'],
+                    regime_label=state['regime_label'],
+                    risk_score=state['risk_score'],
+                    fusion_confidence=state['fusion_confidence'],
+                    final_decision=state['final_decision'],
+                    price_at_decision=float(last_price)
+                )
+            except Exception as e:
+                print(f"    [!] Meta-Agent logging failed in LangGraph: {e}")
+
         return {"executive_summary": summary}
 
     # --------------------------------------------------------------------------
@@ -235,8 +349,8 @@ class FinFolioGraphOrchestrator:
             return "end"
         return "continue"
         
-    def route_after_fusion(self, state: AgentState) -> str:
-        """Only run Red Team if the system wants to BUY."""
+    def route_after_arbitration(self, state: AgentState) -> str:
+        """Only run Red Team if the post-arbitration decision is BUY."""
         if state['final_decision'] == "BUY":
             return "run_red_team"
         return "skip_to_llm"
@@ -253,6 +367,7 @@ class FinFolioGraphOrchestrator:
         workflow.add_node("technical_analysis", self.node_technical_analysis)
         workflow.add_node("sentiment_analysis", self.node_sentiment_analysis)
         workflow.add_node("fusion_engine", self.node_fusion_engine)
+        workflow.add_node("conflict_resolution", self.node_conflict_resolution)  # Phase 13
         workflow.add_node("red_team", self.node_red_team)
         workflow.add_node("llm_supervisor", self.node_llm_supervisor)
         
@@ -274,10 +389,13 @@ class FinFolioGraphOrchestrator:
         workflow.add_edge("technical_analysis", "sentiment_analysis")
         workflow.add_edge("sentiment_analysis", "fusion_engine")
         
-        # Conditional Edge after Fusion
+        # Fusion → Conflict Resolution (Phase 13)
+        workflow.add_edge("fusion_engine", "conflict_resolution")
+        
+        # Conditional Edge after Arbitration (reads post-arbitration decision)
         workflow.add_conditional_edges(
-            "fusion_engine",
-            self.route_after_fusion,
+            "conflict_resolution",
+            self.route_after_arbitration,
             {
                 "run_red_team": "red_team",
                 "skip_to_llm": "llm_supervisor"

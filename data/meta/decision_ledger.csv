@@ -1,0 +1,6 @@
+timestamp,ticker,lstm_score,sent_score,regime_label,risk_score,fusion_confidence,final_decision,price_at_decision,evaluated,actual_price_t5,price_change_pct,lstm_grade,sent_grade,regime_grade,hypothetical_buy_pnl,hypothetical_sell_pnl,optimal_decision,regret_score,llm_retrospective
+2026-02-15 16:26:32,TSLA,0.7934,-0.0909,Bear,0.5,0.5014,BUY,402.51,YES,411.82,0.0231,RIGHT,WRONG,WRONG,0.02213,-0.02413,BUY,0.0,"The AI executed a BUY decision on TSLA on 2026-02-15 with 0.5014 confidence, resulting in a 2.21% profit, which was the optimal choice given the counterfactual analysis showed a SELL would have yielded a -2.41% loss and a HOLD would have resulted in no gain. The system should recognize that its decision was correct, as the regret score of 0.00% indicates no potential for improvement, and the regret level is NONE, validating its choice. The lesson the system should learn from this experience is t"
+2026-03-02 16:42:30,NVDA,0.7211,0.189,Bear,0.5,0.5993,SELL / HOLD,177.19,NO,,,,,,,,,,
+2026-03-03 00:56:14,AAPL,0.7674,-0.2844,Bear,0.5,0.4368,SELL / HOLD,265.79,NO,,,,,,,,,,
+2026-03-03 00:58:00,AAPL,0.7674,-0.2844,Bear,0.5,0.437,SELL / HOLD,265.93,NO,,,,,,,,,,
+2026-03-03 11:23:52,AAPL,0.7671,-0.3445,Bear,0.5,0.4091,SELL / HOLD,264.72,NO,,,,,,,,,,
