@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom';
-import { Activity, Brain, History, Zap } from 'lucide-react';
+import { Activity, Brain, History, Zap, FlaskConical, Grid3x3 } from 'lucide-react';
 
 export default function Navbar() {
     return (
@@ -20,6 +20,12 @@ export default function Navbar() {
                 </NavLink>
                 <NavLink to="/history" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
                     <History size={16} /> Decision Ledger
+                </NavLink>
+                <NavLink to="/simulation" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+                    <FlaskConical size={16} /> Simulation Lab
+                </NavLink>
+                <NavLink to="/topology" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+                    <Grid3x3 size={16} /> Topology
                 </NavLink>
             </div>
         </nav>

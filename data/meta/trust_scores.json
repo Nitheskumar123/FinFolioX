@@ -1,7 +1,82 @@
 {
-  "technical": 1.075,
-  "sentiment": 0.925,
-  "regime": 0.925,
-  "last_updated": "2026-03-02 16:27:41",
-  "evaluation_count": 1
+  "technical": 1.0288,
+  "sentiment": 0.9531,
+  "regime": 0.9079,
+  "last_updated": "2026-03-06 22:26:17",
+  "evaluation_count": 79,
+  "ticker_NVDA": {
+    "technical": 1.0077,
+    "sentiment": 1.0077,
+    "regime": 0.9895
+  },
+  "ticker_AAPL": {
+    "technical": 0.9438,
+    "sentiment": 0.9738,
+    "regime": 0.9438
+  },
+  "ticker_MSFT": {
+    "technical": 1.0263,
+    "sentiment": 1.0263,
+    "regime": 0.9512
+  },
+  "ticker_META": {
+    "technical": 1.0,
+    "sentiment": 1.0,
+    "regime": 1.0
+  },
+  "ticker_TSLA": {
+    "technical": 1.0638,
+    "sentiment": 1.0638,
+    "regime": 1.0638
+  },
+  "ticker_GOLD": {
+    "technical": 0.9484,
+    "sentiment": 1.0234,
+    "regime": 0.9672
+  },
+  "ticker_AVGO": {
+    "technical": 1.0,
+    "sentiment": 1.0,
+    "regime": 1.0
+  },
+  "ticker_PLTR": {
+    "technical": 1.0,
+    "sentiment": 1.0,
+    "regime": 1.0
+  },
+  "ticker_MS": {
+    "technical": 1.0,
+    "sentiment": 1.0,
+    "regime": 1.0
+  },
+  "ticker_AVAV": {
+    "technical": 1.0,
+    "sentiment": 1.0,
+    "regime": 1.0
+  },
+  "ticker_INFY": {
+    "technical": 1.0,
+    "sentiment": 1.0,
+    "regime": 1.0
+  },
+  "ticker_PLUG": {
+    "technical": 1.0,
+    "sentiment": 1.0,
+    "regime": 1.0
+  },
+  "ticker_ASTS": {
+    "technical": 1.0,
+    "sentiment": 1.0,
+    "regime": 1.0
+  },
+  "ticker_RUBYMILLS.NS": {
+    "technical": 1.0,
+    "sentiment": 1.0,
+    "regime": 1.0
+  },
+  "ticker_GOOG": {
+    "technical": 0.9138,
+    "sentiment": 1.0638,
+    "regime": 0.9138
+  }
 }

@@ -23,4 +23,8 @@ export const getTrustScores = () =>
 export const runEvaluation = () =>
   api.post('/evaluate/').then(res => res.data);
 
+// POST /api/simulate/ — Phase 21: Digital Twin Simulation
+export const runSimulation = (params) =>
+  api.post('/simulate/', params).then(res => res.data);
+
 export default api;

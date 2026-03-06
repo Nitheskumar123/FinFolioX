@@ -5,9 +5,7 @@ import numpy as np
 import pandas as pd
 import os
 
-# --- DEFINE THE LSTM ARCHITECTURE ---
-# This must match EXACTLY what you trained in Phase 3.
-# Standard Architecture: 6 Inputs -> 64 Hidden -> 2 Layers -> 1 Output
+# --- ORIGINAL PROTOTYPE LSTM ARCHITECTURE ---
 class LSTMModel(nn.Module):
     def __init__(self, input_size=6, hidden_size=64, num_layers=2, output_size=1):
         super(LSTMModel, self).__init__()
@@ -38,7 +36,7 @@ class TechnicalAgent:
         """
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         
-        # 1. Load the Scaler
+        # 1. Load the Scaler using JOBLIB (Required for old model)
         if os.path.exists(scaler_path):
             self.scaler = joblib.load(scaler_path)
             print(f"✅ Scaler loaded from {scaler_path}")
@@ -57,15 +55,12 @@ class TechnicalAgent:
 
     def predict(self, recent_data_df):
         """
-        Input: DataFrame with last 60 rows containing:
-               ['Close', 'Volume', 'SMA_50', 'SMA_200', 'RSI', 'MACD']
+        Input: DataFrame with last 60 rows.
         Output: A prediction confidence score (0.0 to 1.0)
         """
-        # Ensure we have exactly 60 rows
         if len(recent_data_df) != 60:
-            print(f"⚠️ Warning: Expected 60 rows, got {len(recent_data_df)}. Prediction might be inaccurate.")
+            print(f"⚠️ Warning: Expected 60 rows, got {len(recent_data_df)}.")
         
-        # Select features in the exact order used during training
         features = ['Close', 'Volume', 'SMA_50', 'SMA_200', 'RSI', 'MACD']
         try:
             data = recent_data_df[features].values
@@ -75,15 +70,13 @@ class TechnicalAgent:
         # 1. Scale the data
         scaled_data = self.scaler.transform(data)
         
-        # 2. Convert to Tensor (Batch Size=1, Sequence Length=60, Features=6)
+        # 2. Convert to Tensor
         seq = torch.FloatTensor(scaled_data).view(1, 60, 6).to(self.device)
         
         # 3. Predict
         with torch.no_grad():
             raw_output = self.model(seq).item()
-            
-            # If your model outputs raw prices, we map it to a confidence score 
-            # (Simplification for inference: Sigmoid squashes it to 0-1)
+            # Old math: Sigmoid mapping
             confidence = torch.sigmoid(torch.tensor(raw_output)).item()
             
         return confidence

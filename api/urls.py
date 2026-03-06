@@ -13,4 +13,10 @@ urlpatterns = [
 
     # POST /api/evaluate/  — Trigger T+5 hindsight evaluation
     path("evaluate/", views.EvaluateView.as_view(), name="evaluate"),
+
+    # POST /api/simulate/  — Phase 21: Digital Twin Simulation
+    path("simulate/", views.SimulateView.as_view(), name="simulate"),
+
+    # GET  /api/topology/<ticker>/  — Phase 24: Topological Shape Agent Analysis
+    path("topology/<str:ticker>/", views.TopologyView.as_view(), name="topology"),
 ]

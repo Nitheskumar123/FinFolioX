@@ -14,10 +14,8 @@ from datetime import datetime
 # ==============================================================================
 # PROJECT CONFIGURATION & PATH SETUP
 # ==============================================================================
-# Ensure the python path includes the project root for modular imports
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-# Import our Custom Intelligence Agents
 from ml_engine.technical_agent import TechnicalAgent
 from ml_engine.sentiment_agent import SentimentAgent
 from ml_engine.fusion_agent import FusionAgent
@@ -25,38 +23,45 @@ from ml_engine.regime_agent import RegimeAgent
 from ml_engine.risk_engine import RiskEngine
 from ml_engine.correlation_agent import CorrelationDivergenceDetector
 from ml_engine.uncertainty_agent import UncertaintyAgent
-from ml_engine.explainability_agent import ExplainabilityAgent # <--- PHASE 10
+from ml_engine.explainability_agent import ExplainabilityAgent
+from ml_engine.topology_agent import TopologyAgent
 
 # ==============================================================================
-# SYSTEM CONSTANTS & CONFIGURATION
+# SYSTEM CONSTANTS
 # ==============================================================================
-SYSTEM_VERSION = "16.0 (Disagreement Heatmap)"
-DEFAULT_CAPITAL = 10000.0
-MAX_RISK_PER_TRADE = 0.20  # 20% Hard Cap
+SYSTEM_VERSION = "17.0 (MCP Embedded + Topology)"
+DEFAULT_CAPITAL = 10_000.0
+MAX_RISK_PER_TRADE = 0.20
 NEWS_LOOKBACK_ITEMS = 5
 UNCERTAINTY_THRESHOLD_HIGH = 0.15
 UNCERTAINTY_THRESHOLD_MODERATE = 0.05
 DIVERGENCE_THRESHOLD_CRITICAL = 0.70
 DIVERGENCE_THRESHOLD_MINOR = 0.40
-# ... other imports ...
+
+# FIX: Commodity ticker normalization map (placed at MODULE level, not inside class)
+COMMODITY_MAP = {
+    "GOLD": "GLD",
+    "SILVER": "SLV",
+    "OIL": "USO",
+    "NATGAS": "UNG",
+}
+
 # ==============================================================================
-# PHASE 11 IMPORT FIX (Copy and Replace this section)
+# PHASE 11 IMPORT
 # ==============================================================================
 try:
-    # Attempt 1: Standard Import (Works if running inside ml_engine)
     from adversarial_tester import AdversarialTester
     print("   ✅ Phase 11 (Red Team) Loaded via direct import.")
 except ImportError:
     try:
-        # Attempt 2: Package Import (Works if running from root D:\FinFolioX)
         from ml_engine.adversarial_tester import AdversarialTester
         print("   ✅ Phase 11 (Red Team) Loaded via package import.")
     except ImportError:
-        # Attempt 3: Final check - File missing?
-        print("   ⚠️ Phase 11 Module missing or failed to import. Red Team Disabled.")
+        print("   ⚠️ Phase 11 Module missing. Red Team Disabled.")
         AdversarialTester = None
+
 # ==============================================================================
-# PHASE 13 IMPORT (Conflict Resolution Engine)
+# PHASE 13 IMPORT
 # ==============================================================================
 try:
     from conflict_resolver import ConflictResolver
@@ -68,8 +73,9 @@ except ImportError:
     except ImportError:
         print("   ⚠️ Phase 13 Module missing. Conflict Resolution Disabled.")
         ConflictResolver = None
+
 # ==============================================================================
-# PHASE 14 IMPORT (Self-Correcting Meta-Agent)
+# PHASE 14 IMPORT
 # ==============================================================================
 try:
     from meta_agent import MetaAgent
@@ -81,8 +87,9 @@ except ImportError:
     except ImportError:
         print("   [!] Phase 14 Module missing. Meta-Agent Disabled.")
         MetaAgent = None
+
 # ==============================================================================
-# PHASE 16 IMPORT (Agent Disagreement Heatmap)
+# PHASE 16 IMPORT
 # ==============================================================================
 try:
     from heatmap_agent import HeatmapAgent
@@ -94,69 +101,57 @@ except ImportError:
     except ImportError:
         print("   [!] Phase 16 Module missing. Heatmap Agent Disabled.")
         HeatmapAgent = None
+
+
 # ==============================================================================
 # FINFOLIO-X MASTER SYSTEM CLASS
 # ==============================================================================
-
 class FinFolioSystem:
     """
     The Master Orchestrator for FinFolio-X AI Trading System.
-    
-    This system integrates 9 specialized AI agents into a single coherent
-    decision-making pipeline. It uses a voting mechanism weighted by an
-    attention network, with a Neuro-Symbolic Arbitrator to resolve agent
-    conflicts, producing final buy/sell signals with full explainability.
-    
+
     Architecture:
-    1. Technical Agent (LSTM): Analyzes price trends and patterns.
-    2. Sentiment Agent (FinBERT): Analyzes global news and sentiment.
-    3. Regime Agent (HMM): Detects hidden market states (Bull/Bear).
-    4. Correlation Agent (Graph): Detects systemic risk and anomalies.
-    5. Uncertainty Agent (Bayesian): Quantifies model confidence/guessing.
-    6. Explainability Agent (SHAP): Explains WHY the model made a prediction.
-    7. Fusion Agent (Attention): Weighs all inputs to make a decision.
-    8. Risk Engine (Kelly): Calculates optimal position sizing.
-    9. Conflict Resolver (Phase 13): Arbitrates agent disagreements.
+    1. Technical Agent  (LSTM)       : Analyzes price trends and patterns.
+    2. Sentiment Agent  (FinBERT)    : Analyzes global news and sentiment via MCP.
+    3. Regime Agent     (HMM)        : Detects hidden market states.
+    4. Correlation Agent(Graph)      : Detects systemic risk and anomalies.
+    5. Uncertainty Agent(Bayesian)   : Quantifies model confidence.
+    6. Explainability   (SHAP)       : Explains WHY the model decided.
+    7. Topology Agent   (TDA)        : Phase 24 Geometric Market Shape.
+    8. Fusion Agent     (Attention)  : Weighs all inputs to make a decision.
+    9. Risk Engine      (Kelly)      : Calculates optimal position sizing.
+    10. Conflict Resolver(Phase 13)  : Arbitrates agent disagreements.
     """
 
     def __init__(self):
-        """
-        Initialize all AI agents, load pre-trained models, and set up the environment.
-        """
         self._print_startup_banner()
-        
-        # Define paths for models
+
         BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         MODELS_DIR = os.path.join(BASE_DIR, "saved_models")
-        
-        # ------------------------------------------------------------------
-        # 1. Initialize Technical Agent (The Chart Analyst)
-        # ------------------------------------------------------------------
-        print("\n   🔹 [1/8] Loading Technical Agent (LSTM Chart Reader)...")
+
+        # 1. Technical Agent
+        print("\n   🔹 [1/9] Loading Technical Agent (LSTM Chart Reader)...")
         try:
             self.tech_agent = TechnicalAgent(
                 model_path=os.path.join(MODELS_DIR, "lstm_technical.pth"),
-                scaler_path=os.path.join(MODELS_DIR, "scaler.pkl")
+                scaler_path=os.path.join(MODELS_DIR, "scaler.pkl"),
             )
             print("      ✅ LSTM Model Loaded Successfully.")
         except Exception as e:
             print(f"      ❌ Critical Error loading Technical Agent: {e}")
             sys.exit(1)
-        
-        # ------------------------------------------------------------------
-        # 2. Initialize Sentiment Agent (The News Analyst)
-        # ------------------------------------------------------------------
-        print("   🔹 [2/8] Loading Sentiment Agent (FinBERT Language Model)...")
+
+        # 2. Sentiment Agent
+        print("   🔹 [2/9] Loading Sentiment Agent (FinBERT Language Model)...")
         try:
             self.sent_agent = SentimentAgent()
             print("      ✅ FinBERT Model Loaded Successfully.")
         except Exception as e:
             print(f"      Warning: Sentiment Agent failed ({e}). Using fallback.")
             self.sent_agent = None
-        # ------------------------------------------------------------------
-        # 3. Initialize Regime Agent (The Market Weather Station)
-        # ------------------------------------------------------------------
-        print("   🔹 [3/8] Loading Regime Agent (HMM Market Detector)...")
+
+        # 3. Regime Agent
+        print("   🔹 [3/9] Loading Regime Agent (HMM Market Detector)...")
         try:
             self.regime_agent = RegimeAgent(
                 model_path=os.path.join(MODELS_DIR, "hmm_regime.pkl")
@@ -164,88 +159,68 @@ class FinFolioSystem:
             print("      ✅ Hidden Markov Model Loaded Successfully.")
         except Exception as e:
             print(f"      ⚠️ Warning: Regime Agent failed ({e}).")
+            self.regime_agent = None
 
-        # ------------------------------------------------------------------
-        # 4. Initialize Correlation Agent (Systemic Risk Detector)
-        # ------------------------------------------------------------------
-        print("   🔹 [4/8] Loading Correlation Agent (Statistical Graph)...")
+        # 4. Correlation Agent
+        print("   🔹 [4/9] Loading Correlation Agent (Statistical Graph)...")
         try:
             self.corr_agent = CorrelationDivergenceDetector()
             print("      ✅ Market Graph Engine Initialized.")
         except Exception as e:
             print(f"      ⚠️ Warning: Correlation Agent failed ({e}).")
+            self.corr_agent = None
 
-        # ------------------------------------------------------------------
-        # 5. Initialize Uncertainty Agent (The Lie Detector)
-        # ------------------------------------------------------------------
-        print("   🔹 [5/8] Loading Uncertainty Agent (Bayesian Wrapper)...")
+        # 5. Uncertainty Agent
+        print("   🔹 [5/9] Loading Uncertainty Agent (Bayesian Wrapper)...")
         try:
             self.uncertainty_agent = UncertaintyAgent(self.tech_agent)
             print("      ✅ Monte Carlo Dropout Engine Initialized.")
         except Exception as e:
             print(f"      ⚠️ Warning: Uncertainty Agent failed ({e}).")
+            self.uncertainty_agent = None
 
-        # ------------------------------------------------------------------
-        # 6. Initialize Fusion Agent (The Decision Maker)
-        # ------------------------------------------------------------------
-        print("   🔹 [6/8] Loading Fusion Agent (Multi-Head Attention)...")
+        # 6. Fusion Agent
+        print("   🔹 [6/9] Loading Fusion Agent (Multi-Head Attention)...")
         try:
             self.fusion_agent = FusionAgent(
                 model_path=os.path.join(MODELS_DIR, "attention_fusion.pth")
             )
             print("      ✅ Attention Mechanism Loaded Successfully.")
         except Exception as e:
-             print(f"      ❌ Critical Error loading Fusion Agent: {e}")
-             sys.exit(1)
+            print(f"      ❌ Critical Error loading Fusion Agent: {e}")
+            sys.exit(1)
 
-        # ------------------------------------------------------------------
-        # 7. Initialize Risk Engine (The Wallet Manager)
-        # ------------------------------------------------------------------
-        print("   🔹 [7/8] Loading Risk Engine (Kelly Criterion)...")
+        # 7. Risk Engine
+        print("   🔹 [7/9] Loading Risk Engine (Kelly Criterion)...")
         self.risk_engine = RiskEngine(default_account_size=DEFAULT_CAPITAL)
         print(f"      ✅ Risk Manager Online (Account: ${DEFAULT_CAPITAL:,.2f}).")
-        
-        # ------------------------------------------------------------------
-        # 8. Initialize Explainability Agent (SHAP Engine) - PHASE 10
-        # ------------------------------------------------------------------
-        # Note: We perform "Lazy Initialization" for this agent.
-        # We need actual historical data to create the SHAP background dataset.
-        # We will initialize it during the first call to `analyze_stock`.
-        print("   🔹 [8/8] Preparing Explainability Agent (SHAP)...")
-        self.explainability_agent = None 
-        
-        # Load Regime Scaler (Critical for correct HMM inputs)
+
+        # 8. Explainability Agent (lazy init)
+        print("   🔹 [8/9] Preparing Explainability Agent (SHAP)...")
+        self.explainability_agent = None
+
+        # 9. Topological Shape Agent (Phase 24)
+        print("   🔹 [9/9] Loading Topological Shape Agent (Ripser)...")
+        try:
+            self.topology_agent = TopologyAgent(time_delay=5, dimension=3, lookback=60)
+        except Exception:
+            self.topology_agent = None
+
+        # Regime Scaler
         self.regime_scaler_path = os.path.join(MODELS_DIR, "regime_scaler.pkl")
         if os.path.exists(self.regime_scaler_path):
             self.regime_scaler = joblib.load(self.regime_scaler_path)
         else:
             self.regime_scaler = None
             print("      ⚠️ Warning: Regime Scaler not found. HMM accuracy may be reduced.")
-        
+
         print("\n✅ SYSTEM INITIALIZATION COMPLETE. ALL ENGINES ONLINE.\n")
-    # --- PHASE 11 HOOK ---
-        if AdversarialTester:
-            self.red_team = AdversarialTester(self)
-        else:
-            self.red_team = None
 
-    # --- PHASE 13 HOOK ---
-        if ConflictResolver:
-            self.conflict_resolver = ConflictResolver()
-        else:
-            self.conflict_resolver = None
-
-    # --- PHASE 14 HOOK ---
-        if MetaAgent:
-            self.meta_agent = MetaAgent()
-        else:
-            self.meta_agent = None
-
-    # --- PHASE 16 HOOK ---
-        if HeatmapAgent:
-            self.heatmap_agent = HeatmapAgent()
-        else:
-            self.heatmap_agent = None
+        # Phase hooks
+        self.red_team = AdversarialTester(self) if AdversarialTester else None
+        self.conflict_resolver = ConflictResolver() if ConflictResolver else None
+        self.meta_agent = MetaAgent() if MetaAgent else None
+        self.heatmap_agent = HeatmapAgent() if HeatmapAgent else None
 
     def _print_startup_banner(self):
         print("\n" + "█" * 72)
@@ -258,14 +233,9 @@ class FinFolioSystem:
         print("-" * 72)
 
     # ==========================================================================
-    # HELPER: TECHNICAL INDICATOR CALCULATIONS
+    # HELPER: TECHNICAL INDICATORS
     # ==========================================================================
-    
     def _calculate_rsi(self, prices, window=14):
-        """
-        Calculates Relative Strength Index (RSI).
-        Used to detect Overbought (>70) or Oversold (<30) conditions.
-        """
         delta = prices.diff()
         gain = (delta.where(delta > 0, 0)).rolling(window=window).mean()
         loss = (-delta.where(delta < 0, 0)).rolling(window=window).mean()
@@ -273,397 +243,211 @@ class FinFolioSystem:
         return 100 - (100 / (1 + rs))
 
     def _calculate_macd(self, prices):
-        """
-        Calculates MACD (Moving Average Convergence Divergence).
-        Used to identify trend changes and momentum.
-        """
         ema_12 = prices.ewm(span=12, adjust=False).mean()
         ema_26 = prices.ewm(span=26, adjust=False).mean()
         return ema_12 - ema_26
 
-    # ==========================================================================
-    # HELPER: NEWS SCRAPING & CLEANING ENGINE
-    # ==========================================================================
-
-    def _clean_html_tags(self, text):
-        """
-        Removes HTML tags from RSS summaries (e.g., <a href=...>).
-        Returns clean text.
-        """
-        if not text:
-            return ""
-        clean = re.compile('<.*?>')
-        return re.sub(clean, '', text)
-
-    def _fetch_google_news_rss(self, ticker):
-        """
-        Scrapes Google News RSS Feed.
-        Extracts: Title, Link, Date, Source, AND Summary Description.
-        """
-        news_items = []
-        try:
-            # RSS URL for specific stock news (Localized to India/English)
-            url = f"https://news.google.com/rss/search?q={ticker}+stock+news&hl=en-IN&gl=IN&ceid=IN:en"
-            
-            # Send Request (Timeout 5s)
-            response = requests.get(url, timeout=5)
-            
-            if response.status_code == 200:
-                root = ET.fromstring(response.content)
-                
-                # Iterate through top 5 news items
-                for item in root.findall('./channel/item')[:NEWS_LOOKBACK_ITEMS]:
-                    title = item.find('title').text
-                    link = item.find('link').text
-                    pub_date = item.find('pubDate').text
-                    
-                    # Safe extraction of description
-                    desc_elem = item.find('description')
-                    if desc_elem is not None:
-                        description = desc_elem.text
-                    else:
-                        description = ""
-                    
-                    # Clean the HTML from description
-                    summary = self._clean_html_tags(description)
-                    
-                    # Extract Source Name
-                    source_name = "Google News"
-                    source_obj = item.find('source')
-                    if source_obj is not None:
-                        source_name = source_obj.text
-                    
-                    # Clean Date Format
-                    try:
-                        dt_obj = datetime.strptime(pub_date, "%a, %d %b %Y %H:%M:%S %Z")
-                        date_str = dt_obj.strftime("%Y-%m-%d %H:%M")
-                    except:
-                        date_str = pub_date[:16]
-                        
-                    news_items.append({
-                        'title': title,
-                        'summary': summary[:200] + "...", # Truncate long summaries
-                        'link': link,
-                        'date': date_str,
-                        'source': source_name
-                    })
-        except Exception as e:
-            # Silent fail is okay, we have fallbacks
-            pass
-            
-        return news_items
-
-    def _fetch_yahoo_news(self, stock_obj):
-        """
-        Fetches news from Yahoo Finance API.
-        Attempts to get summary if available.
-        """
-        news_items = []
-        try:
-            raw_news = stock_obj.news
-            if raw_news:
-                for item in raw_news:
-                    title = item.get('title', '')
-                    link = item.get('link', 'No Link Available')
-                    publisher = item.get('publisher', 'Yahoo Finance')
-                    summary = title # Default fallback
-                    
-                    pub_time = item.get('providerPublishTime', 0)
-                    date_str = datetime.fromtimestamp(pub_time).strftime('%Y-%m-%d %H:%M') if pub_time else "Unknown"
-                    
-                    if title:
-                        news_items.append({
-                            'title': title,
-                            'summary': summary, 
-                            'link': link, 
-                            'date': date_str,
-                            'source': publisher
-                        })
-        except:
-            pass
-        return news_items
-
-    def _get_fallback_news(self, ticker, trend_strength):
-        """
-        SIMULATION MODE:
-        Generates realistic backup headlines + Summaries if all Internet APIs fail.
-        This ensures the AI always has data to process during demos.
-        """
-        print(f"   ⚠️ NETWORK ALERT: Live News APIs unreachable. Activating Simulation Mode.")
-        
-        base_link = f"https://finance.yahoo.com/quote/{ticker}"
-        today_str = datetime.now().strftime('%Y-%m-%d %H:%M')
-        
-        if trend_strength > 0.6: # Bullish Simulation
-            return [
-                {
-                    'title': f"Analysts upgrade {ticker} following strong momentum",
-                    'summary': f"Major investment banks have raised their price targets for {ticker}, citing robust quarterly earnings and expanding market share in the tech sector.",
-                    'link': base_link, 'date': today_str, 'source': 'Simulated - Bloomberg'
-                },
-                {
-                    'title': f"{ticker} announces positive outlook, stock surges",
-                    'summary': f"Shares of {ticker} rallied today after the CEO announced a new strategic partnership.",
-                    'link': base_link, 'date': today_str, 'source': 'Simulated - Reuters'
-                }
-            ]
-        elif trend_strength < 0.4: # Bearish Simulation
-            return [
-                {
-                    'title': f"{ticker} faces supply chain headwinds",
-                    'summary': f"{ticker} shares dipped as reports of manufacturing delays in Asia raised concerns.",
-                    'link': base_link, 'date': today_str, 'source': 'Simulated - CNBC'
-                },
-                {
-                    'title': f"Investors cautious on {ticker} volatility",
-                    'summary': f"Market volatility has pushed {ticker} lower as institutional investors rotate out.",
-                    'link': base_link, 'date': today_str, 'source': 'Simulated - NDTV'
-                }
-            ]
-        else: # Neutral Simulation
-            return [
-                {
-                    'title': f"{ticker} trades sideways amidst market uncertainty",
-                    'summary': f"Trading volume for {ticker} remains low as investors await the upcoming Federal Reserve meeting minutes.",
-                    'link': base_link, 'date': today_str, 'source': 'Simulated - MarketWatch'
-                }
-            ]
 
     # ==========================================================================
     # MODULAR ANALYSIS METHODS
     # ==========================================================================
-
     def _fetch_stock_data(self, ticker):
         """Retrieves and processes historical stock data."""
+        ticker = COMMODITY_MAP.get(ticker.upper(), ticker)
+
         try:
             print("   ⏳ Fetching historical data from Yahoo Finance...")
             stock = yf.Ticker(ticker)
-            hist = stock.history(period="2y") 
+            hist = stock.history(period="2y")
             if len(hist) < 200:
                 return None, "❌ Not enough historical data (Need > 200 days)."
-            
-            # Feature Engineering
-            hist['SMA_50'] = hist['Close'].rolling(window=50).mean()
-            hist['SMA_200'] = hist['Close'].rolling(window=200).mean()
-            hist['RSI'] = self._calculate_rsi(hist['Close'])
-            hist['MACD'] = self._calculate_macd(hist['Close'])
+
+            hist["SMA_50"] = hist["Close"].rolling(window=50).mean()
+            hist["SMA_200"] = hist["Close"].rolling(window=200).mean()
+            hist["RSI"] = self._calculate_rsi(hist["Close"])
+            hist["MACD"] = self._calculate_macd(hist["Close"])
             hist.dropna(inplace=True)
-            
+
             if len(hist) < 60:
                 return None, "❌ Not enough data after processing indicators."
-                
+
             return stock, hist
         except Exception as e:
             return None, f"❌ Data Connection Error: {e}"
 
     def _analyze_technicals_and_uncertainty(self, hist):
         """Runs LSTM, Bayesian Uncertainty, and SHAP Explainability."""
-        last_60_days = hist[['Close', 'Volume', 'SMA_50', 'SMA_200', 'RSI', 'MACD']].tail(60)
-        
+        last_60_days = hist[["Close", "Volume", "SMA_50", "SMA_200", "RSI", "MACD"]].tail(60)
+
         print("\n   📈 [Technical Analysis] Reading Charts (LSTM v2)...")
         lstm_signal = self.tech_agent.predict(last_60_days)
         print(f"      - Standard LSTM Signal: {lstm_signal:.4f}")
-        
-        # Phase 10: Explainability (Lazy Init)
+
         if self.explainability_agent is None:
             self.explainability_agent = ExplainabilityAgent(self.tech_agent, hist)
-            
+
         print("   🔍 [Explainability] Running SHAP Analysis...")
         shap_scores, top_driver = self.explainability_agent.explain_prediction(last_60_days)
         if shap_scores:
             print(f"      - Top Driver: {top_driver} (Impact: {shap_scores[top_driver]:.4f})")
-            # Show top 3 features
             sorted_feats = sorted(shap_scores.items(), key=lambda x: abs(x[1]), reverse=True)[:3]
-            print(f"      - Key Factors: {', '.join([f'{k}={v:.3f}' for k,v in sorted_feats])}")
-        
-        # Phase 9: Bayesian Check
+            print(f"      - Key Factors: {', '.join([f'{k}={v:.3f}' for k, v in sorted_feats])}")
+
         print("   🎲 [Uncertainty Agent] Running Monte Carlo Simulation (50 runs)...")
         mc_mean, mc_std = self.uncertainty_agent.predict_with_uncertainty(last_60_days)
-        
+
         uncertainty_status = "✅ High Certainty"
-        if mc_std > UNCERTAINTY_THRESHOLD_MODERATE: uncertainty_status = "⚠️ Moderate Uncertainty"
-        if mc_std > UNCERTAINTY_THRESHOLD_HIGH: uncertainty_status = "🚨 HIGH UNCERTAINTY (Guessing)"
-        
+        if mc_std > UNCERTAINTY_THRESHOLD_MODERATE:
+            uncertainty_status = "⚠️ Moderate Uncertainty"
+        if mc_std > UNCERTAINTY_THRESHOLD_HIGH:
+            uncertainty_status = "🚨 HIGH UNCERTAINTY (Guessing)"
+
         print(f"      - Bayesian Mean: {mc_mean:.4f}")
         print(f"      - Uncertainty (StdDev): {mc_std:.4f} ({uncertainty_status})")
-        
+
         return lstm_signal, mc_mean, mc_std, uncertainty_status, top_driver
 
     def _analyze_sentiment_module(self, ticker, stock_obj, lstm_signal):
-        """Runs News Scraping and FinBERT Analysis."""
-        print("\n   📰 [Sentiment Analysis] Scraping Global News...")
+        """
+        Phase 22: Live News Ingestion via MCP.
+        Delegates completely to the Sentiment Agent and MCP Server.
+        """
+        print("\n   📰 [Sentiment Analysis] Initiating MCP Protocol...")
         
-        google_news = self._fetch_google_news_rss(ticker)
-        yahoo_news = self._fetch_yahoo_news(stock_obj)
-        
-        # Merge and Deduplicate
-        all_news = google_news + yahoo_news
-        seen_titles = set()
-        unique_news = []
-        for n in all_news:
-            if n['title'] not in seen_titles:
-                unique_news.append(n)
-                seen_titles.add(n['title'])
-        
-        if not unique_news:
-            unique_news = self._get_fallback_news(ticker, lstm_signal)
-        
-        analysis_news = unique_news[:NEWS_LOOKBACK_ITEMS]
-        print(f"      Found {len(unique_news)} articles. Analyzing Top {len(analysis_news)}:")
-        
-        ai_input_texts = []
-        for i, item in enumerate(analysis_news):
-            print(f"      {i+1}. [{item['source']}] {item['date']}")
-            print(f"         📢 Headline: {item['title']}")
-            print(f"         📝 Summary : {item['summary'][:100]}...") 
-            print("         " + "-"*30)
-            ai_input_texts.append(f"{item['title']}. {item['summary']}")
-
-        # Fallback if Sentiment Agent failed to load
         if self.sent_agent is None:
             print("      [!] Sentiment Agent unavailable. Using neutral score.")
             return 0.0
 
-        sent_label, sent_score = self.sent_agent.analyze_daily_headlines(ai_input_texts)
-        print(f"      - FinBERT Score: {sent_score:.4f} ({sent_label})")
-        
-        return sent_score
+        try:
+            # Ask FinBERT to process the MCP Payload
+            result = self.sent_agent.analyze_with_mcp(ticker)
+            
+            # Guard against unexpected MCP/FinBERT None returns
+            if not result:
+                print("      ⚠️ MCP failed to return valid data. Defaulting to neutral.")
+                return 0.0
+                
+            sent_label, sent_score = result
+            print(f"      - Final Corroborated Sentiment Score: {sent_score:.4f} ({sent_label})")
+            return sent_score
+            
+        except Exception as e:
+            print(f"      ⚠️ MCP/FinBERT Pipeline Error: {e}. Defaulting to neutral.")
+            return 0.0
 
     def _analyze_regime_module(self, hist):
-        """Runs HMM Regime Detection."""
-        print("\n   ⛈️  [Regime Detection] Analyzing Market Volatility (HMM)...")
-        
-        current_vol = hist['Close'].pct_change().rolling(10).std().iloc[-1]
-        current_ret = hist['Close'].pct_change().iloc[-1]
-        
-        regime_input = np.array([[current_ret, current_vol]])
-        
-        if self.regime_scaler:
-            scaled_input = self.regime_scaler.transform(regime_input)
-            regime_label = self.regime_agent.get_regime_label(scaled_input)
+        """
+        Universal Regime Detection (Heuristic).
+        """
+        print("\n   ⛈️  [Regime Detection] Detecting Market State (Heuristic)...")
+
+        current_vol = hist["Close"].pct_change().rolling(10).std().iloc[-1]
+        if pd.isna(current_vol):
+            current_vol = 0.015
+
+        # --- Universal Mathematical Heuristic ---
+        sma_50 = float(hist["SMA_50"].iloc[-1])
+        sma_200 = float(hist["SMA_200"].iloc[-1])
+
+        if sma_50 > sma_200 and current_vol < 0.025:
+            regime_label = "Bull"
+        elif sma_50 < sma_200 and current_vol > 0.015:
+            regime_label = "Bear"
         else:
-            regime_label = self.regime_agent.get_regime_label(regime_input)
-        
+            regime_label = "Sideways"
+
         print(f"      - Current Volatility: {current_vol:.4f}")
-        print(f"      - Detected State: {regime_label}")
-        
+        print(f"      - Detected State: {regime_label} (via Universal Heuristic)")
+
         return regime_label, current_vol
 
     def _analyze_correlation_module(self, ticker):
         """Runs Graph-Based Systemic Risk Check."""
         print("\n   🕸️  [Systemic Risk] Analyzing Cross-Asset Divergence (GNN/Graph)...")
         risk_score, _ = self.corr_agent.get_market_context(ticker)
-        
+
         div_status = "✅ Synced"
-        if risk_score > DIVERGENCE_THRESHOLD_MINOR: div_status = "⚠️ Minor Divergence"
-        if risk_score > DIVERGENCE_THRESHOLD_CRITICAL: div_status = "🚨 CRITICAL DIVERGENCE (Anomaly)"
-        
+        if risk_score > DIVERGENCE_THRESHOLD_MINOR:
+            div_status = "⚠️ Minor Divergence"
+        if risk_score > DIVERGENCE_THRESHOLD_CRITICAL:
+            div_status = "🚨 CRITICAL DIVERGENCE (Anomaly)"
+
         print(f"      - Divergence Score: {risk_score:.4f}")
         print(f"      - Systemic Status: {div_status}")
-        
+
         return risk_score, div_status
 
     # ==========================================================================
     # MAIN ANALYZER ORCHESTRATOR
     # ==========================================================================
-
     def analyze_stock(self, ticker="AAPL"):
-        """
-        Main entry point for analysis. Orchestrates the flow of data between agents.
-        
-        Returns:
-            None (Prints detailed report to console)
-        """
+        """Main entry point for analysis."""
         print(f"📊 STARTING DEEP DIVE ANALYSIS FOR: {ticker}")
-        
-        # 1. Fetch Data
+
         stock_obj, hist = self._fetch_stock_data(ticker)
         if stock_obj is None:
-            return hist # Returns error message
-            
-        last_price = hist['Close'].iloc[-1]
+            return hist
 
-        # Phase 14: Load Trust Scores
+        last_price = hist["Close"].iloc[-1]
+
+        # Phase 14: Load trust scores 
         trust_scores = None
         if self.meta_agent:
-            trust_scores = self.meta_agent.get_trust_scores()
+            trust_scores = self.meta_agent.get_trust_scores(ticker=ticker)
             self.meta_agent.print_trust_report(trust_scores)
 
-        # 2. Run Technical, Uncertainty & SHAP
-        lstm_signal, mc_mean, mc_std, uncertainty_status, top_driver = self._analyze_technicals_and_uncertainty(hist)
-
-        # 3. Run Sentiment Agent
+        lstm_signal, mc_mean, mc_std, uncertainty_status, top_driver = (
+            self._analyze_technicals_and_uncertainty(hist)
+        )
         sent_score = self._analyze_sentiment_module(ticker, stock_obj, lstm_signal)
-
-        # 4. Run Regime Agent
         regime_label, current_vol = self._analyze_regime_module(hist)
-
-        # 5. Run Correlation Agent
         risk_score, div_status = self._analyze_correlation_module(ticker)
-        # ==================================================================
-        # ➕ NEW: PHASE 11 INTEGRATION (The Red Team Live Check)
-        # ==================================================================
-        robustness_penalty = 0.0
-        
-        if self.red_team:
-            print(f"\n   🛡️  [Red Team] Running Live Robustness Check...")
-            try:
-                # We run a "Mini" stress test (Flash Crash simulation)
-                # This checks if the model is currently "Overfitted" to the trend
-                crashed_df = self.red_team.generate_flash_crash(hist, drop_pct=0.20) # 20% drop simulation
-                
-                # Get the "Crashed" score
-                input_crashed = self.red_team._prepare_data_for_ai(crashed_df)
-                
-                # Predict on crashed data
-                if hasattr(self.tech_agent, 'predict_signal'):
-                     crashed_score = self.tech_agent.predict_signal(input_crashed)
-                else:
-                     crashed_score = self.tech_agent.predict(input_crashed)
 
-                # Calculate Delta (Normal Score vs Crashed Score)
+        # ── Phase 24: Topological Analysis ───────────────────────────────
+        topo_modifier = 1.0
+        topo_signal = "UNKNOWN"
+        if hasattr(self, "topology_agent") and self.topology_agent:
+            print("\n   🌀 [Phase 24] Computing Persistent Homology (Vietoris-Rips)...")
+            topology_result = self.topology_agent.analyze(hist)
+            topo_modifier = topology_result.get("topology_modifier", 1.0)
+            topo_signal = topology_result.get("market_shape_signal", "UNKNOWN")
+
+        # Phase 11: Red Team live check
+        robustness_penalty = 0.0
+        if self.red_team:
+            print("\n   🛡️  [Red Team] Running Live Robustness Check...")
+            try:
+                crashed_df = self.red_team.generate_flash_crash(hist, drop_pct=0.20)
+                input_crashed = self.red_team._prepare_data_for_ai(crashed_df)
+                crashed_score = (
+                    self.tech_agent.predict_signal(input_crashed)
+                    if hasattr(self.tech_agent, "predict_signal")
+                    else self.tech_agent.predict(input_crashed)
+                )
                 robustness_delta = lstm_signal - crashed_score
-                
                 if robustness_delta < 0.02:
                     print(f"      ❌ WARNING: Model is stubborn! (Delta: {robustness_delta:.4f})")
-                    print(f"      ⚠️  Applying Safety Penalty to Fusion Score.")
-                    # We will penalize the final score later in Fusion
                     robustness_penalty = 0.2
                 else:
                     print(f"      ✅ PASS: Model detected the crash. (Delta: {robustness_delta:.4f})")
             except Exception as e:
-                print(f"      ⚠️ Red Team check failed slightly: {e}")
-        # ==================================================================
-        
-        # ------------------------------------------------------------------
-        # STEP F: FUSION & OVERRIDE LOGIC
-        # ------------------------------------------------------------------
-        print("\n   🧠 [Fusion Engine] Synthesizing Intelligence Layers...")
-        
-        # Map Regime to Volatility Input for Fusion Agent
-        if regime_label == "Bear": vol_input = 0.9
-        elif regime_label == "Bull": vol_input = 0.2
-        else: vol_input = 0.5
-            
-        # Use Bayesian Mean instead of Single LSTM prediction for better robustness
-        # Phase 14: Pass trust scores to scale agent inputs before attention
-        final_conf, weights = self.fusion_agent.predict(
-            lstm_p=mc_mean, 
-            sent_s=sent_score, 
-            vol_v=vol_input,
-            trust_scores=trust_scores
-        )
-        print(f"      - Raw Fusion Confidence: {final_conf:.4f}")
+                print(f"      ⚠️ Red Team check failed: {e}")
 
-        # ==================================================================
-        # ⚖️  PHASE 13: CONFLICT RESOLUTION ENGINE (The Arbitrator)
-        # ==================================================================
-        # All systemic risk and uncertainty overrides are now consolidated
-        # inside the ConflictResolver. The old hard-coded if-checks have
-        # been removed from here.
-        # ==================================================================
+        # Fusion - Modulated by Phase 24 Topology
+        print("\n   🧠 [Fusion Engine] Synthesizing Intelligence Layers...")
+        vol_input = 0.9 if regime_label == "Bear" else 0.2 if regime_label == "Bull" else 0.5
+        
+        # Apply Topology geometric modifier to Fusion Inputs
+        final_conf, weights = self.fusion_agent.predict(
+            lstm_p=mc_mean * topo_modifier,
+            sent_s=sent_score * topo_modifier,
+            vol_v=vol_input * topo_modifier,
+            trust_scores=trust_scores,
+        )
+        print(f"      - Raw Fusion Confidence: {final_conf:.4f} (Topology Modified: {topo_modifier:.2f}x)")
+
+        # Phase 13: Conflict Resolution
         if self.conflict_resolver:
-            # Phase 14: Pass trust scores to arbitrator for extra tie-breaking
             arbitration_result = self.conflict_resolver.arbitrate(
                 tech_score=lstm_signal,
                 sent_score=sent_score,
@@ -671,89 +455,83 @@ class FinFolioSystem:
                 regime_label=regime_label,
                 risk_score=risk_score,
                 fusion_confidence=final_conf,
-                trust_scores=trust_scores
+                trust_scores=trust_scores,
             )
-            # Override confidence with the arbitrator's ruling
             final_conf = arbitration_result["adjusted_confidence"]
-            # Print the detailed arbitration report
             self.conflict_resolver.print_report(arbitration_result)
         else:
-            # Fallback: old-style simple overrides if Phase 13 module missing
             if risk_score > DIVERGENCE_THRESHOLD_CRITICAL:
-                final_conf = final_conf * 0.5
+                final_conf *= 0.5
             if mc_std > 0.10:
-                final_conf = final_conf * 0.8
+                final_conf *= 0.8
 
-        # ==================================================================
-        # PHASE 16: AGENT DISAGREEMENT HEATMAP
-        # ==================================================================
-        gdi_penalty = 1.0  # default: no penalty
+        # Phase 16: Disagreement Heatmap
+        gdi_penalty = 1.0
+        gdi_value = 0.0
         if self.heatmap_agent:
             heatmap_result = self.heatmap_agent.analyze(
                 lstm_score=lstm_signal,
                 sent_score=sent_score,
                 regime_label=regime_label,
-                regime_vol=current_vol
+                regime_vol=current_vol,
             )
             self.heatmap_agent.print_heatmap(heatmap_result)
             gdi_penalty = heatmap_result["penalty"]
+            gdi_value = heatmap_result["gdi"] * 100
 
-        # ------------------------------------------------------------------
-        # STEP G: RISK MANAGEMENT (KELLY CRITERION)
-        # ------------------------------------------------------------------
+        # Risk Management
         print("\n   [Risk Engine] Calculating Position Sizing (Kelly)...")
-        
         alloc_pct, kelly_debug = self.risk_engine.calculate_position_size(
-            final_conf, current_vol, disagreement_penalty=gdi_penalty
+            final_conf, current_vol,
+            disagreement_penalty=gdi_penalty,
+            regime=regime_label,
         )
         num_shares, cash_value = self.risk_engine.get_shares_amount(last_price, alloc_pct)
-        
-        # ------------------------------------------------------------------
-        # STEP H: FINAL REPORT GENERATION
-        # ------------------------------------------------------------------
+
+        # Final Report
         print("\n" + "█" * 72)
         print(f"🏆 FINFOLIO-X INTELLIGENCE REPORT: {ticker}")
         print("█" * 72)
-        
-        # 1. The Core Metrics
         print(f"   📊 AI Confidence Score : {final_conf:.4f} (Scale: 0.0 - 1.0)")
         print(f"   🎲 Model Uncertainty   : {mc_std:.4f} ({uncertainty_status})")
         print(f"   ⛈️  Market Regime       : {regime_label} (Vol: {current_vol:.4f})")
         print(f"   🕸️  Systemic Risk       : {risk_score:.4f} ({div_status})")
+        print(f"   🌀 Topological Shape   : {topo_signal} (Mod: {topo_modifier:.2f}x)")
         print(f"   🔍 Primary SHAP Driver : {top_driver}")
         print("-" * 72)
-        
-        # 2. The Decision Logic
+
+        # ------------------------------------------------------------------
+        # FINAL DECISION LOGIC (Relaxed for Prototype LSTM)
+        # ------------------------------------------------------------------
+        BUY_THRESHOLD = 0.50  
+        BUY_GDI_MAX = 55.0  
+
         decision = "HOLD"
-        # Strategy: Only Buy if Allocation is positive AND Confidence is High
-        if alloc_pct > 0.0 and final_conf > 0.6: 
+        
+        # The ultimate entry gate
+        if alloc_pct > 0.0 and final_conf >= BUY_THRESHOLD and regime_label != "Bear" and gdi_value < BUY_GDI_MAX:
             decision = "BUY 🟢"
-        elif final_conf < 0.4: 
+        elif final_conf < 0.40:
             decision = "SELL 🔴"
-        
+
         print(f"   🚀 STRATEGY SIGNAL     : {decision}")
-        
-        # 3. Position Sizing (The Money Part)
+
         if decision == "BUY 🟢":
             print(f"   💰 RECOMMENDED SIZE    : ${cash_value:.2f}")
-            print(f"   📉 PORTFOLIO WEIGHT    : {alloc_pct*100:.1f}%")
+            print(f"   📉 PORTFOLIO WEIGHT    : {alloc_pct * 100:.1f}%")
             print(f"   📦 ORDER QUANTITY      : {num_shares} Shares (@ ${last_price:.2f})")
             print(f"   🧮 KELLY EDGE          : {kelly_debug:.4f}")
         else:
             print("   ⛔ RISK ADVICE         : Stay Cash / Do Not Enter Trade.")
-            
-        # 4. Explainability (Why did the AI decide this?)
-        w_lstm = weights.get('LSTM_Focus', 0)
-        w_sent = weights.get('Sentiment_Focus', 0)
-        w_vol = weights.get('Volatility_Focus', 0)
-        
+
+        w_lstm = weights.get("LSTM_Focus", 0)
+        w_sent = weights.get("Sentiment_Focus", 0)
+        w_vol = weights.get("Volatility_Focus", 0)
         print("-" * 72)
         print("   🔍 AI REASONING (ATTENTION WEIGHTS):")
         print(f"      • Technicals (Chart) : {w_lstm:.2f}")
         print(f"      • Sentiment (News)   : {w_sent:.2f}")
         print(f"      • Risk (Volatility)  : {w_vol:.2f}")
-        
-        # Interpret the attention
         max_focus = max(w_lstm, w_sent, w_vol)
         if max_focus == w_lstm:
             focus_msg = "The AI is prioritizing the Price Trend."
@@ -761,17 +539,13 @@ class FinFolioSystem:
             focus_msg = "The AI is prioritizing News/Sentiment."
         else:
             focus_msg = "The AI is prioritizing Risk Management (Defensive)."
-    
-            
         print(f"      👉 Insight: {focus_msg}")
         print("█" * 72)
         print("\n   Disclaimer: This tool is for educational purposes only.")
         print("   It does not constitute financial advice. Trading involves risk.")
         print("   (c) FinFolio-X Team 2026")
 
-        # ==================================================================
-        # PHASE 14: LOG DECISION TO META-AGENT LEDGER
-        # ==================================================================
+        # Phase 14: Log decision
         if self.meta_agent:
             try:
                 self.meta_agent.log_decision(
@@ -782,14 +556,13 @@ class FinFolioSystem:
                     risk_score=risk_score,
                     fusion_confidence=final_conf,
                     final_decision=decision,
-                    price_at_decision=last_price
+                    price_at_decision=last_price,
                 )
             except Exception as e:
                 print(f"   [!] Meta-Agent logging failed: {e}")
+
     def run_stress_test(self, ticker="AAPL"):
-        """
-        Manually triggers the Phase 11 stress test.
-        """
+        """Manually triggers the Phase 11 stress test."""
         if self.red_team:
             self.red_team.run_robustness_test(ticker)
         else:

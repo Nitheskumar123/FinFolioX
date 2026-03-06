@@ -12,6 +12,10 @@ export default function DecisionLedger() {
         const fetch = async () => {
             try {
                 const result = await getHistory();
+                // Show newest searches at the TOP
+                if (result?.decisions) {
+                    result.decisions = result.decisions.reverse();
+                }
                 setData(result);
             } catch (err) {
                 setError('Failed to load decision history');
