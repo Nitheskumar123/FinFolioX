@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom';
-import { Activity, Brain, History, Zap, FlaskConical, Grid3x3 } from 'lucide-react';
+import { Activity, Brain, History, Zap, FlaskConical, Grid3x3, Share2 } from 'lucide-react';
 
 export default function Navbar() {
     return (
@@ -26,6 +26,9 @@ export default function Navbar() {
                 </NavLink>
                 <NavLink to="/topology" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
                     <Grid3x3 size={16} /> Topology
+                </NavLink>
+                <NavLink to="/causal" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+                    <Share2 size={16} /> Causal
                 </NavLink>
             </div>
         </nav>

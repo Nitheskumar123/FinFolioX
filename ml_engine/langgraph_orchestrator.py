@@ -8,12 +8,13 @@ from langchain_core.messages import SystemMessage, HumanMessage
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from finfolio_x.settings import GROQ_API_KEY, LLM_MODEL_NAME, LLM_TEMPERATURE
 from ml_engine.topology_agent import TopologyAgent
+from ml_engine.causal_agent import CausalAgent  # Phase 25
 
 # BUY threshold constant
 # FIX v2: Lowered from 0.60 → 0.55 to compensate for the mandatory 0.95
 # systemic penalty applied by Phase 13 on every run (risk_score=0.5 → ×0.95).
-BUY_CONFIDENCE_THRESHOLD = 0.55
-BUY_GDI_MAX = 40.0  # Don't enter if boardroom tension > 40%
+BUY_CONFIDENCE_THRESHOLD = 0.45
+BUY_GDI_MAX = 55.0  # Don't enter if boardroom tension > 40%
 
 
 # ==============================================================================
@@ -58,6 +59,9 @@ class AgentState(TypedDict):
     topology_chaos: float
     topology_modifier: float
 
+    causal_result: Optional[Dict[str, Any]]  # Phase 25
+    counterfactual_verdict: Optional[str]    # Phase 25 debate output
+
     red_team_passed: bool
     red_team_delta: float
 
@@ -91,6 +95,13 @@ class FinFolioGraphOrchestrator:
         except Exception as e:
             print(f"   ⚠️ TopologyAgent initialization failed: {e}")
             self.topology_agent = None
+
+        # Phase 25: Initialize CausalAgent once
+        try:
+            self.causal_agent = CausalAgent(lookback=90, alpha=0.05)
+        except Exception as e:
+            print(f"   ⚠️ CausalAgent initialization failed: {e}")
+            self.causal_agent = None
 
         self.graph = self._build_graph()
 
@@ -190,10 +201,103 @@ class FinFolioGraphOrchestrator:
         }
 
     # --------------------------------------------------------------------------
+    # NODE 4.6: Causal Analysis (Phase 25)
+    # --------------------------------------------------------------------------
+    def node_causal_analysis(self, state: AgentState) -> AgentState:
+        print(" [Node: Causal Analysis] Phase 25 — Running Causal Discovery (PC Algorithm)...")
+        
+        causal_result = {}
+        ticker = state.get("ticker", "UNKNOWN")
+        hist_data = state.get("hist_data")
+        
+        if self.causal_agent and hist_data is not None:
+            try:
+                # Fetch universe data for causal analysis
+                universe_data = self._fetch_universe_data()
+                
+                causal_result = self.causal_agent.analyze(
+                    ticker=ticker,
+                    target_hist_df=hist_data,
+                    universe_data=universe_data,
+                )
+                
+                causal_score = causal_result.get("causal_score", 0.5)
+                confounders = causal_result.get("confounders_removed", [])
+                print(f"      - Causal Score: {causal_score:.4f}")
+                print(f"      - Confounders Removed: {len(confounders)}")
+            except Exception as e:
+                print(f"      ⚠️ Causal analysis failed: {e}")
+                causal_result = {}
+        else:
+            print("      ⚠️ Causal Agent not available or no hist_data.")
+        
+        return {"causal_result": causal_result}
+
+    # --------------------------------------------------------------------------
+    # NODE 4.7: Counterfactual Debate (Phase 25)
+    # --------------------------------------------------------------------------
+    def node_counterfactual_debate(self, state: AgentState) -> AgentState:
+        print(" [Node: Counterfactual Debate] Phase 25 — Multi-Agent Debate Round...")
+        
+        causal_result = state.get("causal_result", {})
+        lstm_signal = state.get("lstm_signal", 0.5)
+        
+        causal_score = causal_result.get("causal_score", 0.5)
+        cf_delta = causal_result.get("counterfactual_delta", 0.0)
+        cf_narrative = causal_result.get("counterfactual_narrative", "")
+        confounders = causal_result.get("confounders_removed", [])
+        top_drivers = causal_result.get("true_causal_drivers", [])
+        causal_modifier = causal_result.get("causal_modifier", 1.0)
+
+        signal_direction = "BULLISH" if lstm_signal > 0.5 else "BEARISH"
+
+        # ── BULL ARGUMENT ────────────────────────────────────────────────
+        if top_drivers:
+            top = top_drivers[0]
+            bull_arg = (
+                f"BULL: Causal drivers identified. {top.get('variable', 'Unknown')} "
+                f"has causal effect {top.get('causal_effect', 0):+.4f}. "
+                f"Causal clarity: {causal_score:.2f}."
+            )
+        else:
+            bull_arg = (
+                f"BULL: Signal is {signal_direction}, but weak causal drivers found."
+            )
+
+        # ── BEAR ARGUMENT ────────────────────────────────────────────────
+        if confounders:
+            bear_arg = (
+                f"BEAR: {len(confounders)} confounder(s) detected: {', '.join(confounders)}. "
+                f"Signal may be spurious. {cf_narrative}"
+            )
+        elif abs(cf_delta) > 0.005:
+            bear_arg = (
+                f"BEAR: Counterfactual shows return delta of {cf_delta:+.4f}. "
+                f"Signal partially artificial."
+            )
+        else:
+            bear_arg = f"BEAR: No strong counterfactual argument."
+
+        # ── VERDICT ──────────────────────────────────────────────────────
+        if causal_score >= 0.65:
+            verdict = f"✅ CAUSAL_CONFIRMED — {signal_direction} supported by causal evidence (mod: {causal_modifier:.2f}x)."
+        elif causal_score <= 0.35:
+            verdict = f"⚠️ CAUSAL_WARNED — {signal_direction} appears confounder-driven."
+        else:
+            verdict = f"ℹ️ CAUSAL_NEUTRAL — Mixed causal evidence."
+
+        print(f"      {bull_arg}")
+        print(f"      {bear_arg}")
+        print(f"      {verdict}")
+
+        return {"counterfactual_verdict": verdict}
+        
+
+    # --------------------------------------------------------------------------
     # NODE 5: Fusion Engine
     # --------------------------------------------------------------------------
     def node_fusion_engine(self, state: AgentState) -> AgentState:
-        print(" [Node: Fusion Engine] Fusing signals via Multi-Head Attention (Phase 24 Topology-Enhanced)...")
+        print(" [Node: Fusion Engine] Fusing signals via Multi-Head Attention (Phase 24+25 Enhanced)...")
 
         vol_input = (
             0.9 if state["regime_label"] == "Bear"
@@ -202,19 +306,27 @@ class FinFolioGraphOrchestrator:
         )
         trust_scores = state.get("trust_scores", None)
         
-        # Phase 24: Apply topology modifier to input signals
+        # Phase 24: Topology modifier
         topology_modifier = state.get("topology_modifier", 1.0)
         topology_chaos = state.get("topology_chaos", 0.0)
         
+        # Phase 25: Causal modifier
+        causal_result = state.get("causal_result", {})
+        causal_modifier = causal_result.get("causal_modifier", 1.0)
+        causal_score = causal_result.get("causal_score", 0.5)
+        
+        # Blend topology and causal modifiers
+        combined_modifier = (topology_modifier + causal_modifier) / 2.0
+        
         final_conf, weights = self.master.fusion_agent.predict(
-            lstm_p=state["mc_mean"] * topology_modifier,
-            sent_s=state["sent_score"] * topology_modifier,
-            vol_v=vol_input * topology_modifier,
+            lstm_p=state["mc_mean"] * combined_modifier,
+            sent_s=state["sent_score"] * combined_modifier,
+            vol_v=vol_input * combined_modifier,
             trust_scores=trust_scores,
         )
         
-        # Log topology contribution
-        print(f"      - Topology modifier applied: {topology_modifier:.3f}x (chaos: {topology_chaos:.3f})")
+        # Log modifiers
+        print(f"      - Combined modifier: {combined_modifier:.3f}x (Topology: {topology_modifier:.2f}x, Causal: {causal_modifier:.2f}x)")
 
         return {
             "fusion_confidence": final_conf,
@@ -365,6 +477,8 @@ class FinFolioGraphOrchestrator:
         Uncertainty: {state['uncertainty_status']} (StdDev: {state['mc_std']:.4f})
         Sentiment: {state['sent_score']:.4f}
         Topology Chaos (Phase 24): {state.get('topology_chaos', 0.0):.4f} (Modifier: {state.get('topology_modifier', 1.0):.3f}x)
+        Causal Score (Phase 25): {state.get('causal_result', {}).get('causal_score', 0.5):.4f} (Modifier: {state.get('causal_result', {}).get('causal_modifier', 1.0):.3f}x)
+        Counterfactual Verdict: {state.get('counterfactual_verdict', 'N/A')}
         Fusion Confidence: {state['fusion_confidence']:.4f}
         Conflict Detected: {state['conflict_detected']}
         Conflict Ruling: {state['conflict_ruling']}
@@ -414,6 +528,24 @@ class FinFolioGraphOrchestrator:
         return {"executive_summary": summary}
 
     # --------------------------------------------------------------------------
+    # HELPER: Fetch Universe Data
+    # --------------------------------------------------------------------------
+    def _fetch_universe_data(self):
+        """Fetch macro universe data for Phase 25 causal analysis."""
+        import yfinance as yf
+        
+        UNIVERSE_TICKERS = ["SPY", "QQQ", "VIX", "TLT", "GLD", "DXY"]
+        universe_data = {}
+        
+        for sym in UNIVERSE_TICKERS:
+            try:
+                universe_data[sym] = yf.download(sym, period="6mo", interval="1d", progress=False)
+            except Exception:
+                pass
+        
+        return universe_data
+
+    # --------------------------------------------------------------------------
     # ROUTING LOGIC
     # --------------------------------------------------------------------------
     def route_after_data(self, state: AgentState) -> str:
@@ -433,6 +565,8 @@ class FinFolioGraphOrchestrator:
         workflow.add_node("technical_analysis", self.node_technical_analysis)
         workflow.add_node("sentiment_analysis", self.node_sentiment_analysis)
         workflow.add_node("topology_analysis", self.node_topology_analysis)  # Phase 24
+        workflow.add_node("causal_analysis", self.node_causal_analysis)  # Phase 25
+        workflow.add_node("counterfactual_debate", self.node_counterfactual_debate)  # Phase 25
         workflow.add_node("fusion_engine", self.node_fusion_engine)
         workflow.add_node("conflict_resolution", self.node_conflict_resolution)
         workflow.add_node("red_team", self.node_red_team)
@@ -449,7 +583,9 @@ class FinFolioGraphOrchestrator:
         workflow.add_edge("market_context", "technical_analysis")
         workflow.add_edge("technical_analysis", "sentiment_analysis")
         workflow.add_edge("sentiment_analysis", "topology_analysis")  # Phase 24: topology after sentiment
-        workflow.add_edge("topology_analysis", "fusion_engine")  # Phase 24: topology feeds fusion
+        workflow.add_edge("topology_analysis", "causal_analysis")  # Phase 25: causal after topology
+        workflow.add_edge("causal_analysis", "counterfactual_debate")  # Phase 25: debate after causal
+        workflow.add_edge("counterfactual_debate", "fusion_engine")  # Phase 25: fusion after debate
         workflow.add_edge("fusion_engine", "conflict_resolution")
 
         workflow.add_conditional_edges(
@@ -474,6 +610,8 @@ class FinFolioGraphOrchestrator:
             "topology_result": None,
             "topology_chaos": 0.0,
             "topology_modifier": 1.0,
+            "causal_result": None,  # Phase 25
+            "counterfactual_verdict": None,  # Phase 25
         }
         print(f"\n🚀 [LangGraph Orchestrator] Starting Multi-Agent Graph for {ticker}...")
 

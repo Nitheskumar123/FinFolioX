@@ -25,11 +25,12 @@ from ml_engine.correlation_agent import CorrelationDivergenceDetector
 from ml_engine.uncertainty_agent import UncertaintyAgent
 from ml_engine.explainability_agent import ExplainabilityAgent
 from ml_engine.topology_agent import TopologyAgent
+from ml_engine.causal_agent import CausalAgent  # Phase 25
 
 # ==============================================================================
 # SYSTEM CONSTANTS
 # ==============================================================================
-SYSTEM_VERSION = "17.0 (MCP Embedded + Topology)"
+SYSTEM_VERSION = "25.0 (Causal Discovery)"
 DEFAULT_CAPITAL = 10_000.0
 MAX_RISK_PER_TRADE = 0.20
 NEWS_LOOKBACK_ITEMS = 5
@@ -206,6 +207,18 @@ class FinFolioSystem:
         except Exception:
             self.topology_agent = None
 
+        # 10. Causal Discovery Agent (Phase 25)
+        print("   🔹 [10/10] Loading Causal Discovery Agent (PC Algorithm)...")
+        try:
+            self.causal_agent = CausalAgent(
+                lookback=90,   # 90 trading days of history
+                alpha=0.05,    # PC algorithm significance level
+            )
+            print("      ✅ Causal Discovery Engine Online.")
+        except Exception as e:
+            print(f"      ⚠️ Warning: Causal Agent failed ({e}).")
+            self.causal_agent = None
+
         # Regime Scaler
         self.regime_scaler_path = os.path.join(MODELS_DIR, "regime_scaler.pkl")
         if os.path.exists(self.regime_scaler_path):
@@ -377,9 +390,23 @@ class FinFolioSystem:
 
         return risk_score, div_status
 
+    def _fetch_universe_data(self):
+        """Fetch macro universe data for Phase 25 causal analysis."""
+        UNIVERSE_TICKERS = ["SPY", "QQQ", "VIX", "TLT", "GLD", "DXY"]
+        universe_data = {}
+        
+        print("\n   📊 [Causal Setup] Fetching macro universe data...")
+        for sym in UNIVERSE_TICKERS:
+            try:
+                universe_data[sym] = yf.download(sym, period="6mo", interval="1d", progress=False)
+            except Exception as e:
+                print(f"      ⚠️ Failed to fetch {sym}: {e}")
+        
+        return universe_data
+
     # ==========================================================================
     # MAIN ANALYZER ORCHESTRATOR
-    # ==========================================================================
+    # ===========================================================================
     def analyze_stock(self, ticker="AAPL"):
         """Main entry point for analysis."""
         print(f"📊 STARTING DEEP DIVE ANALYSIS FOR: {ticker}")
@@ -406,11 +433,33 @@ class FinFolioSystem:
         # ── Phase 24: Topological Analysis ───────────────────────────────
         topo_modifier = 1.0
         topo_signal = "UNKNOWN"
+        topology_result = {}
         if hasattr(self, "topology_agent") and self.topology_agent:
             print("\n   🌀 [Phase 24] Computing Persistent Homology (Vietoris-Rips)...")
             topology_result = self.topology_agent.analyze(hist)
             topo_modifier = topology_result.get("topology_modifier", 1.0)
             topo_signal = topology_result.get("market_shape_signal", "UNKNOWN")
+
+        # ── Phase 25: Causal Discovery Analysis ──────────────────────────
+        causal_modifier = 1.0
+        causal_score = 0.5
+        causal_result = {}
+        if hasattr(self, "causal_agent") and self.causal_agent:
+            print("\n   🔗 [Phase 25] Running Causal Discovery (PC Algorithm)...")
+            try:
+                universe_data = self._fetch_universe_data()
+                causal_result = self.causal_agent.analyze(
+                    ticker=ticker,
+                    target_hist_df=hist,
+                    universe_data=universe_data,
+                )
+                causal_modifier = causal_result.get("causal_modifier", 1.0)
+                causal_score = causal_result.get("causal_score", 0.5)
+                print(f"      - Causal Score: {causal_score:.4f} (Modifier: {causal_modifier:.3f}x)")
+                print(f"      - Confounders Removed: {causal_result.get('confounders_removed', [])}")
+            except Exception as e:
+                print(f"      ⚠️ Causal analysis failed: {e}")
+                causal_modifier = 1.0
 
         # Phase 11: Red Team live check
         robustness_penalty = 0.0
@@ -433,18 +482,21 @@ class FinFolioSystem:
             except Exception as e:
                 print(f"      ⚠️ Red Team check failed: {e}")
 
-        # Fusion - Modulated by Phase 24 Topology
+        # Fusion - Modulated by Phase 24 Topology and Phase 25 Causal
         print("\n   🧠 [Fusion Engine] Synthesizing Intelligence Layers...")
         vol_input = 0.9 if regime_label == "Bear" else 0.2 if regime_label == "Bull" else 0.5
         
-        # Apply Topology geometric modifier to Fusion Inputs
+        # Combine topology and causal modifiers (blend them)
+        combined_modifier = (topo_modifier + causal_modifier) / 2.0
+        
+        # Apply combined modifier to Fusion Inputs
         final_conf, weights = self.fusion_agent.predict(
-            lstm_p=mc_mean * topo_modifier,
-            sent_s=sent_score * topo_modifier,
-            vol_v=vol_input * topo_modifier,
+            lstm_p=mc_mean * combined_modifier,
+            sent_s=sent_score * combined_modifier,
+            vol_v=vol_input * combined_modifier,
             trust_scores=trust_scores,
         )
-        print(f"      - Raw Fusion Confidence: {final_conf:.4f} (Topology Modified: {topo_modifier:.2f}x)")
+        print(f"      - Raw Fusion Confidence: {final_conf:.4f} (Topology: {topo_modifier:.2f}x, Causal: {causal_modifier:.2f}x)")
 
         # Phase 13: Conflict Resolution
         if self.conflict_resolver:
@@ -497,6 +549,7 @@ class FinFolioSystem:
         print(f"   ⛈️  Market Regime       : {regime_label} (Vol: {current_vol:.4f})")
         print(f"   🕸️  Systemic Risk       : {risk_score:.4f} ({div_status})")
         print(f"   🌀 Topological Shape   : {topo_signal} (Mod: {topo_modifier:.2f}x)")
+        print(f"   🔗 Causal Dynamics     : Score={causal_score:.4f} (Confounders: {len(causal_result.get('confounders_removed', []))})")
         print(f"   🔍 Primary SHAP Driver : {top_driver}")
         print("-" * 72)
 

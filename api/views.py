@@ -26,6 +26,7 @@ from django.http import JsonResponse
 from django.views import View
 
 from ml_engine.topology_agent import TopologyAgent  # Phase 24
+from ml_engine.causal_agent import CausalAgent  # Phase 25
 
 # Ensure project root is on the path for ml_engine imports
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -99,6 +100,23 @@ def _get_topology_agent():
             print(f"   ⚠️ TopologyAgent initialization failed: {e}")
             _topology_agent = None
     return _topology_agent
+
+
+_causal_agent = None
+
+
+def _get_causal_agent():
+    """
+    Singleton loader for CausalAgent (Phase 25).
+    """
+    global _causal_agent
+    if _causal_agent is None:
+        try:
+            _causal_agent = CausalAgent(lookback=90, alpha=0.05)
+        except Exception as e:
+            print(f"   ⚠️ CausalAgent initialization failed: {e}")
+            _causal_agent = None
+    return _causal_agent
 
 
 # ==============================================================================
@@ -500,3 +518,210 @@ class TopologyView(View):
                 {"error": str(exc), "status": "error"},
                 status=500,
             )
+
+
+# ==============================================================================
+# 7. GET /api/causal/<ticker>/ — Phase 25: Causal Discovery Agent Analysis
+# ==============================================================================
+@method_decorator(csrf_exempt, name="dispatch")
+class CausalAnalysisView(View):
+    """
+    GET /api/causal/<ticker>/
+
+    Returns the full Phase 25 Causal Discovery analysis for a ticker.
+
+    Response shape:
+    {
+      "ticker": "AAPL",
+      "causal_score": 0.74,
+      "true_causal_drivers": [
+        {"variable": "SPY",  "causal_effect": 0.0423, "p_value": 0.012,
+         "significant": true, "direction": "↑", "label": "S&P 500"},
+        {"variable": "VIX",  "causal_effect": -0.0312, "p_value": 0.034, ...}
+      ],
+      "confounders_removed": ["QQQ", "GLD"],
+      "counterfactual_delta": 0.00128,
+      "counterfactual_narrative": "If VIX had been at ...",
+      "causal_modifier": 1.08,
+      "dag_edges": [
+        {"source": "VIX", "target": "SPY", "strength": 0.9, "causal": false, "effect": 0},
+        {"source": "SPY", "target": "TARGET", "strength": 0.8, "causal": true, "effect": 0.0423},
+        ...
+      ],
+      "correlation_vs_causal": [
+        {"variable": "SPY", "correlation": 0.68, "causal_effect": 0.042, "gap": 0.638, ...},
+        ...
+      ],
+      "status": "ok"
+    }
+    """
+
+    def get(self, request, ticker: str):
+        try:
+            import yfinance as yf
+
+            ticker = ticker.upper()
+
+            # Target stock
+            hist_df = yf.download(ticker, period="6mo", interval="1d", progress=False)
+            if hist_df.empty:
+                return JsonResponse({"error": f"No data for '{ticker}'"}, status=404)
+
+            # Universe data
+            universe_syms = ["SPY", "QQQ", "VIX", "TLT", "GLD", "DXY"]
+            universe_data = {}
+            for sym in universe_syms:
+                try:
+                    df = yf.download(sym, period="6mo", interval="1d", progress=False)
+                    if not df.empty:
+                        universe_data[sym] = df
+                except Exception:
+                    pass
+
+            causal_agent = _get_causal_agent()
+            if causal_agent is None:
+                return JsonResponse(
+                    {"error": "Causal Agent not available"},
+                    status=500,
+                )
+
+            result = causal_agent.analyze(
+                ticker=ticker,
+                target_hist_df=hist_df,
+                universe_data=universe_data if universe_data else None,
+            )
+
+            # Strip any non-serialisable fields
+            safe_result = {k: v for k, v in result.items() if k != "hist_df"}
+            safe_result["ticker"] = ticker
+            safe_result["status"] = "ok"
+
+            return JsonResponse(safe_result, encoder=NumpySafeEncoder)
+
+        except Exception as exc:
+            return JsonResponse({"error": str(exc), "status": "error"}, status=500)
+
+
+# ==============================================================================
+# 8. POST /api/causal/counterfactual/ — Phase 25: On-Demand Counterfactual Query
+# ==============================================================================
+@method_decorator(csrf_exempt, name="dispatch")
+class CounterfactualQueryView(View):
+    """
+    POST /api/causal/counterfactual/
+
+    On-demand counterfactual query:
+    "What would {ticker} return have been if {variable} had been {sigma} standard
+     deviations from its mean?"
+
+    Request body (JSON):
+    {
+      "ticker":   "AAPL",
+      "variable": "VIX",
+      "sigma":    -1.5      // negative = lower than mean (calmer market)
+    }
+
+    Response:
+    {
+      "ticker": "AAPL",
+      "variable": "VIX",
+      "sigma": -1.5,
+      "query": "What if VIX had been -1.5σ from mean?",
+      "factual_return": 0.00234,
+      "counterfactual_return": 0.00412,
+      "delta": 0.00178,
+      "narrative": "If VIX had been 1.5 standard deviations BELOW its mean ...",
+      "causal_effect_used": -0.0312,
+      "status": "ok"
+    }
+    """
+
+    def post(self, request):
+        try:
+            import yfinance as yf
+
+            body = json.loads(request.body)
+            ticker = body.get("ticker", "AAPL").upper()
+            variable = body.get("variable", "VIX").upper()
+            sigma = float(body.get("sigma", -1.0))
+
+            # Fetch data
+            hist_df = yf.download(ticker, period="6mo", interval="1d", progress=False)
+            var_df = yf.download(variable, period="6mo", interval="1d", progress=False)
+
+            if hist_df.empty:
+                return JsonResponse({"error": f"No data for '{ticker}'"}, status=404)
+
+            # Run full causal analysis first
+            causal_agent = _get_causal_agent()
+            if causal_agent is None:
+                return JsonResponse(
+                    {"error": "Causal Agent not available"},
+                    status=500,
+                )
+
+            universe_data = {variable: var_df} if not var_df.empty else None
+            causal_result = causal_agent.analyze(
+                ticker=ticker,
+                target_hist_df=hist_df,
+                universe_data=universe_data,
+            )
+
+            # Find the causal effect of the requested variable
+            causal_effect = 0.0
+            for driver in causal_result.get("true_causal_drivers", []):
+                if driver["variable"] == variable:
+                    causal_effect = driver["causal_effect"]
+                    break
+
+            # Compute counterfactual
+            if not var_df.empty:
+                var_returns = np.log(var_df["Close"].values[1:] / var_df["Close"].values[:-1])
+                var_std = float(np.std(var_returns))
+                var_last = float(var_returns[-1]) if len(var_returns) > 0 else 0.0
+                var_mean = float(np.mean(var_returns))
+                hypothetical = var_mean + sigma * var_std
+            else:
+                var_std = 0.01
+                var_last = 0.0
+                var_mean = 0.0
+                hypothetical = sigma * var_std
+
+            # Factual last target return
+            tgt_returns = np.log(hist_df["Close"].values[1:] / hist_df["Close"].values[:-1])
+            factual_ret = float(tgt_returns[-1]) if len(tgt_returns) > 0 else 0.0
+
+            # Counterfactual: adjust for the do-operator
+            # Y_cf = Y_factual - beta_do × (X_actual - X_hypothetical)
+            cf_return = factual_ret - causal_effect * (var_last - hypothetical)
+            delta = cf_return - factual_ret
+
+            direction = "ABOVE" if sigma > 0 else "BELOW"
+            magnitude = abs(sigma)
+            narrative = (
+                f"If {variable} had been {magnitude:.1f} standard deviations "
+                f"{direction} its historical mean (do({variable}={hypothetical:.4f}) "
+                f"instead of observed {var_last:.4f}), {ticker} would have returned "
+                f"{cf_return * 100:+.3f}% instead of the factual {factual_ret * 100:+.3f}%. "
+                f"Δ = {delta * 100:+.3f}%. "
+                f"Causal effect used: β_do({variable}→{ticker}) = {causal_effect:.5f}."
+            )
+
+            return JsonResponse(
+                {
+                    "ticker": ticker,
+                    "variable": variable,
+                    "sigma": sigma,
+                    "query": f"What if {variable} had been {sigma:+.1f}σ from its mean?",
+                    "factual_return": round(factual_ret, 6),
+                    "counterfactual_return": round(cf_return, 6),
+                    "delta": round(delta, 6),
+                    "narrative": narrative,
+                    "causal_effect_used": round(causal_effect, 6),
+                    "status": "ok",
+                },
+                encoder=NumpySafeEncoder,
+            )
+
+        except Exception as exc:
+            return JsonResponse({"error": str(exc), "status": "error"}, status=500)

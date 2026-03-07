@@ -19,4 +19,10 @@ urlpatterns = [
 
     # GET  /api/topology/<ticker>/  — Phase 24: Topological Shape Agent Analysis
     path("topology/<str:ticker>/", views.TopologyView.as_view(), name="topology"),
+
+    # GET  /api/causal/<ticker>/  — Phase 25: Causal Discovery Agent Analysis
+    path("causal/<str:ticker>/", views.CausalAnalysisView.as_view(), name="causal-analysis"),
+
+    # POST /api/causal/counterfactual/  — Phase 25: On-Demand Counterfactual Query
+    path("causal/counterfactual/", views.CounterfactualQueryView.as_view(), name="counterfactual-query"),
 ]
