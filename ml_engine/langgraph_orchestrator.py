@@ -534,17 +534,27 @@ class FinFolioGraphOrchestrator:
         """Fetch macro universe data for Phase 25 causal analysis."""
         import yfinance as yf
         
-        UNIVERSE_TICKERS = ["SPY", "QQQ", "VIX", "TLT", "GLD", "DXY"]
+        # Map our clean internal names to Yahoo Finance's actual tickers
+        ticker_map = {
+            "SPY": "SPY",
+            "QQQ": "QQQ",
+            "VIX": "^VIX",       # Fix: Added caret for Yahoo Finance
+            "TLT": "TLT",
+            "GLD": "GLD",
+            "DXY": "DX-Y.NYB"    # Fix: Correct Yahoo Finance ticker for US Dollar Index
+        }
+        
         universe_data = {}
         
-        for sym in UNIVERSE_TICKERS:
+        print("\n   📊 [Causal Setup] Fetching macro universe data...")
+        for clean_name, yf_ticker in ticker_map.items():
             try:
-                universe_data[sym] = yf.download(sym, period="6mo", interval="1d", progress=False)
-            except Exception:
-                pass
+                # Download using the YF ticker, but store it under the clean name
+                universe_data[clean_name] = yf.download(yf_ticker, period="6mo", interval="1d", progress=False)
+            except Exception as e:
+                print(f"      ⚠️ Failed to fetch {clean_name} ({yf_ticker}): {e}")
         
         return universe_data
-
     # --------------------------------------------------------------------------
     # ROUTING LOGIC
     # --------------------------------------------------------------------------

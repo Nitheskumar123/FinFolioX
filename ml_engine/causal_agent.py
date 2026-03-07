@@ -145,7 +145,7 @@ class CausalAgent:
 
     def __init__(
         self,
-        lookback: int                  = 90,
+        lookback: int                  = 250,
         alpha: float                   = 0.05,
         max_causal_drivers: int        = 4,
         counterfactual_sigma: float    = 1.0,
