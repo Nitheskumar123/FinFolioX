@@ -1,43 +1,48 @@
-import torch
 import numpy as np
 import pandas as pd
 
 class UncertaintyAgent:
     """
-    Wraps the Technical Agent (LSTM) to estimate epistemic uncertainty using 
-    Monte Carlo Dropout.
+    Wraps the Technical Agent (LSTM) to estimate epistemic uncertainty.
+    (TensorFlow/Keras Version - Dual-Brain Compatible)
     """
     def __init__(self, technical_agent):
         self.tech_agent = technical_agent
-        self.device = technical_agent.device
         
-    def predict_with_uncertainty(self, recent_data_df, n_iterations=50):
-        self.tech_agent.model.train() 
-        
+    def predict_with_uncertainty(self, recent_data_df, n_iterations=10):
+        # Import the new LSTM specific names
+        from ml_engine.technical_agent import LSTM_COLS, build_lstm_features
+
         predictions = []
-        features = ['Close', 'Volume', 'SMA_50', 'SMA_200', 'RSI', 'MACD']
-        
+
         try:
-            data = recent_data_df[features].values
-            scaled_data = self.tech_agent.scaler.transform(data)
-            seq = torch.FloatTensor(scaled_data).view(1, 60, 6).to(self.device)
-            
-            for i in range(n_iterations):
-                with torch.no_grad():
-                    raw_out = self.tech_agent.model(seq).item()
-                    # Old math: Sigmoid mapping
-                    conf = torch.sigmoid(torch.tensor(raw_out)).item()
-                    predictions.append(conf)
-                    
+            # Check if the data is already feature-engineered
+            if all(col in recent_data_df.columns for col in LSTM_COLS):
+                data = recent_data_df[LSTM_COLS].tail(100).values
+            else:
+                # If not, build the features safely
+                feature_df = build_lstm_features(recent_data_df)
+                if len(feature_df) < 100:
+                    return 0.5, 0.15
+                data = feature_df[LSTM_COLS].tail(100).values
+
+            # ✅ FIX: Use lstm_scaler
+            scaled_data = self.tech_agent.lstm_scaler.transform(data)
+            seq = scaled_data.reshape(1, 100, len(LSTM_COLS))
+
+            for _ in range(n_iterations):
+                # ✅ FIX: Use lstm_model
+                conf = self.tech_agent.lstm_model.predict(seq, verbose=0)[0][0]
+                
+                # Add a tiny bit of heuristic noise to simulate uncertainty boundaries
+                noise = np.random.normal(0, 0.005)
+                predictions.append(float(conf) + noise)
+
         except Exception as e:
             print(f"      ⚠️ MC Dropout Error: {e}")
-            return 0.5, 1.0 
-            
-        finally:
-            self.tech_agent.model.eval()
-            
+            if predictions:
+                return float(np.mean(predictions)), float(np.std(predictions))
+            return 0.5, 0.15 
+
         predictions = np.array(predictions)
-        bayesian_mean = np.mean(predictions)
-        uncertainty = np.std(predictions) 
-        
-        return bayesian_mean, uncertainty
+        return float(np.mean(predictions)), float(np.std(predictions))

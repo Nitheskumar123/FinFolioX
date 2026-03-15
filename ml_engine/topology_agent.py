@@ -378,17 +378,17 @@ class TopologyAgent:
         Maps the topology chaos score to a Fusion confidence modifier.
 
         Low chaos (structured topology) → slight boost to confidence.
-        High chaos (disordered topology) → penalty on confidence.
-
-        LOOP structure is particularly penalised for BUY signals because
-        the attractor manifold predicts mean-reversion, not breakout.
+        High chaos (disordered topology) → gentle penalty on confidence.
         """
-        base_mod = 1.0 - (chaos_score - 0.5) * 0.50  # 0.5 chaos → 1.0x  |  1.0 chaos → 0.75x
+        # Relaxed penalty: 0.5 chaos → 1.0x  |  1.0 chaos → 0.90x (instead of 0.75x)
+        base_mod = 1.0 - (chaos_score - 0.5) * 0.20  
+        
         if dominant_structure == "LOOP":
-            base_mod *= 0.90  # extra 10% cut for loop (likely sideways)
+            base_mod *= 0.95  # Gentle 5% cut for loop (likely sideways)
         elif dominant_structure == "TREND":
-            base_mod = min(base_mod * 1.05, 1.20)  # slight boost for clean trend
-        return float(np.clip(base_mod, 0.55, 1.20))
+            base_mod = min(base_mod * 1.05, 1.10)  # max 10% boost for clean trend
+            
+        return float(np.clip(base_mod, 0.85, 1.10))
 
     # ──────────────────────────────────────────────────────────────────────
     # SERIALISATION

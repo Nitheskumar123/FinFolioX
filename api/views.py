@@ -122,6 +122,9 @@ def _get_causal_agent():
 # ==============================================================================
 # 1. POST /api/analyze/ — Run the full AI pipeline
 # ==============================================================================
+# ==============================================================================
+# 1. POST /api/analyze/ — Run the full AI pipeline
+# ==============================================================================
 class AnalyzeView(APIView):
     """
     Accepts {"ticker": "AAPL"} and runs the LangGraph orchestrator.
@@ -140,39 +143,32 @@ class AnalyzeView(APIView):
         try:
             system = _get_system()
 
-            # Check if LangGraph orchestrator is available
-            try:
-                from ml_engine.langgraph_orchestrator import FinFolioGraphOrchestrator
-                orchestrator = FinFolioGraphOrchestrator(system)
-                final_state = orchestrator.run_analysis(ticker)
+            # ✅ REMOVED THE FALLBACK TRAP!
+            # If there is an import error here, it will now print to the terminal!
+            print(f"\n🌐 API REQUEST: Forcing LangGraph Orchestrator for {ticker}...")
+            
+            from ml_engine.langgraph_orchestrator import FinFolioGraphOrchestrator
+            
+            orchestrator = FinFolioGraphOrchestrator(system)
+            final_state = orchestrator.run_analysis(ticker)
 
-                if final_state.get("error"):
-                    return Response(
-                        {"error": final_state["error"]},
-                        status=status.HTTP_500_INTERNAL_SERVER_ERROR
-                    )
-
-                # Convert AgentState to a clean JSON-safe dictionary
-                result = _state_to_json(final_state, ticker)
-                return Response(result, status=status.HTTP_200_OK)
-
-            except ImportError:
-                # Fallback: use master_system.analyze_stock() directly
-                system.analyze_stock(ticker)
+            if final_state.get("error"):
                 return Response(
-                    {"message": f"Analysis complete for {ticker}. Check terminal logs.",
-                     "ticker": ticker},
-                    status=status.HTTP_200_OK
+                    {"error": final_state["error"]},
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR
                 )
 
+            # Convert AgentState to a clean JSON-safe dictionary
+            result = _state_to_json(final_state, ticker)
+            return Response(result, status=status.HTTP_200_OK)
+
         except Exception as e:
+            # ✅ Now, if ANYTHING goes wrong, it will print the exact error to the terminal
             traceback.print_exc()
             return Response(
                 {"error": str(e), "traceback": traceback.format_exc()},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
-
-
 # ==============================================================================
 # 2. GET /api/history/ — Read decision ledger
 # ==============================================================================

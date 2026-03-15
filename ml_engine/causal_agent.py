@@ -770,11 +770,12 @@ class CausalAgent:
     def _confidence_modifier(self, causal_score: float, n_confounders: int) -> float:
         """
         High causal clarity + few confounders → boost Fusion confidence.
-        Low causal clarity + many confounders → penalise.
+        Low causal clarity + many confounders → gentle penalty.
         """
-        base = 0.7 + causal_score * 0.60   # 0.7 – 1.3
-        confounder_penalty = min(n_confounders * 0.05, 0.25)
-        return float(np.clip(base - confounder_penalty, 0.55, 1.30))
+        # Relaxed penalty: base is now 0.85 - 1.15
+        base = 0.85 + causal_score * 0.30   
+        confounder_penalty = min(n_confounders * 0.02, 0.10) # Max 10% penalty for confounders
+        return float(np.clip(base - confounder_penalty, 0.85, 1.15))
 
     # ──────────────────────────────────────────────────────────────────────
     # SERIALISATION

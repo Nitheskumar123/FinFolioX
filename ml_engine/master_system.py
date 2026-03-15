@@ -131,13 +131,17 @@ class FinFolioSystem:
         MODELS_DIR = os.path.join(BASE_DIR, "saved_models")
 
         # 1. Technical Agent
-        print("\n   🔹 [1/9] Loading Technical Agent (LSTM Chart Reader)...")
+        # 1. Technical Agent
+        # 1. Technical Agent
+        print("\n   🔹 [1/9] Loading Technical Agent (Dual-Brain)...")
         try:
             self.tech_agent = TechnicalAgent(
-                model_path=os.path.join(MODELS_DIR, "lstm_technical.pth"),
-                scaler_path=os.path.join(MODELS_DIR, "scaler.pkl"),
+                lstm_model_path=os.path.join(MODELS_DIR, "best_model.keras"),
+                lstm_scaler_path=os.path.join(MODELS_DIR, "scaler.pkl"),
+                trans_model_path=os.path.join(MODELS_DIR, "transformer.keras"),
+                trans_scaler_path=os.path.join(MODELS_DIR, "transformer_scaler.pkl")
             )
-            print("      ✅ LSTM Model Loaded Successfully.")
+            print("      ✅ Dual-Brain Architecture Online.")
         except Exception as e:
             print(f"      ❌ Critical Error loading Technical Agent: {e}")
             sys.exit(1)
@@ -289,25 +293,31 @@ class FinFolioSystem:
             return None, f"❌ Data Connection Error: {e}"
 
     def _analyze_technicals_and_uncertainty(self, hist):
-        """Runs LSTM, Bayesian Uncertainty, and SHAP Explainability."""
-        last_60_days = hist[["Close", "Volume", "SMA_50", "SMA_200", "RSI", "MACD"]].tail(60)
+        """Runs Dual-Brain AI, Bayesian Uncertainty, and SHAP Explainability."""
+        print("\n   📈 [Technical Analysis] Reading Charts (LSTM + Transformer)...")
+        
+        # 1. Get the Fused Signal from the Dual-Brain
+        lstm_signal = self.tech_agent.predict(hist)
+        print(f"      - Fused Technical Signal: {lstm_signal:.4f}")
 
-        print("\n   📈 [Technical Analysis] Reading Charts (LSTM v2)...")
-        lstm_signal = self.tech_agent.predict(last_60_days)
-        print(f"      - Standard LSTM Signal: {lstm_signal:.4f}")
+        # 2. Build features for SHAP/Uncertainty (We use the LSTM features as the baseline for Explainability)
+        from ml_engine.technical_agent import build_lstm_features
+        feature_df = build_lstm_features(hist)
+        last_100_days = feature_df.tail(100)
 
         if self.explainability_agent is None:
-            self.explainability_agent = ExplainabilityAgent(self.tech_agent, hist)
+            self.explainability_agent = ExplainabilityAgent(self.tech_agent, feature_df)
 
         print("   🔍 [Explainability] Running SHAP Analysis...")
-        shap_scores, top_driver = self.explainability_agent.explain_prediction(last_60_days)
+        shap_scores, top_driver = self.explainability_agent.explain_prediction(last_100_days)
         if shap_scores:
-            print(f"      - Top Driver: {top_driver} (Impact: {shap_scores[top_driver]:.4f})")
+            impact_val = shap_scores.get(top_driver, 0.0)
+            print(f"      - Top Driver: {top_driver} (Impact: {impact_val:.4f})")
             sorted_feats = sorted(shap_scores.items(), key=lambda x: abs(x[1]), reverse=True)[:3]
             print(f"      - Key Factors: {', '.join([f'{k}={v:.3f}' for k, v in sorted_feats])}")
 
-        print("   🎲 [Uncertainty Agent] Running Monte Carlo Simulation (50 runs)...")
-        mc_mean, mc_std = self.uncertainty_agent.predict_with_uncertainty(last_60_days)
+        print("   🎲 [Uncertainty Agent] Running Monte Carlo Simulation (10 runs)...")
+        mc_mean, mc_std = self.uncertainty_agent.predict_with_uncertainty(last_100_days)
 
         uncertainty_status = "✅ High Certainty"
         if mc_std > UNCERTAINTY_THRESHOLD_MODERATE:
@@ -319,7 +329,6 @@ class FinFolioSystem:
         print(f"      - Uncertainty (StdDev): {mc_std:.4f} ({uncertainty_status})")
 
         return lstm_signal, mc_mean, mc_std, uncertainty_status, top_driver
-
     def _analyze_sentiment_module(self, ticker, stock_obj, lstm_signal):
         """
         Phase 22: Live News Ingestion via MCP.
