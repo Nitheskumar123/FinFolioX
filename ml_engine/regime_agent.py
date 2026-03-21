@@ -94,7 +94,7 @@ class RegimeAgent:
         try:
             if recent_data.ndim == 1:
                 recent_data = recent_data.reshape(1, -1)
-            state = self.model.predict(recent_data)[0]
+            state = self.model.predict(recent_data)[-1]  # [-1] = today, not 30 days ago
             return state
         except:
             return 0

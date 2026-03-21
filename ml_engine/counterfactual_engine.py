@@ -80,7 +80,7 @@ class CounterfactualEngine:
     # A. REGRET MATRIX (The Math Engine)
     # ------------------------------------------------------------------
     def analyze(self, actual_decision, decision_price, actual_price_t5,
-                confidence=0.5):
+                confidence=0.5, tlt_price_start=None, tlt_price_end=None):
         """
         Simulates BUY/SELL/HOLD universes and calculates regret.
 
@@ -99,8 +99,19 @@ class CounterfactualEngine:
         sell_pnl = -price_change_pct - TRADE_COMMISSION
 
         # --- Universe C: HOLD ---
-        # If held cash: no profit, no loss
+        # If held cash: L3 FIX - dynamic risk-free rate proxy rather than hard 0.0
+        # Assuming ~5% annual risk-free rate ≈ 0.02% per 1 trading day (5 days ~ 0.1%)
         hold_pnl = 0.0
+        if tlt_price_start is not None and tlt_price_end is not None:
+            # TLT represents the bond alternative
+            try:
+                tlt_change = (tlt_price_end - tlt_price_start) / tlt_price_start
+                # Scale it down to mimic a safe cash yield vs long bond
+                hold_pnl = tlt_change * 0.20
+            except ZeroDivisionError:
+                hold_pnl = 0.001
+        else:
+            hold_pnl = 0.001 # 0.1% for 5 days is a reasonable cash proxy
 
         # Build the universe map
         universes = {

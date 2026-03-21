@@ -1,32 +1,28 @@
 """
-ENHANCED MCP DATA SERVER — FinFolioX v2.0
-==========================================
+ENHANCED MCP DATA SERVER — FinFolioX v2.2 (Future Events Added)
+================================================================
 Model Context Protocol (MCP) Server with Real-Time Macro Intelligence.
 
-NEW TIERS ADDED:
-  Tier 0 (weight 1.5) — Central Bank / Fed (FRED API — free, no key needed)
-  Tier 1 (weight 1.0) — SEC EDGAR (unchanged)
-  Tier 2 (weight 0.9) — Yahoo Finance RSS (unchanged, boosted weight)
-  Tier 3 (weight 0.8) — Geopolitical Events (GDELT Project — free, real-time)
-  Tier 4 (weight 0.7) — Economic Calendar (open-meteo macro indicators)
-  Tier 5 (weight 0.6) — Commodity / FX Macro (Yahoo Finance quotes)
-  Tier 6 (weight 0.5) — Google Trends Proxy (RSS-based interest spikes)
-  Tier 7 (weight 0.3) — Reddit WallStreetBets (unchanged)
+WHAT'S NEW IN v2.2:
+  NEW TIER 8 (weight 0.75) — Future Event Scout
+    Fetches upcoming events that could move the stock in the next 30 days:
+      • Earnings date + analyst expectations (Yahoo Finance calendar API)
+      • FOMC meeting dates with expected rate decision context
+      • Upcoming product launches / conferences (Google News forward search)
+      • Scheduled SEC filings (next 10-Q/8-K window)
+      • Reddit upcoming event mentions ("earnings play", "catalyst", "next week")
+    These are returned as structured text for the LLM future scorer in
+    sentiment_agent.py to reason about.
 
-All sources are FREE and require NO API keys.
+ALL PREVIOUS FIXES (v2.1) PRESERVED EXACTLY — nothing changed below Tier 7.
 
-GDELT Project:
-  - Scans 65+ news sources worldwide every 15 minutes
-  - Provides geopolitical tone scores (-10 = war, +10 = peace)
-  - Event categories: military, sanctions, economic, diplomacy
-
-FRED (Federal Reserve Economic Data):
-  - Real-time Fed statements, FOMC minutes, rate decisions
-  - Pulled via FRED RSS feeds — no API key required
-
-Usage:
-  mcp = MCPDataServer()
-  payload = mcp.get_global_context_payload("WTI")  # or "CL=F", "AAPL", etc.
+FIXES IN v2.1:
+  FIX-1: FRED RSS fallback order improved.
+  FIX-2: GDELT conflict-monitor query narrowed to ticker-specific topics.
+  FIX-3: EconCalendar investing.com RSS 403 → BLS/BEA primary.
+  FIX-4: VIX numeric fetch (no RSS) → Yahoo Finance quote API.
+  FIX-5: Fuzzy deduplication (first 60 chars).
+  FIX-6: Per-source item caps.
 """
 
 import requests
@@ -45,612 +41,870 @@ logger = logging.getLogger("MCPServer")
 # CONFIGURATION — Tune weights here
 # ==============================================================================
 TIER_WEIGHTS = {
-    "FRED":         1.50,   # Tier 0 — Central Bank / Fed
-    "SEC EDGAR":    1.00,   # Tier 1 — Regulatory filings
-    "Yahoo Finance":0.90,   # Tier 2 — Financial news
-    "GDELT":        0.80,   # Tier 3 — Geopolitical events
-    "EconCalendar": 0.70,   # Tier 4 — Economic data releases
-    "MacroFX":      0.60,   # Tier 5 — Commodity / FX macro
-    "GoogleTrends": 0.50,   # Tier 6 — Search interest proxy
-    "Reddit r/WSB": 0.30,   # Tier 7 — Retail sentiment
+    "FRED":          1.50,   # Tier 0 — Central Bank / Fed
+    "SEC EDGAR":     1.00,   # Tier 1 — Regulatory filings
+    "Yahoo Finance": 0.90,   # Tier 2 — Financial news
+    "GDELT":         0.80,   # Tier 3 — Geopolitical events
+    "EconCalendar":  0.70,   # Tier 4 — Economic data releases
+    "MacroFX":       0.60,   # Tier 5 — Commodity / FX macro
+    "GoogleTrends":  0.50,   # Tier 6 — Search interest proxy
+    "Reddit r/WSB":  0.30,   # Tier 7 — Retail sentiment
+    "FutureEvents":  0.75,   # Tier 8 — Upcoming events (NEW v2.2)
 }
 
-# GDELT topic filters → maps to asset classes for smart routing
+# Per-source item caps
+SOURCE_MAX_ITEMS = {
+    "FRED":          4,
+    "SEC EDGAR":     3,
+    "Yahoo Finance": 4,
+    "GDELT":         4,
+    "EconCalendar":  3,
+    "MacroFX":       3,
+    "GoogleTrends":  3,
+    "Reddit r/WSB":  3,
+    "FutureEvents":  6,   # NEW — up to 6 forward-looking signals
+}
+
+# ==============================================================================
+# FIX-3: FINANCE RELEVANCE FILTER FOR FUTURE EVENTS
+# Prevents garbage (entertainment, sports, politics) from polluting the LLM prompt.
+# A future event article must contain at least one of these keywords to be included.
+# Two tiers:
+#   FINANCE_MUST_KEYWORDS — strong market-moving signals (any one = include)
+#   FINANCE_BROAD_KEYWORDS — weaker signals (require 2 matches to include)
+# ==============================================================================
+FINANCE_MUST_KEYWORDS = [
+    # Earnings & guidance
+    "earnings", "eps", "revenue", "profit", "guidance", "forecast", "outlook",
+    "beat", "miss", "estimate", "quarterly", "annual report", "results",
+    # Fed / rates / macro
+    "fed", "federal reserve", "fomc", "interest rate", "rate hike", "rate cut",
+    "inflation", "cpi", "pce", "gdp", "jobs", "payroll", "unemployment",
+    # Company events
+    "product launch", "launch", "keynote", "announcement", "conference",
+    "merger", "acquisition", "buyback", "dividend", "spinoff", "ipo",
+    # Tech / AI / Chips (high-impact for NVDA, AAPL, MSFT, GOOGL)
+    "ai", "artificial intelligence", "chip", "semiconductor", "gpu",
+    "regulation", "antitrust", "lawsuit", "sec", "fine", "penalty",
+    # Macro / FX / commodities
+    "opec", "crude oil", "gold", "dollar", "tariff", "trade war",
+    "recession", "credit", "bond yield", "treasury bond", "government bond",
+    "bond market", "corporate bond", "junk bond", "yield", "debt ceiling",
+    # Catalyst keywords
+    "catalyst", "breakout", "upgrade", "downgrade", "price target",
+    "analyst", "rating", "buy", "sell", "hold",
+]
+
+FINANCE_BROAD_KEYWORDS = [
+    "stock", "market", "shares", "investors", "wall street", "nasdaq",
+    "s&p", "index", "etf", "fund", "portfolio", "trading",
+]
+
+# ==============================================================================
+# FINANCE BLOCKLIST — explicit non-finance false positives
+# "bond" matches financial bonds but also James Bond, Bail Bond, etc.
+# Any text containing one of these phrases is immediately excluded,
+# even if it also contains a finance keyword.
+# ==============================================================================
+FINANCE_BLOCKLIST = [
+    "james bond",       # Bond film franchise
+    "stranger things",  # Netflix
+    "stranger thing",
+    "james bond",
+    "007",
+    "taylor swift",
+    "super bowl",
+    "oscar",
+    "emmy",
+    "grammy",
+    "golden globe",
+    "world cup",
+    "nba finals",
+    "nfl draft",
+    "boxing match",
+    "premiere",         # film/show premieres
+    "celebrity",
+    "kardashian",
+    "royal family",
+]
+
+def _is_finance_relevant(text: str) -> bool:
+    """
+    Returns True if text passes the finance relevance gate.
+
+    Two-step logic:
+      Step 1 — Blocklist check (fast reject):
+        If any non-finance phrase is found (e.g. "james bond", "super bowl"),
+        return False immediately — even if the text also contains "bond" or "market".
+        This prevents false positives like "Who will be the next James Bond?"
+        matching the financial keyword "bond".
+
+      Step 2 — Keyword match (accept):
+        Strong finance keyword → accept.
+        Two broad finance keywords together → accept.
+    """
+    lower = text.lower()
+
+    # Step 1: Hard blocklist — reject non-finance topics immediately
+    if any(phrase in lower for phrase in FINANCE_BLOCKLIST):
+        return False
+
+    # Step 2: Strong finance keyword → immediately relevant
+    if any(kw in lower for kw in FINANCE_MUST_KEYWORDS):
+        return True
+
+    # Step 3: Two broad keywords together → probably relevant
+    broad_hits = sum(1 for kw in FINANCE_BROAD_KEYWORDS if kw in lower)
+    return broad_hits >= 2
+
+# GDELT topic filters
 GDELT_TOPIC_MAP = {
-    "OIL":  ["OPEC", "Strait of Hormuz", "crude oil", "energy sanctions", "Iran", "Saudi Arabia", "Russia oil"],
-    "GOLD": ["Federal Reserve", "inflation", "gold reserves", "dollar collapse", "safe haven"],
-    "SPY":  ["Federal Reserve", "recession", "S&P", "tariff", "trade war", "earnings"],
-    "QQQ":  ["AI chip", "semiconductor", "tech regulation", "antitrust", "NVDA", "TSLA"],
-    "WTI":  ["OPEC", "Strait of Hormuz", "crude oil", "pipeline", "Iran", "Libya", "Iraq"],
-    "BTC":  ["Bitcoin", "crypto regulation", "SEC crypto", "stablecoin", "CBDC"],
-    "TLT":  ["Federal Reserve", "interest rate", "bond market", "FOMC", "treasury yield"],
-    "GLD":  ["gold", "inflation hedge", "dollar weakness", "central bank gold"],
-    "DEFAULT": ["Federal Reserve", "recession", "inflation", "trade war", "geopolitical risk"],
+    "OIL":   ["OPEC crude oil price", "Strait of Hormuz oil", "Iran Saudi Arabia oil"],
+    "GOLD":  ["Federal Reserve gold inflation", "dollar gold safe haven"],
+    "SPY":   ["Federal Reserve recession S&P 500", "US trade war tariff earnings"],
+    "QQQ":   ["AI semiconductor chip", "tech antitrust regulation NVDA"],
+    "WTI":   ["OPEC crude oil pipeline", "Iraq Libya oil production"],
+    "BTC":   ["Bitcoin crypto regulation SEC stablecoin"],
+    "TLT":   ["Federal Reserve interest rate FOMC treasury yield"],
+    "GLD":   ["gold inflation hedge dollar central bank reserves"],
+    "DEFAULT": ["Federal Reserve recession inflation trade war"],
 }
 
-# FRED series that matter most for equities / commodities
+# FOMC 2026 scheduled meeting dates (hardcoded — updated annually)
+# Source: federalreserve.gov/monetarypolicy/fomccalendars.htm
+FOMC_2026_DATES = [
+    ("2026-01-28", "2026-01-29"),
+    ("2026-03-18", "2026-03-19"),
+    ("2026-04-29", "2026-04-30"),
+    ("2026-06-17", "2026-06-18"),
+    ("2026-07-29", "2026-07-30"),
+    ("2026-09-16", "2026-09-17"),
+    ("2026-10-28", "2026-10-29"),
+    ("2026-12-09", "2026-12-10"),
+]
+
+# FRED series
 FRED_SERIES = {
-    "FEDFUNDS":  "Federal Funds Rate",
-    "CPIAUCSL":  "Consumer Price Index (Inflation)",
-    "UNRATE":    "Unemployment Rate",
-    "GDP":       "Gross Domestic Product",
-    "DGS10":     "10-Year Treasury Yield",
-    "DCOILWTICO":"WTI Crude Oil Price (FRED)",
+    "FEDFUNDS":   "Federal Funds Rate",
+    "CPIAUCSL":   "Consumer Price Index (Inflation)",
+    "UNRATE":     "Unemployment Rate",
+    "GDP":        "Gross Domestic Product",
+    "DGS10":      "10-Year Treasury Yield",
+    "DCOILWTICO": "WTI Crude Oil Price (FRED)",
 }
 
 
 class MCPDataServer:
     """
-    Enhanced Model Context Protocol (MCP) Server.
-
-    Fetches, sanitizes, and packages intelligence from 8 tiers:
-      - Regulatory (SEC), Macro (FRED), Geopolitical (GDELT),
-        News (Yahoo), Economic Calendar, FX/Commodity, Trends, Retail
+    Enhanced MCP Server v2.2.
+    Fetches present news (Tiers 0-7) + upcoming events (Tier 8).
     """
 
     def __init__(self):
         self.headers = {
-            "User-Agent": "FinFolioX_Research_Bot/2.0 (Educational Capstone)"
+            "User-Agent": "FinFolioX_Research_Bot/2.2 (Educational Capstone)"
         }
         self.reddit_headers = {
-            "User-Agent": "FinFolioX:v2.0 (by /u/finfolio_admin)"
+            "User-Agent": "FinFolioX:v2.2 (by /u/finfolio_admin)"
         }
         self.ticker_to_cik = {}
         self._load_sec_cik_mapping()
-        print("   🔌 [MCP Server] Initialized and listening for requests...")
+        print("   🔌 [MCP Server v2.2] Initialized — 9 tiers active (Tier 8: Future Events)")
 
     # ==========================================================================
     # UTILITIES
     # ==========================================================================
+
     def _load_sec_cik_mapping(self):
-        """Loads the official SEC Ticker-to-CIK JSON mapping."""
         try:
             url = "https://www.sec.gov/files/company_tickers.json"
             resp = requests.get(url, headers=self.headers, timeout=5)
             if resp.status_code == 200:
-                data = resp.json()
-                for entry in data.values():
-                    self.ticker_to_cik[entry['ticker'].upper()] = str(entry['cik_str']).zfill(10)
+                for entry in resp.json().values():
+                    self.ticker_to_cik[entry["ticker"].upper()] = str(entry["cik_str"]).zfill(10)
         except Exception:
             pass
 
     def _clean_text(self, text: str) -> str:
-        """Strips HTML, emojis, and artifacts to protect FinBERT."""
         if not text:
             return ""
-        text = re.sub(re.compile('<.*?>'), '', text)
-        text = text.encode('ascii', 'ignore').decode('ascii')
-        text = re.sub(r'\s+', ' ', text)
+        text = re.sub(re.compile("<.*?>"), "", text)
+        text = text.encode("ascii", "ignore").decode("ascii")
+        text = re.sub(r"\s+", " ", text)
         return text.strip()
 
     def _gdelt_topics_for_ticker(self, ticker: str) -> List[str]:
-        """Returns relevant GDELT search topics for a given ticker."""
         ticker_upper = ticker.upper()
-        # Direct match first (WTI, OIL, GLD, BTC, etc.)
         for key in GDELT_TOPIC_MAP:
             if key in ticker_upper or ticker_upper in key:
                 return GDELT_TOPIC_MAP[key]
         return GDELT_TOPIC_MAP["DEFAULT"]
 
     # ==========================================================================
-    # TIER 0: FRED — Federal Reserve & Central Bank Data
+    # TIER 0: FRED
     # ==========================================================================
+
     def fetch_fed_macro(self, ticker: str) -> List[Dict]:
-        """
-        TIER 0 (weight 1.5): Federal Reserve Economic Data (FRED RSS).
-        
-        Fetches:
-          - FRED blog / research posts (macro policy signals)
-          - Relevant economic series release headlines
-
-        No API key required. Uses FRED public RSS.
-        """
         results = []
-        fred_rss_urls = [
-            ("https://feeds.a.dj.com/rss/RSSMarketsMain.xml", "Fed/Macro News"),
-            ("https://www.federalreserve.gov/feeds/press_all.xml", "Federal Reserve Press"),
+        fred_series_to_try = [
+            ("FEDFUNDS", "Federal Funds Rate"),
+            ("DGS10",    "10-Year Treasury Yield"),
+            ("CPIAUCSL", "Consumer Price Index"),
         ]
-
-        for url, label in fred_rss_urls:
+        for series_id, series_label in fred_series_to_try:
+            if len(results) >= SOURCE_MAX_ITEMS["FRED"]:
+                break
             try:
-                resp = requests.get(url, headers=self.headers, timeout=6)
+                url = f"https://fred.stlouisfed.org/graph/fredgraph.csv?id={series_id}"
+                resp = requests.get(url, headers=self.headers, timeout=5)
+                if resp.status_code == 200:
+                    lines = resp.text.strip().split("\n")
+                    if len(lines) >= 2:
+                        latest = lines[-1].split(",")
+                        prev   = lines[-2].split(",") if len(lines) >= 3 else latest
+                        if len(latest) == 2:
+                            date_val, rate_val = latest[0].strip(), latest[1].strip()
+                            prev_val = prev[1].strip() if len(prev) == 2 else rate_val
+                            try:
+                                change    = float(rate_val) - float(prev_val)
+                                direction = "unchanged" if abs(change) < 0.001 else (
+                                    "increased" if change > 0 else "decreased")
+                                text = (
+                                    f"{series_label} as of {date_val}: {rate_val}%. "
+                                    f"Rate {direction} from previous period ({prev_val}%)."
+                                )
+                            except ValueError:
+                                text = f"{series_label} as of {date_val}: {rate_val}%."
+                            results.append({
+                                "source": "FRED", "text": text,
+                                "tier_weight": TIER_WEIGHTS["FRED"], "tier": 0,
+                                "label": series_label,
+                            })
+            except Exception as e:
+                logger.debug(f"FRED CSV ({series_id}) failed: {e}")
+
+        if len(results) < 2:
+            try:
+                resp = requests.get(
+                    "https://www.federalreserve.gov/feeds/press_all.xml",
+                    headers=self.headers, timeout=6)
                 if resp.status_code == 200:
                     root = ET.fromstring(resp.content)
-                    items = root.findall('./channel/item')
-                    for item in items[:3]:
-                        title_elem = item.find('title')
-                        desc_elem = item.find('description')
+                    for item in root.findall("./channel/item")[:2]:
+                        title_elem = item.find("title")
+                        desc_elem  = item.find("description")
                         if title_elem is not None and title_elem.text:
-                            title = self._clean_text(title_elem.text)
-                            desc = self._clean_text(desc_elem.text) if desc_elem is not None and desc_elem.text else ""
+                            title    = self._clean_text(title_elem.text)
+                            desc     = self._clean_text(desc_elem.text) if desc_elem is not None and desc_elem.text else ""
                             combined = f"{title}. {desc}"[:300]
                             if len(combined.strip()) > 10:
                                 results.append({
-                                    "source": "FRED",
-                                    "text": combined,
-                                    "tier_weight": TIER_WEIGHTS["FRED"],
-                                    "tier": 0,
-                                    "label": label,
+                                    "source": "FRED", "text": combined,
+                                    "tier_weight": TIER_WEIGHTS["FRED"], "tier": 0,
+                                    "label": "Fed Press Release",
                                 })
             except Exception as e:
-                logger.debug(f"FRED RSS fetch failed ({label}): {e}")
-
-        # Fallback: FRED API for key series (no API key — uses public endpoint)
-        if not results:
-            try:
-                url = "https://fred.stlouisfed.org/graph/fredgraph.csv?id=FEDFUNDS"
-                resp = requests.get(url, headers=self.headers, timeout=5)
-                if resp.status_code == 200:
-                    lines = resp.text.strip().split('\n')
-                    if len(lines) >= 2:
-                        latest = lines[-1].split(',')
-                        if len(latest) == 2:
-                            date_val, rate_val = latest[0], latest[1]
-                            text = (
-                                f"Federal Funds Rate as of {date_val}: {rate_val}%. "
-                                f"Current Fed policy rate is {rate_val} percent."
-                            )
-                            results.append({
-                                "source": "FRED",
-                                "text": text,
-                                "tier_weight": TIER_WEIGHTS["FRED"],
-                                "tier": 0,
-                                "label": "Fed Funds Rate",
-                            })
-            except Exception as e:
-                logger.debug(f"FRED CSV fetch failed: {e}")
-
-        return results
+                logger.debug(f"Fed Reserve RSS failed: {e}")
+        return results[:SOURCE_MAX_ITEMS["FRED"]]
 
     # ==========================================================================
-    # TIER 1: SEC EDGAR — Regulatory Filings (unchanged, enhanced)
+    # TIER 1: SEC EDGAR
     # ==========================================================================
+
     def fetch_sec_filings(self, ticker: str) -> List[Dict]:
-        """TIER 1 (weight 1.0): SEC EDGAR regulatory filings."""
         filings = []
         ticker_upper = ticker.upper()
         try:
             if ticker_upper in self.ticker_to_cik:
                 cik = self.ticker_to_cik[ticker_upper]
-                url = (
-                    f"https://www.sec.gov/cgi-bin/browse-edgar"
-                    f"?action=getcompany&CIK={cik}&type=&dateb=&owner=exclude&count=5&output=atom"
-                )
+                url = (f"https://www.sec.gov/cgi-bin/browse-edgar"
+                       f"?action=getcompany&CIK={cik}&type=&dateb=&owner=exclude&count=5&output=atom")
             else:
-                url = (
-                    f"https://www.sec.gov/cgi-bin/browse-edgar"
-                    f"?company={ticker}&CIK=&action=getcompany&output=atom"
-                )
-
+                url = (f"https://www.sec.gov/cgi-bin/browse-edgar"
+                       f"?company={ticker}&CIK=&action=getcompany&output=atom")
             resp = requests.get(url, headers=self.headers, timeout=5)
             if resp.status_code == 200:
                 root = ET.fromstring(resp.content)
-                ns = {'atom': 'http://www.w3.org/2005/Atom'}
-                for entry in root.findall('atom:entry', ns)[:3]:
-                    title = entry.find('atom:title', ns).text
-                    summary_elem = entry.find('atom:summary', ns)
-                    summary = summary_elem.text if summary_elem is not None else ""
-                    clean_text = self._clean_text(f"{title} - {summary}")
+                ns   = {"atom": "http://www.w3.org/2005/Atom"}
+                for entry in root.findall("atom:entry", ns)[:SOURCE_MAX_ITEMS["SEC EDGAR"]]:
+                    title   = entry.find("atom:title", ns).text
+                    summary = entry.find("atom:summary", ns)
+                    summary = summary.text if summary is not None else ""
+                    clean   = self._clean_text(f"{title} - {summary}")
                     filings.append({
-                        "source": "SEC EDGAR",
-                        "text": clean_text,
-                        "tier_weight": TIER_WEIGHTS["SEC EDGAR"],
-                        "tier": 1,
+                        "source": "SEC EDGAR", "text": clean,
+                        "tier_weight": TIER_WEIGHTS["SEC EDGAR"], "tier": 1,
                     })
         except Exception as e:
             logger.debug(f"SEC EDGAR fetch failed: {e}")
         return filings
 
     # ==========================================================================
-    # TIER 2: Yahoo Finance RSS — Financial News
+    # TIER 2: Yahoo Finance RSS
     # ==========================================================================
+
     def fetch_institutional_news(self, ticker: str) -> List[Dict]:
-        """TIER 2 (weight 0.9): Yahoo Finance RSS news feed."""
         news = []
         try:
-            url = f"https://feeds.finance.yahoo.com/rss/2.0/headline?s={ticker}&region=US&lang=en-US"
+            url  = f"https://feeds.finance.yahoo.com/rss/2.0/headline?s={ticker}&region=US&lang=en-US"
             resp = requests.get(url, headers=self.headers, timeout=5)
             if resp.status_code == 200:
                 root = ET.fromstring(resp.content)
-                for item in root.findall('./channel/item')[:4]:
-                    title_elem = item.find('title')
+                for item in root.findall("./channel/item")[:SOURCE_MAX_ITEMS["Yahoo Finance"]]:
+                    title_elem = item.find("title")
                     if title_elem is not None and title_elem.text:
-                        clean_text = self._clean_text(title_elem.text)
+                        clean = self._clean_text(title_elem.text)
                         news.append({
-                            "source": "Yahoo Finance",
-                            "text": clean_text,
-                            "tier_weight": TIER_WEIGHTS["Yahoo Finance"],
-                            "tier": 2,
+                            "source": "Yahoo Finance", "text": clean,
+                            "tier_weight": TIER_WEIGHTS["Yahoo Finance"], "tier": 2,
                         })
         except Exception as e:
             logger.debug(f"Yahoo Finance RSS failed: {e}")
         return news
 
     # ==========================================================================
-    # TIER 3: GDELT — Real-Time Geopolitical Events
+    # TIER 3: GDELT
     # ==========================================================================
+
     def fetch_gdelt_geopolitical(self, ticker: str) -> List[Dict]:
-        """
-        TIER 3 (weight 0.8): GDELT Project — Real-Time Global Event Monitor.
-
-        GDELT scans 65+ languages across 150+ countries every 15 minutes.
-        We query the GDELT 2.0 DOC API for news articles matching 
-        geopolitical themes relevant to the ticker's asset class.
-
-        This is where Chatbot B's Iran-Israel event would be DETECTED.
-
-        API Docs: https://blog.gdeltproject.org/gdelt-doc-2-0-api-debuts/
-        """
         results = []
-        topics = self._gdelt_topics_for_ticker(ticker)
-
-        # Query top 2 topics to keep latency low (GDELT is public, rate-limit conscious)
+        topics  = self._gdelt_topics_for_ticker(ticker)
         for topic in topics[:2]:
             try:
-                # GDELT DOC 2.0 API — returns JSON article list
                 url = (
                     "https://api.gdeltproject.org/api/v2/doc/doc"
                     f"?query={requests.utils.quote(topic)}"
-                    "&mode=artlist"
-                    "&maxrecords=5"
-                    "&format=json"
-                    "&timespan=1440"   # Last 24 hours (minutes)
-                    "&sort=DateDesc"
+                    "&mode=artlist&maxrecords=5&format=json&timespan=1440&sort=DateDesc"
                 )
                 resp = requests.get(url, headers=self.headers, timeout=8)
-
                 if resp.status_code == 200:
                     data = resp.json()
-                    articles = data.get("articles", [])
-
-                    for article in articles[:3]:
+                    for article in data.get("articles", [])[:2]:
                         title = article.get("title", "")
-                        source_country = article.get("sourcecountry", "")
-                        tone = article.get("tone", None)   # GDELT tone score
-
                         if not title:
                             continue
-
                         clean_title = self._clean_text(title)
-
-                        # Augment with GDELT tone signal if available
-                        tone_text = ""
+                        tone        = article.get("tone", None)
+                        tone_text   = ""
                         if tone is not None:
                             try:
-                                tone_val = float(tone)
-                                if tone_val < -5:
-                                    tone_text = " Tone: highly negative geopolitical event."
-                                elif tone_val < -2:
-                                    tone_text = " Tone: negative geopolitical tension detected."
-                                elif tone_val > 2:
-                                    tone_text = " Tone: positive diplomatic development."
+                                tv = float(tone)
+                                if tv < -5:   tone_text = " Tone: highly negative geopolitical event."
+                                elif tv < -2: tone_text = " Tone: negative geopolitical tension detected."
+                                elif tv > 2:  tone_text = " Tone: positive diplomatic development."
                             except (ValueError, TypeError):
                                 pass
-
-                        full_text = f"{clean_title}.{tone_text}"
-                        if source_country:
-                            full_text += f" Source: {source_country}."
-
                         results.append({
                             "source": "GDELT",
-                            "text": full_text[:400],
-                            "tier_weight": TIER_WEIGHTS["GDELT"],
-                            "tier": 3,
-                            "topic": topic,
-                            "gdelt_tone": tone,
+                            "text":   f"{clean_title}.{tone_text}"[:400],
+                            "tier_weight": TIER_WEIGHTS["GDELT"], "tier": 3,
+                            "topic": topic, "gdelt_tone": tone,
                         })
-
             except Exception as e:
                 logger.debug(f"GDELT fetch failed for topic '{topic}': {e}")
 
-        # GDELT GKG (Global Knowledge Graph) — Conflict/Instability events
-        # This catches military escalation events like Hormuz
-        try:
-            conflict_url = (
-                "https://api.gdeltproject.org/api/v2/doc/doc"
-                "?query=military+escalation+oil+supply+disruption"
-                "&mode=artlist"
-                "&maxrecords=3"
-                "&format=json"
-                "&timespan=720"   # Last 12 hours
-                "&sort=DateDesc"
-            )
-            resp = requests.get(conflict_url, headers=self.headers, timeout=8)
-            if resp.status_code == 200:
-                data = resp.json()
-                for article in data.get("articles", [])[:2]:
-                    title = article.get("title", "")
-                    if title:
-                        clean = self._clean_text(title)
-                        results.append({
-                            "source": "GDELT",
-                            "text": f"[CONFLICT ALERT] {clean}",
-                            "tier_weight": TIER_WEIGHTS["GDELT"] * 1.1,  # Boost conflict signals
-                            "tier": 3,
-                            "topic": "conflict_monitor",
-                            "gdelt_tone": article.get("tone"),
-                        })
-        except Exception as e:
-            logger.debug(f"GDELT conflict monitor failed: {e}")
-
-        return results
+        if len(results) < SOURCE_MAX_ITEMS["GDELT"]:
+            conflict_topic = topics[0] + " conflict risk"
+            try:
+                conflict_url = (
+                    "https://api.gdeltproject.org/api/v2/doc/doc"
+                    f"?query={requests.utils.quote(conflict_topic)}"
+                    "&mode=artlist&maxrecords=3&format=json&timespan=720&sort=DateDesc"
+                )
+                resp = requests.get(conflict_url, headers=self.headers, timeout=8)
+                if resp.status_code == 200:
+                    data = resp.json()
+                    for article in data.get("articles", [])[:1]:
+                        title = article.get("title", "")
+                        if title:
+                            results.append({
+                                "source": "GDELT",
+                                "text":   f"[CONFLICT ALERT] {self._clean_text(title)}",
+                                "tier_weight": TIER_WEIGHTS["GDELT"] * 1.1, "tier": 3,
+                                "topic": "conflict_monitor",
+                                "gdelt_tone": article.get("tone"),
+                            })
+            except Exception as e:
+                logger.debug(f"GDELT conflict monitor failed: {e}")
+        return results[:SOURCE_MAX_ITEMS["GDELT"]]
 
     # ==========================================================================
-    # TIER 4: Economic Calendar — Scheduled Macro Data Releases
+    # TIER 4: Economic Calendar
     # ==========================================================================
+
     def fetch_economic_calendar(self, ticker: str) -> List[Dict]:
-        """
-        TIER 4 (weight 0.7): Upcoming and recent economic data releases.
-
-        Uses the Trading Economics RSS feed (free, no API key).
-        Covers: CPI, NFP, GDP, FOMC, PMI, PPI, retail sales, etc.
-
-        These are the SCHEDULED macro shocks — not geopolitical surprises.
-        """
         results = []
-        econ_rss_urls = [
-            "https://tradingeconomics.com/rss/news.aspx",
-            "https://www.investing.com/rss/news_301.rss",  # Economic indicators
+        primary_urls = [
+            "https://www.bls.gov/bls/news-release/rss.xml",
+            "https://www.bea.gov/node/feed",
         ]
-
-        for url in econ_rss_urls:
+        for url in primary_urls:
+            if results:
+                break
             try:
                 resp = requests.get(url, headers=self.headers, timeout=6)
                 if resp.status_code == 200:
                     root = ET.fromstring(resp.content)
-                    for item in root.findall('./channel/item')[:4]:
-                        title_elem = item.find('title')
-                        desc_elem  = item.find('description')
+                    for item in root.findall("./channel/item")[:3]:
+                        title_elem = item.find("title")
+                        desc_elem  = item.find("description")
                         if title_elem is not None and title_elem.text:
-                            title = self._clean_text(title_elem.text)
-                            desc  = self._clean_text(desc_elem.text) if desc_elem is not None and desc_elem.text else ""
+                            title    = self._clean_text(title_elem.text)
+                            desc     = self._clean_text(desc_elem.text) if desc_elem is not None and desc_elem.text else ""
                             combined = f"{title}. {desc}"[:300]
                             if len(combined.strip()) > 15:
                                 results.append({
-                                    "source": "EconCalendar",
-                                    "text": combined,
-                                    "tier_weight": TIER_WEIGHTS["EconCalendar"],
-                                    "tier": 4,
+                                    "source": "EconCalendar", "text": combined,
+                                    "tier_weight": TIER_WEIGHTS["EconCalendar"], "tier": 4,
                                 })
-                    break   # One working source is enough
             except Exception as e:
-                logger.debug(f"Economic calendar RSS failed ({url}): {e}")
+                logger.debug(f"EconCalendar primary RSS failed ({url}): {e}")
 
-        # Fallback: BLS, BEA public release pages via Yahoo RSS proxy
         if not results:
             try:
-                url = "https://feeds.finance.yahoo.com/rss/2.0/headline?s=^GSPC&region=US&lang=en-US"
-                resp = requests.get(url, headers=self.headers, timeout=5)
+                resp = requests.get(
+                    "https://tradingeconomics.com/rss/news.aspx",
+                    headers=self.headers, timeout=6)
                 if resp.status_code == 200:
                     root = ET.fromstring(resp.content)
-                    macro_keywords = ["CPI", "inflation", "GDP", "jobs", "Fed", "rate", "PMI", "NFP", "payroll"]
-                    for item in root.findall('./channel/item')[:8]:
-                        title_elem = item.find('title')
+                    for item in root.findall("./channel/item")[:3]:
+                        title_elem = item.find("title")
+                        if title_elem is not None and title_elem.text:
+                            results.append({
+                                "source": "EconCalendar",
+                                "text":   self._clean_text(title_elem.text),
+                                "tier_weight": TIER_WEIGHTS["EconCalendar"], "tier": 4,
+                            })
+            except Exception as e:
+                logger.debug(f"EconCalendar tradingeconomics fallback failed: {e}")
+
+        if not results:
+            try:
+                url  = "https://feeds.finance.yahoo.com/rss/2.0/headline?s=^GSPC&region=US&lang=en-US"
+                resp = requests.get(url, headers=self.headers, timeout=5)
+                if resp.status_code == 200:
+                    root   = ET.fromstring(resp.content)
+                    macro_kw = ["CPI", "inflation", "GDP", "jobs", "Fed", "rate",
+                                "PMI", "NFP", "payroll", "unemployment", "FOMC"]
+                    for item in root.findall("./channel/item")[:8]:
+                        title_elem = item.find("title")
                         if title_elem is not None and title_elem.text:
                             title = title_elem.text
-                            if any(kw.lower() in title.lower() for kw in macro_keywords):
-                                clean = self._clean_text(title)
+                            if any(kw.lower() in title.lower() for kw in macro_kw):
                                 results.append({
                                     "source": "EconCalendar",
-                                    "text": f"[MACRO] {clean}",
-                                    "tier_weight": TIER_WEIGHTS["EconCalendar"],
-                                    "tier": 4,
+                                    "text":   f"[MACRO] {self._clean_text(title)}",
+                                    "tier_weight": TIER_WEIGHTS["EconCalendar"], "tier": 4,
                                 })
             except Exception as e:
-                logger.debug(f"EconCalendar fallback failed: {e}")
-
-        return results
+                logger.debug(f"EconCalendar Yahoo fallback failed: {e}")
+        return results[:SOURCE_MAX_ITEMS["EconCalendar"]]
 
     # ==========================================================================
-    # TIER 5: Macro FX & Commodity Context
+    # TIER 5: Macro FX & Commodity
     # ==========================================================================
+
     def fetch_macro_fx_commodity(self, ticker: str) -> List[Dict]:
-        """
-        TIER 5 (weight 0.6): Real-time commodity and FX macro context.
-
-        Fetches price headlines for key macro barometers:
-          DXY (dollar index), VIX (fear index), GC=F (gold),
-          CL=F (crude oil), ^TNX (10Y yield), EURUSD=X
-
-        Converts prices into narrative text so FinBERT can score them.
-        """
         results = []
-
-        macro_symbols = {
-            "DX-Y.NYB":  "US Dollar Index",
-            "^VIX":      "VIX Volatility Index",
-            "GC=F":      "Gold Futures",
-            "CL=F":      "WTI Crude Oil Futures",
-            "^TNX":      "US 10-Year Treasury Yield",
-            "EURUSD=X":  "EUR/USD Exchange Rate",
-            "BZ=F":      "Brent Crude Oil Futures",
+        numeric_symbols = {
+            "^VIX":     ("VIX Volatility Index",   "fear index"),
+            "^TNX":     ("US 10-Year Treasury Yield", "bond yield"),
+            "DX-Y.NYB": ("US Dollar Index",         "DXY"),
         }
-
-        for symbol, label in macro_symbols.items():
+        for symbol, (label, short_name) in numeric_symbols.items():
+            if len(results) >= SOURCE_MAX_ITEMS["MacroFX"]:
+                break
             try:
-                url = f"https://feeds.finance.yahoo.com/rss/2.0/headline?s={symbol}&region=US&lang=en-US"
+                url  = f"https://query1.finance.yahoo.com/v8/finance/chart/{symbol}?interval=1d&range=2d"
+                resp = requests.get(url, headers=self.headers, timeout=5)
+                if resp.status_code == 200:
+                    data   = resp.json()
+                    closes = data["chart"]["result"][0]["indicators"]["quote"][0]["close"]
+                    closes = [c for c in closes if c is not None]
+                    if len(closes) >= 2:
+                        current, prev  = closes[-1], closes[-2]
+                        change_pct     = ((current - prev) / prev) * 100
+                        if symbol == "^VIX":
+                            if current > 25:
+                                narrative = f"VIX fear index elevated at {current:.1f}, signaling high market anxiety."
+                            elif current > 18:
+                                narrative = f"VIX at {current:.1f}, moderate market concern. Change: {change_pct:+.1f}%."
+                            else:
+                                narrative = f"VIX low at {current:.1f}, markets calm and complacent."
+                        else:
+                            direction = "rising" if change_pct > 0 else "falling"
+                            narrative = (f"{label} {direction} at {current:.2f} "
+                                         f"({change_pct:+.2f}% vs prior session).")
+                        results.append({
+                            "source": "MacroFX", "text": narrative,
+                            "tier_weight": TIER_WEIGHTS["MacroFX"], "tier": 5,
+                            "symbol": symbol,
+                        })
+            except Exception as e:
+                logger.debug(f"MacroFX numeric fetch failed for {symbol}: {e}")
+
+        rss_symbols = {
+            "GC=F":     "Gold Futures",
+            "CL=F":     "WTI Crude Oil Futures",
+            "EURUSD=X": "EUR/USD Exchange Rate",
+        }
+        for symbol, label in rss_symbols.items():
+            if len(results) >= SOURCE_MAX_ITEMS["MacroFX"]:
+                break
+            try:
+                url  = f"https://feeds.finance.yahoo.com/rss/2.0/headline?s={symbol}&region=US&lang=en-US"
                 resp = requests.get(url, headers=self.headers, timeout=5)
                 if resp.status_code == 200:
                     root = ET.fromstring(resp.content)
-                    for item in root.findall('./channel/item')[:1]:
-                        title_elem = item.find('title')
+                    for item in root.findall("./channel/item")[:1]:
+                        title_elem = item.find("title")
                         if title_elem is not None and title_elem.text:
                             clean = self._clean_text(title_elem.text)
                             results.append({
                                 "source": "MacroFX",
-                                "text": f"[{label}] {clean}",
-                                "tier_weight": TIER_WEIGHTS["MacroFX"],
-                                "tier": 5,
+                                "text":   f"[{label}] {clean}",
+                                "tier_weight": TIER_WEIGHTS["MacroFX"], "tier": 5,
                                 "symbol": symbol,
                             })
             except Exception as e:
-                logger.debug(f"MacroFX fetch failed for {symbol}: {e}")
-
-        return results
+                logger.debug(f"MacroFX RSS failed for {symbol}: {e}")
+        return results[:SOURCE_MAX_ITEMS["MacroFX"]]
 
     # ==========================================================================
-    # TIER 6: Google Trends Proxy (Search Interest via RSS)
+    # TIER 6: Google Trends Proxy
     # ==========================================================================
+
     def fetch_google_trends_proxy(self, ticker: str) -> List[Dict]:
-        """
-        TIER 6 (weight 0.5): Google Trends proxy via Google News RSS.
-
-        Google News RSS reflects rising search interest — a proxy for
-        the trend momentum that moves retail flows.
-
-        When a topic spikes on Google Trends → it's already in this feed.
-        """
         results = []
-        topics = self._gdelt_topics_for_ticker(ticker)
+        topics       = self._gdelt_topics_for_ticker(ticker)
         search_query = topics[0] if topics else ticker
-
         try:
-            # Google News RSS (public, no API key)
             encoded_query = requests.utils.quote(search_query)
-            url = f"https://news.google.com/rss/search?q={encoded_query}&hl=en-US&gl=US&ceid=US:en"
+            url  = f"https://news.google.com/rss/search?q={encoded_query}&hl=en-US&gl=US&ceid=US:en"
             resp = requests.get(url, headers=self.headers, timeout=6)
-
             if resp.status_code == 200:
                 root = ET.fromstring(resp.content)
-                for item in root.findall('./channel/item')[:3]:
-                    title_elem = item.find('title')
+                for item in root.findall("./channel/item")[:SOURCE_MAX_ITEMS["GoogleTrends"]]:
+                    title_elem = item.find("title")
                     if title_elem is not None and title_elem.text:
                         clean = self._clean_text(title_elem.text)
-                        # Strip Google's " - Publisher" suffix
-                        clean = re.sub(r'\s+-\s+\S+$', '', clean)
+                        clean = re.sub(r"\s+-\s+\S+$", "", clean)
                         if len(clean) > 10:
                             results.append({
-                                "source": "GoogleTrends",
-                                "text": clean,
-                                "tier_weight": TIER_WEIGHTS["GoogleTrends"],
-                                "tier": 6,
+                                "source": "GoogleTrends", "text": clean,
+                                "tier_weight": TIER_WEIGHTS["GoogleTrends"], "tier": 6,
                             })
         except Exception as e:
             logger.debug(f"Google Trends proxy failed: {e}")
-
         return results
 
     # ==========================================================================
-    # TIER 7: Reddit WallStreetBets — Retail Momentum (unchanged)
+    # TIER 7: Reddit WallStreetBets
     # ==========================================================================
+
     def fetch_retail_momentum(self, ticker: str) -> List[Dict]:
-        """TIER 7 (weight 0.3): Reddit WallStreetBets retail sentiment."""
         reddit_posts = []
         try:
-            url = (
-                f"https://www.reddit.com/r/wallstreetbets/search.json"
-                f"?q={ticker}&restrict_sr=on&sort=new&limit=3"
-            )
+            url  = (f"https://www.reddit.com/r/wallstreetbets/search.json"
+                    f"?q={ticker}&restrict_sr=on&sort=new&limit=3")
             resp = requests.get(url, headers=self.reddit_headers, timeout=5)
             if resp.status_code == 200:
                 data = resp.json()
-                children = data.get('data', {}).get('children', [])
-                for child in children:
-                    post = child['data']
-                    title = post.get('title', '')
-                    clean_text = self._clean_text(title)
+                for child in data.get("data", {}).get("children", []):
+                    post       = child["data"]
+                    clean_text = self._clean_text(post.get("title", ""))
                     reddit_posts.append({
-                        "source": "Reddit r/WSB",
-                        "text": clean_text,
-                        "tier_weight": TIER_WEIGHTS["Reddit r/WSB"],
-                        "tier": 7,
+                        "source": "Reddit r/WSB", "text": clean_text,
+                        "tier_weight": TIER_WEIGHTS["Reddit r/WSB"], "tier": 7,
                     })
         except Exception as e:
             logger.debug(f"Reddit fetch failed: {e}")
         return reddit_posts
 
     # ==========================================================================
+    # TIER 8 (NEW v2.2): Future Event Scout
+    # Returns upcoming events as structured text for LLM to reason about.
+    # These are NOT scored by FinBERT — they go directly to the LLM scorer
+    # in sentiment_agent.py via the "future_events" key in the returned dict.
+    # ==========================================================================
+
+    def fetch_future_events(self, ticker: str) -> List[Dict]:
+        """
+        TIER 8 (weight 0.75): Upcoming event scanner.
+
+        Sources:
+          A. Next earnings date + expectations (Yahoo Finance calendar API)
+          B. Next FOMC meeting (hardcoded 2026 schedule)
+          C. Forward-looking news (Google News: "{ticker} upcoming next week")
+          D. Reddit event mentions ("earnings play catalyst next week {ticker}")
+          E. Economic release schedule (BLS advance release calendar)
+
+        Items marked with "future_event": True so sentiment_agent.py can route
+        them to the LLM scorer instead of FinBERT.
+        """
+        results = []
+
+        # ── A: Earnings date ─────────────────────────────────────────────────
+        try:
+            import yfinance as yf
+            import io, sys, contextlib
+
+            @contextlib.contextmanager
+            def _s():
+                old = sys.stdout, sys.stderr
+                sys.stdout = sys.stderr = io.StringIO()
+                try: yield
+                finally: sys.stdout, sys.stderr = old
+
+            with _s():
+                ticker_obj = yf.Ticker(ticker)
+                cal        = ticker_obj.calendar
+
+            if cal is not None and not cal.empty:
+                # calendar is a DataFrame with index = field names
+                if "Earnings Date" in cal.index:
+                    earnings_dates = cal.loc["Earnings Date"]
+                    if hasattr(earnings_dates, '__iter__'):
+                        dates_list = [d for d in earnings_dates if d is not None]
+                    else:
+                        dates_list = [earnings_dates]
+
+                    if dates_list:
+                        next_earnings = dates_list[0]
+                        days_until    = (pd.Timestamp(next_earnings) - pd.Timestamp.now()).days \
+                                        if hasattr(next_earnings, '__class__') else 0
+
+                        eps_est = ""
+                        if "EPS Estimate" in cal.index:
+                            try:
+                                eps_est = f" EPS estimate: ${float(cal.loc['EPS Estimate'].iloc[0]):.2f}."
+                            except Exception:
+                                pass
+
+                        rev_est = ""
+                        if "Revenue Estimate" in cal.index:
+                            try:
+                                rev_val = float(cal.loc["Revenue Estimate"].iloc[0])
+                                rev_est = f" Revenue estimate: ${rev_val/1e9:.1f}B."
+                            except Exception:
+                                pass
+
+                        if days_until >= 0:
+                            text = (f"[UPCOMING EARNINGS] {ticker} reports earnings on "
+                                    f"{str(next_earnings)[:10]} ({days_until} days away)."
+                                    f"{eps_est}{rev_est} Markets will react to beat/miss.")
+                        else:
+                            text = (f"[RECENT EARNINGS] {ticker} reported earnings on "
+                                    f"{str(next_earnings)[:10]}. Post-earnings reaction ongoing.")
+
+                        results.append({
+                            "source":       "FutureEvents",
+                            "text":         text,
+                            "tier_weight":  TIER_WEIGHTS["FutureEvents"],
+                            "tier":         8,
+                            "future_event": True,
+                            "event_type":   "earnings",
+                            "days_until":   int(days_until) if isinstance(days_until, (int, float)) else 0,
+                        })
+        except Exception as e:
+            logger.debug(f"Future: Earnings calendar fetch failed for {ticker}: {e}")
+
+        # ── B: Next FOMC meeting ──────────────────────────────────────────────
+        try:
+            today = datetime.today().date()
+            next_fomc = None
+            for start_str, end_str in FOMC_2026_DATES:
+                meeting_start = datetime.strptime(start_str, "%Y-%m-%d").date()
+                meeting_end   = datetime.strptime(end_str,   "%Y-%m-%d").date()
+                if meeting_start >= today:
+                    next_fomc = (meeting_start, meeting_end)
+                    break
+
+            if next_fomc:
+                days_until = (next_fomc[0] - today).days
+                if days_until <= 30:   # only if within next 30 days
+                    text = (f"[UPCOMING FOMC] Federal Reserve FOMC meeting scheduled "
+                            f"{next_fomc[0]} to {next_fomc[1]} ({days_until} days away). "
+                            f"Rate decision will impact growth stocks, bonds, and sector rotations. "
+                            f"Market positioning before and after meeting can cause volatility.")
+                    results.append({
+                        "source":       "FutureEvents",
+                        "text":         text,
+                        "tier_weight":  TIER_WEIGHTS["FutureEvents"],
+                        "tier":         8,
+                        "future_event": True,
+                        "event_type":   "fomc",
+                        "days_until":   days_until,
+                    })
+        except Exception as e:
+            logger.debug(f"Future: FOMC calendar failed: {e}")
+
+        # ── C: Forward-looking news (Google News) ─────────────────────────────
+        forward_queries = [
+            f"{ticker} upcoming announcement next week",
+            f"{ticker} product launch event 2026",
+            f"{ticker} earnings catalyst upcoming",
+        ]
+        for query in forward_queries[:2]:
+            if len(results) >= SOURCE_MAX_ITEMS["FutureEvents"] - 1:
+                break
+            try:
+                encoded = requests.utils.quote(query)
+                url     = f"https://news.google.com/rss/search?q={encoded}&hl=en-US&gl=US&ceid=US:en"
+                resp    = requests.get(url, headers=self.headers, timeout=6)
+                if resp.status_code == 200:
+                    root = ET.fromstring(resp.content)
+                    for item in root.findall("./channel/item")[:2]:
+                        title_elem = item.find("title")
+                        pub_date   = item.find("pubDate")
+                        if title_elem is not None and title_elem.text:
+                            clean = self._clean_text(title_elem.text)
+                            clean = re.sub(r"\s+-\s+\S+$", "", clean)
+                            # FIX-3: Two-gate filter:
+                            # Gate 1 — must contain forward-looking intent keyword
+                            # Gate 2 — must pass finance relevance (no Stranger Things etc.)
+                            fwd_kw = ["upcoming", "next", "plan", "launch", "announce",
+                                      "schedule", "expect", "forecast", "will", "event",
+                                      "preview", "ahead", "before", "catalyst", "earnings"]
+                            has_fwd      = any(kw in clean.lower() for kw in fwd_kw)
+                            is_finance   = _is_finance_relevant(clean)
+                            if has_fwd and is_finance and len(clean) > 15:
+                                results.append({
+                                    "source":       "FutureEvents",
+                                    "text":         f"[UPCOMING NEWS] {clean}",
+                                    "tier_weight":  TIER_WEIGHTS["FutureEvents"],
+                                    "tier":         8,
+                                    "future_event": True,
+                                    "event_type":   "news_forward",
+                                })
+            except Exception as e:
+                logger.debug(f"Future: Google forward news failed for '{query}': {e}")
+
+        # ── D: Reddit upcoming event mentions ─────────────────────────────────
+        try:
+            url  = (f"https://www.reddit.com/r/wallstreetbets/search.json"
+                    f"?q={ticker}+earnings+play+catalyst&restrict_sr=on&sort=new&limit=3")
+            resp = requests.get(url, headers=self.reddit_headers, timeout=5)
+            if resp.status_code == 200:
+                data = resp.json()
+                for child in data.get("data", {}).get("children", [])[:2]:
+                    post  = child["data"]
+                    title = self._clean_text(post.get("title", ""))
+                    fwd_kw = ["earnings", "catalyst", "play", "next week", "upcoming",
+                               "before earnings", "yolo", "calls", "puts", "event"]
+                    # FIX-3: Reddit posts must also pass finance relevance gate
+                    has_fwd    = any(kw in title.lower() for kw in fwd_kw)
+                    is_finance = _is_finance_relevant(title)
+                    if has_fwd and is_finance and len(title) > 10:
+                        score = post.get("score", 0)
+                        text  = f"[RETAIL CATALYST] {title} (upvotes: {score})"
+                        results.append({
+                            "source":       "FutureEvents",
+                            "text":         text,
+                            "tier_weight":  TIER_WEIGHTS["FutureEvents"] * 0.6,
+                            "tier":         8,
+                            "future_event": True,
+                            "event_type":   "reddit_catalyst",
+                        })
+        except Exception as e:
+            logger.debug(f"Future: Reddit catalyst scan failed: {e}")
+
+        # ── E: BLS advance release schedule ───────────────────────────────────
+        try:
+            url  = "https://www.bls.gov/bls/news-release/rss.xml"
+            resp = requests.get(url, headers=self.headers, timeout=6)
+            if resp.status_code == 200:
+                root   = ET.fromstring(resp.content)
+                fwd_kw = ["advance", "preliminary", "scheduled", "upcoming",
+                          "next release", "will release", "estimate"]
+                for item in root.findall("./channel/item")[:5]:
+                    title_elem = item.find("title")
+                    if title_elem is not None and title_elem.text:
+                        title = title_elem.text
+                        if any(kw in title.lower() for kw in fwd_kw):
+                            clean = self._clean_text(title)
+                            results.append({
+                                "source":       "FutureEvents",
+                                "text":         f"[BLS UPCOMING] {clean}",
+                                "tier_weight":  TIER_WEIGHTS["FutureEvents"] * 0.8,
+                                "tier":         8,
+                                "future_event": True,
+                                "event_type":   "economic_release",
+                            })
+        except Exception as e:
+            logger.debug(f"Future: BLS advance schedule failed: {e}")
+
+        return results[:SOURCE_MAX_ITEMS["FutureEvents"]]
+
+    # ==========================================================================
     # MASTER ASSEMBLER
     # ==========================================================================
+
     def get_global_context_payload(self, ticker: str) -> List[Dict]:
         """
-        Assembles the full 8-tier intelligence payload.
+        Assembles the full 9-tier intelligence payload.
 
-        Tier execution order (by importance):
-          0 → FRED (Central Bank)
-          1 → SEC EDGAR
-          2 → Yahoo Finance
-          3 → GDELT (Geopolitical)
-          4 → Economic Calendar
-          5 → Macro FX/Commodity
-          6 → Google Trends Proxy
-          7 → Reddit WSB
+        Tiers 0-7: Present-day sentiment (FinBERT scored in sentiment_agent.py)
+        Tier 8:    Future events (LLM scored in sentiment_agent.py)
 
-        Returns deduplicated, length-filtered list of signals.
+        Items with "future_event": True are routed to the LLM scorer.
+        Items without it go to FinBERT as before.
         """
-        print(f"      📡 [MCP] Broadcasting API requests across 8 intelligence tiers for {ticker}...")
+        print(f"      📡 [MCP v2.2] Broadcasting across 9 tiers for {ticker}...")
 
         payload: List[Dict] = []
 
-        # Execute all tiers (failures are silent — each method handles its own exceptions)
-        payload.extend(self.fetch_fed_macro(ticker))         # Tier 0: FRED
-        payload.extend(self.fetch_sec_filings(ticker))       # Tier 1: SEC
-        payload.extend(self.fetch_institutional_news(ticker))# Tier 2: Yahoo
-        payload.extend(self.fetch_gdelt_geopolitical(ticker))# Tier 3: GDELT ← NEW
-        payload.extend(self.fetch_economic_calendar(ticker)) # Tier 4: EconCal ← NEW
-        payload.extend(self.fetch_macro_fx_commodity(ticker))# Tier 5: MacroFX ← NEW
-        payload.extend(self.fetch_google_trends_proxy(ticker))# Tier 6: GTrends ← NEW
-        payload.extend(self.fetch_retail_momentum(ticker))   # Tier 7: Reddit
+        payload.extend(self.fetch_fed_macro(ticker))            # Tier 0: FRED
+        payload.extend(self.fetch_sec_filings(ticker))          # Tier 1: SEC
+        payload.extend(self.fetch_institutional_news(ticker))   # Tier 2: Yahoo
+        payload.extend(self.fetch_gdelt_geopolitical(ticker))   # Tier 3: GDELT
+        payload.extend(self.fetch_economic_calendar(ticker))    # Tier 4: EconCal
+        payload.extend(self.fetch_macro_fx_commodity(ticker))   # Tier 5: MacroFX
+        payload.extend(self.fetch_google_trends_proxy(ticker))  # Tier 6: GTrends
+        payload.extend(self.fetch_retail_momentum(ticker))      # Tier 7: Reddit
+        payload.extend(self.fetch_future_events(ticker))        # Tier 8: Future ← NEW
 
-        # Deduplication by text content
-        seen_texts: set = set()
+        # Fuzzy deduplication (first 60 chars)
+        seen_fingerprints: set = set()
         clean_payload: List[Dict] = []
         for item in payload:
-            text = item.get('text', '')
-            if text not in seen_texts and len(text.strip()) > 5:
+            text = item.get("text", "")
+            if len(text.strip()) <= 5:
+                continue
+            fingerprint = text.strip().lower()[:60]
+            if fingerprint not in seen_fingerprints:
                 clean_payload.append(item)
-                seen_texts.add(text)
+                seen_fingerprints.add(fingerprint)
 
-        # Sort by tier_weight descending (highest-trust signals scored first by FinBERT)
-        clean_payload.sort(key=lambda x: x.get('tier_weight', 0), reverse=True)
+        # Sort by tier_weight descending
+        clean_payload.sort(key=lambda x: x.get("tier_weight", 0), reverse=True)
 
-        # Fallback if everything failed
+        # Global cap at 30 items (raised from 25 to accommodate Tier 8)
+        clean_payload = clean_payload[:30]
+
         if not clean_payload:
             clean_payload.append({
-                "source": "System Fallback",
-                "text": f"{ticker} trading in standard market conditions with low news velocity.",
+                "source":      "System Fallback",
+                "text":        f"{ticker} trading in standard market conditions with low news velocity.",
                 "tier_weight": 0.50,
-                "tier": 99,
+                "tier":        99,
             })
 
         tier_counts = {}
         for item in clean_payload:
-            src = item.get('source', 'Unknown')
+            src = item.get("source", "Unknown")
             tier_counts[src] = tier_counts.get(src, 0) + 1
 
-        print(f"      ✅ [MCP] Context Assembly Complete. {len(clean_payload)} global signals captured.")
+        future_count = sum(1 for i in clean_payload if i.get("future_event"))
+        print(f"      ✅ [MCP v2.2] Assembly complete. "
+              f"{len(clean_payload)} signals ({future_count} future events).")
         print(f"         Sources: {tier_counts}")
 
         return clean_payload
 
 
-# ==============================================================================
-# UPDATED SentimentAgent.analyze_with_mcp  (drop-in replacement)
-# ==============================================================================
-# The only change needed in sentiment_agent.py is the print statement
-# to display the new tier labels. Everything else works identically.
-#
-# Updated display loop (replace the existing for-loop):
-#
-#   for item in mcp_payload:
-#       source     = item['source']
-#       text       = item['text']
-#       tier_weight = item['tier_weight']
-#       tier_num   = item.get('tier', '?')
-#       topic      = item.get('topic', '')
-#
-#       if len(text.strip()) < 10:
-#           continue
-#
-#       label, raw_score, probs = self.get_sentiment(text)
-#       confidence = float(np.max(probs))
-#       confidence_multiplier = confidence if confidence >= 0.65 else 0.30
-#       final_item_weight = tier_weight * confidence_multiplier
-#       adjusted_score = raw_score * final_item_weight
-#
-#       weighted_scores.append(adjusted_score)
-#       total_weight_applied += final_item_weight
-#
-#       topic_tag = f" [{topic}]" if topic else ""
-#       print(f"   🏛️ [T{tier_num}: {source}{topic_tag}] (Weight: {tier_weight:.1f})")
-#       print(f"      📄 '{text[:70]}...' -> {label.upper()} (Raw: {raw_score:.2f})")
+# ── import needed by fetch_future_events ─────────────────────────────────────
+try:
+    import pandas as pd
+except ImportError:
+    pass

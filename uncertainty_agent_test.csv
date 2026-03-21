@@ -1,0 +1,31 @@
+Ticker,MC_Mean,Signal,Std_Real,Unc_Real,Std_Fake,Unc_Fake,Actual_5D_%,Signal_Correct,Verdict,Detail
+AAPL,0.0131,SELL,0.013055,LOW,0.013055,LOW,-2.52,True,✅ GOOD,Confident + Correct
+MSFT,0.0491,SELL,0.049078,LOW,0.049078,LOW,-1.35,True,✅ GOOD,Confident + Correct
+NVDA,0.0551,SELL,0.055109,MODERATE,0.055109,MODERATE,-2.2,True,➖ CAUTIOUS,Uncertain + Correct (over-warned)
+TSLA,0.3748,SELL,0.374817,HIGH,0.374817,HIGH,-2.1,True,➖ CAUTIOUS,Uncertain + Correct (over-warned)
+META,0.0004,SELL,0.000397,LOW,0.000397,LOW,-4.84,True,✅ GOOD,Confident + Correct
+AMZN,0.1608,SELL,0.160752,HIGH,0.160752,HIGH,1.2,False,✅ WARNED,Uncertain + Wrong (correctly flagged)
+GOOGL,0.6484,BUY,0.351574,HIGH,0.351574,HIGH,0.72,True,➖ CAUTIOUS,Uncertain + Correct (over-warned)
+AMD,0.1267,SELL,0.126738,MODERATE,0.126738,MODERATE,-4.16,True,➖ CAUTIOUS,Uncertain + Correct (over-warned)
+INTC,0.294,SELL,0.293966,HIGH,0.293966,HIGH,-8.17,True,➖ CAUTIOUS,Uncertain + Correct (over-warned)
+NFLX,0.0053,SELL,0.005321,LOW,0.005321,LOW,-0.56,True,✅ GOOD,Confident + Correct
+JPM,0.1916,SELL,0.191587,HIGH,0.191587,HIGH,-0.22,True,➖ CAUTIOUS,Uncertain + Correct (over-warned)
+V,0.1716,SELL,0.171597,HIGH,0.171597,HIGH,-0.16,True,➖ CAUTIOUS,Uncertain + Correct (over-warned)
+WMT,0.7283,BUY,0.271748,HIGH,0.271748,HIGH,1.29,True,➖ CAUTIOUS,Uncertain + Correct (over-warned)
+JNJ,0.2917,SELL,0.291733,HIGH,0.291733,HIGH,-2.01,True,➖ CAUTIOUS,Uncertain + Correct (over-warned)
+XOM,0.5511,BUY,0.448909,HIGH,0.448909,HIGH,4.77,True,➖ CAUTIOUS,Uncertain + Correct (over-warned)
+CAT,0.9397,BUY,0.060325,MODERATE,0.060325,MODERATE,-0.79,False,✅ WARNED,Uncertain + Wrong (correctly flagged)
+DIS,0.0237,SELL,0.023678,LOW,0.023678,LOW,-0.58,True,✅ GOOD,Confident + Correct
+BA,0.0279,SELL,0.027912,LOW,0.027912,LOW,-1.53,True,✅ GOOD,Confident + Correct
+MCD,0.0037,SELL,0.003689,LOW,0.003689,LOW,0.34,False,❌ OVERCONFIDENT,Confident + WRONG (failed to warn)
+KO,0.7674,BUY,0.232635,HIGH,0.232635,HIGH,0.62,True,➖ CAUTIOUS,Uncertain + Correct (over-warned)
+SPY,0.5196,HOLD,0.480379,HIGH,0.480379,HIGH,-0.82,,SKIP,HOLD — not evaluated
+QQQ,0.181,SELL,0.181024,HIGH,0.181024,HIGH,-0.72,True,➖ CAUTIOUS,Uncertain + Correct (over-warned)
+TLT,0.2194,SELL,0.219366,HIGH,0.219366,HIGH,0.36,False,✅ WARNED,Uncertain + Wrong (correctly flagged)
+GLD,0.0576,SELL,0.057607,MODERATE,0.057607,MODERATE,-3.56,True,➖ CAUTIOUS,Uncertain + Correct (over-warned)
+SLV,0.0736,SELL,0.073633,MODERATE,0.073633,MODERATE,-8.02,True,➖ CAUTIOUS,Uncertain + Correct (over-warned)
+USO,0.7683,BUY,0.231706,HIGH,0.231706,HIGH,9.99,True,➖ CAUTIOUS,Uncertain + Correct (over-warned)
+UNG,0.0006,SELL,0.000646,LOW,0.000646,LOW,-5.28,True,✅ GOOD,Confident + Correct
+DIA,0.4316,SELL,0.431582,HIGH,0.431582,HIGH,-0.82,True,➖ CAUTIOUS,Uncertain + Correct (over-warned)
+IWM,0.0442,SELL,0.04418,LOW,0.04418,LOW,-1.11,True,✅ GOOD,Confident + Correct
+EEM,0.489,HOLD,0.488965,HIGH,0.488965,HIGH,-0.14,,SKIP,HOLD — not evaluated

@@ -97,9 +97,18 @@ class HeatmapAgent:
             [spread_lr, spread_fr, 0.0      ],
         ])
 
-        # Step 4: Global Disagreement Index = average of all pairwise spreads
-        gdi = np.mean([spread_lf, spread_lr, spread_fr])
-        gdi = max(0.0, min(1.0, gdi))  # Clamp
+        # Step 4: Global Disagreement Index
+        # H5 FIX: If sentiment is frozen/missing, use only LSTM vs Regime distance
+        sentiment_frozen = abs(sent_score) < 0.001
+        if sentiment_frozen:
+            gdi = spread_lr * 1.5
+        else:
+            gdi = np.mean([spread_lf, spread_lr, spread_fr]) * 1.5
+            
+        if gdi > 0.40:
+            print(f"      ⚠️ [Heatmap] High Boardroom Tension detected: {gdi*100:.1f}%")
+            
+        gdi = max(0.0, min(1.0, gdi))  # Cap at 100%, not 20%
 
         # Step 5: Classify tension level and penalty
         tension, penalty = self._classify_tension(gdi)
@@ -118,9 +127,9 @@ class HeatmapAgent:
         """Convert regime label to a bullish/bearish score on [0, 1]."""
         label = str(regime_label).strip().lower()
         if label == "bull":
-            return 0.80
+            return 0.65
         elif label == "bear":
-            return 0.20
+            return 0.35
         else:
             return 0.50  # Sideways
 

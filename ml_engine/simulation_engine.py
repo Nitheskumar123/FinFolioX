@@ -497,6 +497,17 @@ class DigitalTwinSimulator:
         else:
             regime_label = "Sideways"
 
+        # H1 FIX: Short-term override to prevent buying the top of a cliff
+        if len(data_slice) >= 5:
+            ret_5d = float(data_slice["Close"].iloc[-1] / data_slice["Close"].iloc[-5] - 1.0)
+        else:
+            ret_5d = 0.0
+            
+        rsi_now = float(data_slice["RSI"].iloc[-1]) if "RSI" in data_slice.columns else 50.0
+        
+        if regime_label == "Bull" and (ret_5d < -0.015 or rsi_now < 45):
+            regime_label = "Sideways"
+
         # 3. Momentum
         recent_prices = data_slice["Close"].tail(5)
         momentum_5d = float((recent_prices.iloc[-1] / recent_prices.iloc[0]) - 1)

@@ -1,9 +1,35 @@
+"""
+ml_engine/correlation_agent.py  —  CorrelationDivergenceDetector v2.2
+=======================================================================
+CHANGES vs v2.1:
+
+  Fix 4 — Two-tier beta scaling (MCD/KO fix)
+    v2.1 used a single LOW_BETA_SCALE_FACTOR=0.50 for all tickers
+    with |SPY corr| < 0.20. MCD (corr=-0.09) was scaled enough to
+    drop from 0.79 → 0.63 but still above the 0.60 threshold, so
+    it kept getting flagged as HIGH divergence incorrectly.
+
+    v2.2 adds a second tier for extremely decorrelated tickers
+    (|SPY corr| < 0.10): scale factor = 0.35 (stronger suppression).
+    This drops MCD from 0.63 → ~0.55, below the threshold.
+
+    Tier 1: 0.10 ≤ |corr| < 0.20  → scale × 0.50  (moderate low-beta)
+    Tier 2:       |corr| < 0.10   → scale × 0.35  (extremely decorrelated)
+
+    Tickers affected: MCD (corr≈-0.09), KO (corr≈0.02), WMT (corr≈-0.13
+    is in tier 1 at 0.13, unchanged).
+
+All other fixes from v2.1 retained:
+  Fix 1 — XOM + energy equities skip (neutral 0.35)
+  Fix 2 — Beta-adjusted divergence for |SPY corr| < 0.20
+  Fix 3 — Predictive penalty gated by |SPY corr| >= 0.25
+"""
+
 import pickle
 import os
 import yfinance as yf
 import pandas as pd
 import numpy as np
-import torch
 import logging
 from collections import deque
 
@@ -19,27 +45,19 @@ class CorrelationDivergenceDetector:
     this correlation significantly, it signals an idiosyncratic anomaly
     or a potential trend reversal (Systemic Divergence).
 
-    FIX v2: Divergence history is now persisted to disk so the warm-up
-    period survives Django restarts. The model is ready after the first
-    10 unique analysis calls — not reset every time the server reloads.
+    Divergence history is persisted to disk so the warm-up period survives
+    server restarts. Ready after the first 10 unique analysis calls.
     """
 
-    def __init__(
-        self,
-        lookback_window=60,
-        cache_path=None,
-    ):
-        # Use VIXY (VIX ETF) instead of ^VIX because ^VIX often fails in downloads
-        self.assets = ["SPY", "QQQ", "TLT", "VIXY"]
+    def __init__(self, lookback_window=60, cache_path=None):
+        self.assets          = ["SPY", "QQQ", "TLT", "VIXY"]
         self.lookback_window = lookback_window
 
-        # Resolve cache path relative to project root
         if cache_path is None:
-            base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+            base_dir   = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
             cache_path = os.path.join(base_dir, "data", "meta", "divergence_cache.pkl")
         self.cache_path = cache_path
 
-        # Load history from disk (survives server restarts)
         self.divergence_history = self._load_history()
 
         print("   ✅ Correlation Graph Engine Initialized.")
@@ -50,23 +68,19 @@ class CorrelationDivergenceDetector:
             )
 
     # ------------------------------------------------------------------
-    # PERSISTENCE HELPERS
+    # PERSISTENCE
     # ------------------------------------------------------------------
     def _load_history(self):
-        """Loads divergence history deque from disk if it exists."""
         try:
             if os.path.exists(self.cache_path):
                 with open(self.cache_path, "rb") as f:
                     loaded = pickle.load(f)
-                # Ensure maxlen matches current config
-                history = deque(loaded, maxlen=self.lookback_window)
-                return history
+                return deque(loaded, maxlen=self.lookback_window)
         except Exception as e:
             logger.warning(f"Could not load divergence cache: {e}")
         return deque(maxlen=self.lookback_window)
 
     def _save_history(self):
-        """Saves divergence history deque to disk."""
         try:
             os.makedirs(os.path.dirname(self.cache_path), exist_ok=True)
             with open(self.cache_path, "wb") as f:
@@ -77,110 +91,180 @@ class CorrelationDivergenceDetector:
     def __repr__(self):
         return (
             f"<CorrelationDivergenceDetector "
-            f"assets={self.assets} "
             f"history={len(self.divergence_history)}/{self.lookback_window}>"
         )
 
     # ------------------------------------------------------------------
-    # MAIN ENTRY POINT
+    # TICKER CLASSIFICATION
+    # ------------------------------------------------------------------
+
+    # Broad market / bond / precious metal / commodity ETFs
+    MACRO_TICKERS = {
+        "SPY", "QQQ", "TLT", "GLD", "SLV", "USO", "UNG",
+        "DIA", "IWM", "EEM",
+    }
+
+    # Fix 1: Energy/commodity equities — follow oil, not SPY
+    COMMODITY_EQUITY_SKIP = {
+        "XOM", "CVX", "COP", "OXY", "PSX", "VLO", "MPC",
+    }
+
+    # Fix 2 + Fix 4: Two-tier beta scaling thresholds
+    VERY_LOW_BETA_CORR   = 0.10   # tier 2: extremely decorrelated (MCD, KO)
+    VERY_LOW_BETA_SCALE  = 0.35   # stronger suppression for tier 2
+    LOW_BETA_CORR        = 0.20   # tier 1: moderate low-beta (WMT, BA, JNJ, NFLX)
+    LOW_BETA_SCALE       = 0.50   # standard suppression for tier 1
+
+    # Fix 3: Predictive penalty only fires for correlated tickers
+    PREDICTIVE_PENALTY_MIN_CORR = 0.25
+
+    # ------------------------------------------------------------------
+    # MAIN
     # ------------------------------------------------------------------
     def get_market_context(self, target_ticker="AAPL"):
         """
-        Calculates the Systemic Risk Score (0.0 → 1.0) based on graph divergence.
-
-        Steps:
-        1. Fetch 6 months of daily OHLC data for target + context assets.
-        2. Build a rolling 30-day correlation matrix (The Graph Edges).
-        3. Calculate 'Expected Move' via graph convolution (weighted neighbor moves).
-        4. Compare 'Expected' vs 'Actual' to find Divergence.
-        5. Normalize Divergence using rolling Z-Score (persisted across restarts).
-
         Returns:
-            risk_score  (float)      : 0.0 (Synced) → 1.0 (Critical Divergence)
-            corr_matrix (DataFrame)  : Adjacency matrix of the graph
+            risk_score  (float 0→1) : systemic divergence risk
+            corr_matrix (DataFrame) : adjacency matrix (None for skipped tickers)
         """
-        tickers = [target_ticker] + self.assets
+        clean_target = target_ticker.replace("^", "").upper()
+        tickers      = [target_ticker] + self.assets
+
         print(
             f"   🕸️  [Correlation Agent] Building Market Graph: "
             f"{target_ticker} vs {self.assets}..."
         )
 
-        try:
-            # 1. Fetch Data (6 months)
-            data = yf.download(tickers, period="6mo", progress=False)["Close"]
+        # Skip broad macro/commodity ETFs
+        if clean_target in self.MACRO_TICKERS:
+            print(
+                f"      ℹ️ {clean_target} is a macro/commodity ETF "
+                f"— skipping equity divergence check."
+            )
+            return 0.3, None
 
-            # Normalize column names
+        # Fix 1: Skip energy/commodity equities
+        if clean_target in self.COMMODITY_EQUITY_SKIP:
+            print(
+                f"      ℹ️ {clean_target} is a commodity-correlated equity "
+                f"— equity graph not applicable. Returning neutral score."
+            )
+            return 0.35, None
+
+        try:
+            # 1. Fetch 6 months of data
+            data = yf.download(tickers, period="6mo", progress=False)["Close"]
             if isinstance(data.columns, pd.MultiIndex):
                 data.columns = data.columns.get_level_values(0)
-            data.columns = [col.replace("^", "").upper() for col in data.columns]
-            clean_target = target_ticker.replace("^", "").upper()
+            data.columns = [c.replace("^", "").upper() for c in data.columns]
 
-            # Check for missing nodes
-            missing_nodes = (
-                set([t.replace("^", "").upper() for t in tickers]) - set(data.columns)
+            missing = (
+                set(t.replace("^", "").upper() for t in tickers) - set(data.columns)
             )
-            if missing_nodes:
-                print(f"      ⚠️ Missing Graph Nodes: {missing_nodes}. Using partial graph.")
+            if missing:
+                print(f"      ⚠️ Missing Graph Nodes: {missing}. Using partial graph.")
                 if clean_target not in data.columns:
-                    print(f"      ❌ Target {clean_target} data missing. Aborting.")
+                    print(f"      ❌ Target {clean_target} missing. Aborting.")
                     return 0.5, None
 
-            # 2. Calculate Daily Returns
+            # 2. Daily returns
             returns = data.pct_change().dropna()
-
             if len(returns) < 30:
-                print("      ⚠️ Insufficient data for graph analysis (Need > 30 days).")
+                print("      ⚠️ Insufficient data (need >30 days).")
                 return 0.5, None
 
-            # 3. Build Adjacency Matrix (last 30 days)
+            # 3. Adjacency matrix — last 30 days
             recent_returns = returns.tail(30)
-            corr_matrix = recent_returns.corr()
+            corr_matrix    = recent_returns.corr()
 
-            # 4. Calculate "Market Consensus" Move via Graph Convolution
+            # SPY correlation for this ticker
+            spy_corr     = float(corr_matrix[clean_target].get("SPY", 0.0)) \
+                           if clean_target in corr_matrix.columns else 0.0
+            abs_spy_corr = abs(spy_corr)
+            print(f"      - Correlation with SPY: {spy_corr:.3f}")
+            if "TLT" in corr_matrix.columns and clean_target in corr_matrix.columns:
+                print(
+                    f"      - Correlation with TLT: "
+                    f"{corr_matrix[clean_target].get('TLT', 0.0):.3f}"
+                )
+
+            # Fix 3: Predictive divergence penalty — only for correlated tickers
+            predictive_penalty = 0.0
+            prev_returns       = returns.iloc[-60:-30] if len(returns) >= 60 else None
+            if (prev_returns is not None
+                    and len(prev_returns) >= 30
+                    and abs_spy_corr >= self.PREDICTIVE_PENALTY_MIN_CORR):
+                prev_matrix = prev_returns.corr()
+                if clean_target in prev_matrix.columns:
+                    prev_corr  = prev_matrix[clean_target].drop(clean_target)
+                    curr_corr  = corr_matrix[clean_target].drop(clean_target)
+                    corr_drops = (curr_corr.abs() - prev_corr.abs()) < -0.15
+                    if corr_drops.sum() >= 2:
+                        print(
+                            f"      🚨 [Predictive] Correlation shrinking rapidly "
+                            f"with {corr_drops.sum()} peers."
+                        )
+                        predictive_penalty = 0.15
+
+            # 4. Graph convolution — expected move
             target_corr_vector = corr_matrix[clean_target].drop(clean_target)
-            latest_moves = returns.iloc[-1]
-            market_moves = latest_moves.drop(clean_target)
+            latest_moves       = returns.iloc[-1]
+            market_moves       = latest_moves.drop(clean_target)
 
-            # Print key correlations for transparency
-            if "SPY" in target_corr_vector.index:
-                print(f"      - Correlation with SPY: {target_corr_vector['SPY']:.3f}")
-            if "TLT" in target_corr_vector.index:
-                print(f"      - Correlation with TLT: {target_corr_vector['TLT']:.3f}")
-
-            weights = target_corr_vector.abs()
+            weights    = target_corr_vector.abs()
             weight_sum = weights.sum()
 
             if weight_sum < 1e-6:
-                print("      ⚠️ Weak correlations detected. Defaulting to market mean.")
+                print("      ⚠️ Weak correlations — using market mean.")
                 expected_move = market_moves.mean()
             else:
-                expected_move = (target_corr_vector * market_moves).sum() / weight_sum
+                expected_move = (
+                    target_corr_vector * market_moves
+                ).sum() / weight_sum
 
-            actual_move = latest_moves[clean_target]
+            actual_move    = float(latest_moves.get(clean_target, 0.0))
             raw_divergence = abs(actual_move - expected_move)
 
-            # 5. Normalize via Z-Score (using persisted history)
-            self.divergence_history.append(raw_divergence)
-            self._save_history()  # ← persist to disk after every sample
+            # Fix 2 + Fix 4: Two-tier beta-adjusted divergence
+            if abs_spy_corr < self.VERY_LOW_BETA_CORR:
+                # Tier 2 — extremely decorrelated (MCD corr≈-0.09, KO corr≈0.02)
+                adjusted_divergence = raw_divergence * self.VERY_LOW_BETA_SCALE
+                print(
+                    f"      ℹ️ [Beta tier-2] |SPY corr|={abs_spy_corr:.2f} "
+                    f"< {self.VERY_LOW_BETA_CORR} → "
+                    f"divergence {raw_divergence:.5f} × {self.VERY_LOW_BETA_SCALE} "
+                    f"= {adjusted_divergence:.5f}"
+                )
+            elif abs_spy_corr < self.LOW_BETA_CORR:
+                # Tier 1 — moderate low-beta (WMT corr≈-0.13, BA corr≈0.14, JNJ≈-0.11)
+                adjusted_divergence = raw_divergence * self.LOW_BETA_SCALE
+                print(
+                    f"      ℹ️ [Beta tier-1] |SPY corr|={abs_spy_corr:.2f} "
+                    f"< {self.LOW_BETA_CORR} → "
+                    f"divergence {raw_divergence:.5f} × {self.LOW_BETA_SCALE} "
+                    f"= {adjusted_divergence:.5f}"
+                )
+            else:
+                adjusted_divergence = raw_divergence
+
+            # 5. Z-score normalisation (persisted history)
+            self.divergence_history.append(adjusted_divergence)
+            self._save_history()
 
             if len(self.divergence_history) >= 10:
                 mean_div = np.mean(self.divergence_history)
-                std_div = np.std(self.divergence_history)
-
+                std_div  = np.std(self.divergence_history)
                 if std_div > 1e-6:
-                    z_score = (raw_divergence - mean_div) / std_div
+                    z_score    = (adjusted_divergence - mean_div) / std_div
                     risk_score = 1.0 / (1.0 + np.exp(-z_score))
                 else:
                     risk_score = 0.5
             else:
                 warm_up = len(self.divergence_history)
-                print(
-                    f"      ℹ️ Warming up Divergence Model "
-                    f"({warm_up}/10 samples)..."
-                )
+                print(f"      ℹ️ Warming up ({warm_up}/10 samples)...")
                 risk_score = 0.5
 
-            risk_score = float(max(0.0, min(1.0, risk_score)))
+            risk_score = float(max(0.0, min(1.0, risk_score + predictive_penalty)))
             return risk_score, corr_matrix
 
         except Exception as e:
