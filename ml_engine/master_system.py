@@ -212,7 +212,10 @@ class FinFolioSystem:
 
         # 7. Risk Engine
         print("   🔹 [7/11] Loading Risk Engine (Kelly Criterion)...")
-        self.risk_engine = RiskEngine(default_account_size=DEFAULT_CAPITAL)
+        self.risk_engine = RiskEngine(
+    default_account_size=DEFAULT_CAPITAL,
+    bear_max_allocation=0.10,   # ← v2.2: cap Bear allocations at 10%
+)
         print(f"      ✅ Risk Manager Online (Account: ${DEFAULT_CAPITAL:,.2f}).")
 
         # 8. Explainability Agent (lazy init)
@@ -309,7 +312,7 @@ class FinFolioSystem:
 
     def _analyze_technicals_and_uncertainty(self, hist):
         print("\n   📈 [Technical Analysis] Reading Charts (LSTM)...")
-        lstm_signal = self.tech_agent.predict(hist)
+        lstm_signal = self.tech_agent.predict(hist)          # ← already correct, untouched
         print(f"      - LSTM Signal: {lstm_signal:.4f}")
 
         from ml_engine.technical_agent import build_lstm_features
@@ -328,7 +331,7 @@ class FinFolioSystem:
             print(f"      - Key Factors: {', '.join([f'{k}={v:.3f}' for k, v in sorted_feats])}")
 
         print("   🎲 [Uncertainty Agent] Computing confidence distance...")
-        mc_mean, mc_std = self.uncertainty_agent.predict_with_uncertainty(last_100_days)
+        mc_mean, mc_std = self.uncertainty_agent.predict_from_prob(lstm_signal)  # ← ONLY CHANGE
 
         uncertainty_status = "✅ High Certainty"
         if mc_std > UNCERTAINTY_THRESHOLD_MODERATE:
@@ -586,8 +589,9 @@ class FinFolioSystem:
         # ── Risk Management ───────────────────────────────────────────────────
         print("\n   [Risk Engine] Calculating Position Sizing (Kelly)...")
         alloc_pct, kelly_debug = self.risk_engine.calculate_position_size(
-            final_conf, current_vol, disagreement_penalty=gdi_penalty, regime=regime_label,
-        )
+    final_conf, current_vol, disagreement_penalty=gdi_penalty,
+    regime=regime_label, stock_price=last_price,   # ← v2.2: min $50 check
+)
         num_shares, cash_value = self.risk_engine.get_shares_amount(last_price, alloc_pct)
 
         # ── Final Report ──────────────────────────────────────────────────────

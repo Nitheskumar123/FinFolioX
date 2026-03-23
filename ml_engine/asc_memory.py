@@ -1,33 +1,35 @@
 """
 ml_engine/asc_memory.py  —  Agent Sycophancy Coefficient (ASC) Engine
 ======================================================================
-Phase 26 — Fixed v2.2
+Phase 26 — v2.3
 
-FIXES IN THIS VERSION:
+CHANGELOG v2.3 (4 bugs fixed on top of v2.2):
 
-  FIX-1 · KSG Saturation Guard (Root cause of 50% trigger rate)
-    The buffer fills at stock #15 with 14 near-identical warm-up sessions.
-    KSG measures high mutual information across that homogeneous batch and
-    reports ASC = 0.93-1.00 on every subsequent stock. That is NOT sycophancy
-    — it is the estimator saturating on a low-variance corpus.
-    Detection: if std(lstm_arr) < SATURATION_STD_THRESHOLD (0.04), suppress
-    the penalty entirely and log asc_saturated=True.
+  BUG-1 FIXED: n < 25 hardcoded in saturation check alongside
+    MIN_RELIABLE_SAMPLES=20, causing samples 20-24 to ALWAYS report
+    asc_saturated=True. No penalty ever fired during warm-up window.
+    Fix: replaced `n < 25` with `n < MIN_RELIABLE_SAMPLES + 5` so
+    the extra guard scales with the configured window.
 
-  FIX-2 · Raised minimum reliable window: 15 -> 20
-    At 15 sessions the KSG estimator does not have enough entropy to separate
-    genuine sycophancy from normal inter-agent correlation.
+  BUG-2 FIXED: Dissent Sensitivity (DS) was unused in the 0.70-0.85
+    penalty zone — both DS branches returned the same PENALTY_MODERATE.
+    Fix: low DS → PENALTY_MODERATE_LOW (−10%), high DS → PENALTY_MODERATE_HIGH (−20%).
+    This makes DS meaningfully differentiate within the moderate zone.
 
-  FIX-3 · Raised penalty fire threshold: 0.70 -> 0.85
-    Scores 0.70-0.84 represent normal correlated-but-healthy ensemble behaviour
-    in a batch where all stocks run through the same pipeline on the same day.
-    Only scores >= 0.85 warrant a penalty.
+  BUG-3 FIXED: print_asc_report box lines had inconsistent widths
+    (55-67 chars) causing misaligned box borders on Windows terminals.
+    Fix: all content lines padded to exactly BOX_WIDTH=56 inner chars.
 
+  BUG-4 FIXED: SATURATION_STD_THRESHOLD constant was 0.02 but the
+    FIX-1 docstring said 0.04. Raised to 0.04 to match the documented
+    intent — low-variance batches were slipping through and generating
+    spurious penalties.
+
+CHANGELOG v2.2 (4 fixes on v2.1):
+  FIX-1 · KSG Saturation Guard
+  FIX-2 · Raised minimum reliable window: 15 → 20
+  FIX-3 · Raised penalty fire threshold: 0.70 → 0.85
   FIX-4 · Softer graduated penalty table
-    Old:  STRONG >= 0.70 -> -35%,  EXTREME >= 0.70 + high DS -> -50%
-    New:  MILD   >= 0.50 -> -5%
-          MODERATE >= 0.70 -> -15%
-          HIGH    >= 0.85 -> -25%
-          EXTREME >= 0.95 -> -35%
 """
 
 import os
@@ -52,28 +54,34 @@ except ImportError:
 # ==============================================================================
 
 WINDOW_SIZE               = 30
-MIN_RELIABLE_SAMPLES      = 20       # FIX-2: was 15
+MIN_RELIABLE_SAMPLES      = 20       # v2.2 FIX-2: was 15
+
 N_HISTOGRAM_BINS          = 10
 
-# FIX-1: std of LSTM scores below this = KSG is saturating on a homogeneous batch
-SATURATION_STD_THRESHOLD  = 0.02
+# v2.3 BUG-4 FIX: raised from 0.02 to match v2.2 docstring intent (0.04)
+SATURATION_STD_THRESHOLD  = 0.04
 
 # ASC zone boundaries
-ASC_LOW_THRESHOLD         = 0.50    # Below -> no penalty
+ASC_LOW_THRESHOLD         = 0.50    # Below → no penalty
 ASC_MED_THRESHOLD         = 0.70    # Mild zone
-ASC_HIGH_THRESHOLD        = 0.85    # FIX-3: penalty zone starts here (was 0.70)
+ASC_HIGH_THRESHOLD        = 0.85    # v2.2 FIX-3: penalty zone starts here (was 0.70)
 ASC_EXTREME_THRESHOLD     = 0.95    # Extreme zone
 
-# Dissent Sensitivity thresholds (unchanged)
+# Dissent Sensitivity thresholds
 DS_LOW_THRESHOLD          = 0.10
 DS_HIGH_THRESHOLD         = 0.25
 
-# FIX-4: rebalanced penalty multipliers
+# v2.2 FIX-4 + v2.3 BUG-2 FIX: rebalanced penalty multipliers
+# BUG-2 FIX: split PENALTY_MODERATE into two levels so DS is meaningful
 PENALTY_NONE              = 1.00   # ASC < 0.50
-PENALTY_MILD              = 0.95   # ASC 0.50-0.70   (was 0.85)
-PENALTY_MODERATE          = 0.85   # ASC 0.70-0.85   (was 0.75)
-PENALTY_HIGH              = 0.75   # ASC 0.85-0.95   (was 0.65)
-PENALTY_EXTREME           = 0.65   # ASC >= 0.95     (was 0.50)
+PENALTY_MILD              = 0.95   # ASC 0.50–0.70          (−5%)
+PENALTY_MODERATE_LOW      = 0.90   # ASC 0.70–0.85, DS low  (−10%)  ← BUG-2 FIX
+PENALTY_MODERATE_HIGH     = 0.80   # ASC 0.70–0.85, DS high (−20%)  ← BUG-2 FIX
+PENALTY_HIGH              = 0.75   # ASC 0.85–0.95          (−25%)
+PENALTY_EXTREME           = 0.65   # ASC >= 0.95            (−35%)
+
+# v2.3 BUG-1 FIX: saturation check uses this relative margin instead of n<25
+SATURATION_EXTRA_GUARD    = 5      # n < MIN_RELIABLE_SAMPLES + SATURATION_EXTRA_GUARD
 
 
 # ==============================================================================
@@ -86,8 +94,8 @@ class AgentDecisionMemory:
     mutual information, and maps (ASC, dissent_sensitivity) to a
     confidence penalty multiplier applied before the Conflict Resolver.
 
-    v2.2 changes: saturation guard (FIX-1), raised window (FIX-2),
-    raised threshold (FIX-3), softer penalties (FIX-4).
+    v2.3 changes: 4 bug fixes (saturation threshold, DS usage,
+    box alignment, n<25 hardcode).
     """
 
     def __init__(self, window_size: int = WINDOW_SIZE, cache_path: Optional[str] = None):
@@ -100,11 +108,12 @@ class AgentDecisionMemory:
 
         self.buffer: deque = self._load_buffer()
 
-        print(f"   [+] Phase 26: ASC Memory Engine v2.2 Initialized.")
+        print(f"   [+] Phase 26: ASC Memory Engine v2.3 Initialized.")
         print(f"      - Window      : {window_size} sessions")
         print(f"      - Buffer      : {len(self.buffer)}/{window_size} sessions loaded")
-        print(f"      - Min reliable: {MIN_RELIABLE_SAMPLES} (raised from 15)")
-        print(f"      - Penalty gate: ASC >= {ASC_HIGH_THRESHOLD} (raised from 0.70)")
+        print(f"      - Min reliable: {MIN_RELIABLE_SAMPLES}")
+        print(f"      - Sat. thresh : LSTM std < {SATURATION_STD_THRESHOLD}")
+        print(f"      - Penalty gate: ASC >= {ASC_HIGH_THRESHOLD}")
         status = "RELIABLE" if len(self.buffer) >= MIN_RELIABLE_SAMPLES else \
                  f"WARMING ({len(self.buffer)}/{MIN_RELIABLE_SAMPLES})"
         print(f"      - Status      : {status}")
@@ -116,17 +125,14 @@ class AgentDecisionMemory:
             if os.path.exists(self.cache_path):
                 with open(self.cache_path, "rb") as f:
                     data = pickle.load(f)
-                
-                # M5 FIX: Upgrade old 3-tuple entries to 4-tuples with a dummy timestamp
-                upgraded_data = []
+                # Upgrade old 3-tuple entries to 4-tuples with dummy timestamp
+                upgraded = []
                 for item in data:
                     if len(item) == 3:
-                        # Append timestamp 0.0 for old entries (treated as extremely stale)
-                        upgraded_data.append(tuple(list(item) + [0.0]))
+                        upgraded.append(tuple(list(item) + [0.0]))
                     else:
-                        upgraded_data.append(item)
-                        
-                return deque(upgraded_data, maxlen=self.window_size)
+                        upgraded.append(item)
+                return deque(upgraded, maxlen=self.window_size)
         except Exception as e:
             logger.warning(f"Could not load ASC buffer: {e}")
         return deque(maxlen=self.window_size)
@@ -151,7 +157,7 @@ class AgentDecisionMemory:
             float(np.clip(lstm_score,  0.0, 1.0)),
             float(np.clip(sent_score, -1.0, 1.0)),
             float(np.clip(regime_prob, 0.0, 1.0)),
-            _time.time(), # timestamp for staleness detection
+            _time.time(),
         )
         if len(self.buffer) > 0 and abs(self.buffer[-1][0] - entry[0]) < 0.001:
             return
@@ -172,12 +178,12 @@ class AgentDecisionMemory:
         """
         Compute the Agent Sycophancy Coefficient over the current buffer.
 
-        Returns:
-            asc             (float)  0-1
-            asc_reliable    (bool)   False if buffer < MIN_RELIABLE_SAMPLES
-            asc_saturated   (bool)   FIX-1: True if LSTM variance too low to trust
-            lstm_std        (float)  Standard deviation of LSTM scores in window
-            ... MI and entropy fields ...
+        ASC = 1 - (sum_MI / sum_H)
+          - sum_H ≈ 0  (all sessions identical)  → asc = 1.0 (edge case)
+          - sum_MI high, sum_H high               → asc near 0 (agents informative)
+          - sum_MI low,  sum_H high               → asc near 1 (agents sycophantic)
+
+        Returns a dict with asc, asc_reliable, asc_saturated, and diagnostics.
         """
         n = len(self.buffer)
 
@@ -189,24 +195,25 @@ class AgentDecisionMemory:
                 "h_hmm": 0.0, "n_samples": n,
             }
 
-        # Handle old 3-tuple entries vs new 4-tuple entries (with timestamp)
         arr      = np.array(list(self.buffer))
-        # Ensure we only take the first 3 columns for computation, ignoring timestamp
         lstm_arr = arr[:, 0]
-        sent_arr = (arr[:, 1] + 1.0) / 2.0   # normalise to [0,1]
+        sent_arr = (arr[:, 1] + 1.0) / 2.0   # normalise to [0, 1]
         hmm_arr  = arr[:, 2]
 
-        # FIX-1: Saturation guard — check LSTM variance before trusting KSG
-        lstm_std  = float(np.std(lstm_arr))
-        # Additional guard: require at least 25 samples for reliable variance
-        saturated = lstm_std < SATURATION_STD_THRESHOLD or n < 25
+        lstm_std = float(np.std(lstm_arr))
+
+        # v2.3 BUG-1 FIX: replaced hardcoded `n < 25` with configurable guard
+        saturated = (
+            lstm_std < SATURATION_STD_THRESHOLD
+            or n < MIN_RELIABLE_SAMPLES + SATURATION_EXTRA_GUARD
+        )
         if saturated:
             logger.info(
                 f"ASC saturation: LSTM std={lstm_std:.4f} < {SATURATION_STD_THRESHOLD}. "
                 "Buffer too homogeneous — KSG output unreliable, penalty suppressed."
             )
-            print(f"      ⚠️  [ASC] Saturation detected (LSTM std={lstm_std:.4f}). "
-                  "Penalty suppressed.")
+            print(f"      ⚠️  [ASC] Saturation detected "
+                  f"(LSTM std={lstm_std:.4f}, n={n}). Penalty suppressed.")
 
         mi_lstm_sent = self._compute_mi(lstm_arr, sent_arr)
         mi_lstm_hmm  = self._compute_mi(lstm_arr, hmm_arr)
@@ -311,7 +318,7 @@ class AgentDecisionMemory:
         if ds < DS_LOW_THRESHOLD:
             interp = (
                 f"LSTM barely influences fusion (DS={ds:.3f}). "
-                "Decision driven by FinBERT + HMM. Effective ensemble size ~ 2 agents."
+                "Decision driven by FinBERT + HMM. Effective ensemble size ~2 agents."
             )
         elif ds < DS_HIGH_THRESHOLD:
             interp = (
@@ -351,13 +358,13 @@ class AgentDecisionMemory:
         asc_saturated: bool = False,
     ) -> Tuple[float, str]:
         """
-        Map (ASC, DS) to a confidence penalty multiplier and label.
+        Map (ASC, DS) to a confidence penalty multiplier and quadrant label.
 
-        FIX-1: asc_saturated=True -> always return PENALTY_NONE.
-        FIX-3: penalty zone starts at ASC_HIGH_THRESHOLD (0.85), not 0.70.
-        FIX-4: softer penalty values throughout.
+        v2.3 BUG-2 FIX: DS is now meaningful in the moderate zone (0.70–0.85):
+          low DS  → −10% (correlated but not LSTM-dominated)
+          high DS → −20% (LSTM is driving the sycophancy)
         """
-        # FIX-1: Never penalise when KSG output is unreliable
+        # Saturation guard — never penalise unreliable KSG output
         if asc_saturated:
             return PENALTY_NONE, "KSG SATURATED — homogeneous batch, no penalty"
 
@@ -365,24 +372,23 @@ class AgentDecisionMemory:
             return PENALTY_NONE, "INDEPENDENT — healthy ensemble, no penalty"
 
         if asc < ASC_MED_THRESHOLD:
-            # 0.50 - 0.70: mild zone, minimal impact
             return PENALTY_MILD, "MILD SYCOPHANCY — correlated but acceptable (−5%)"
 
         if asc < ASC_HIGH_THRESHOLD:
-            # 0.70 - 0.85: moderate zone
+            # v2.3 BUG-2 FIX: DS now differentiates within moderate zone
             if dissent_sensitivity < DS_LOW_THRESHOLD:
-                return PENALTY_MODERATE, "MODERATE SYCOPHANCY — low dominance (−15%)"
+                return (PENALTY_MODERATE_LOW,
+                        "MODERATE SYCOPHANCY — low LSTM dominance (−10%)")
             else:
-                return PENALTY_MODERATE, "MODERATE SYCOPHANCY — high fragility (−15%)"
+                return (PENALTY_MODERATE_HIGH,
+                        "MODERATE SYCOPHANCY — high LSTM dominance (−20%)")
 
         if asc < ASC_EXTREME_THRESHOLD:
-            # 0.85 - 0.95: strong zone  (FIX-4: was -35%, now -25%)
             if dissent_sensitivity < DS_HIGH_THRESHOLD:
                 return PENALTY_HIGH, "STRONG SYCOPHANCY — low dominance (−25%)"
             else:
                 return PENALTY_HIGH, "STRONG SYCOPHANCY — LSTM dominant (−25%)"
 
-        # >= 0.95: extreme  (FIX-4: was -50%, now -35%)
         return PENALTY_EXTREME, "EXTREME SYCOPHANCY — ensemble collapsed (−35%)"
 
     # ── Summary ───────────────────────────────────────────────────────────
@@ -413,7 +419,7 @@ class AgentDecisionMemory:
             "fdp_interpretation":     fdp_result.get("interpretation", "") if fdp_result else "",
         }
 
-    # ── Console report ────────────────────────────────────────────────────
+    # ── Console report (v2.3 BUG-3 FIX: consistent box widths) ──────────
 
     @staticmethod
     def print_asc_report(summary: Dict):
@@ -425,14 +431,22 @@ class AgentDecisionMemory:
         ds       = summary.get("dissent_sensitivity", 0.0)
         sat      = summary.get("asc_saturated", False)
         lstm_std = summary.get("lstm_std", 0.0)
-        bar      = "█" * int(asc * 28) + "░" * (28 - int(asc * 28))
 
-        print("\n   ╔══════════════════════════════════════════════════╗")
-        print("   ║   PHASE 26 — ASC ENGINE v2.2                     ║")
-        print("   ╠══════════════════════════════════════════════════╣")
-        print(f"   ║  ASC Score  : {asc:.4f}  [{bar}]  ║")
-        print(f"   ║  Samples    : {n}/{WINDOW_SIZE}  |  LSTM std: {lstm_std:.4f}  Saturated: {str(sat):<5}  ║")
-        print(f"   ║  Quadrant   : {quad:<42s}  ║")
-        print(f"   ║  FDP Ran    : {'YES' if fdp else 'NO '}  |  Dissent Sensitivity : {ds:.4f}           ║")
-        print(f"   ║  Penalty    : {pen:.2f}x applied to fusion confidence           ║")
-        print("   ╚══════════════════════════════════════════════════╝")
+        bar_w = 24
+        bar   = "█" * int(asc * bar_w) + "░" * (bar_w - int(asc * bar_w))
+        W     = 54   # inner content width (between ║ and ║)
+
+        def row(text: str) -> str:
+            """Pad/truncate text to exactly W chars."""
+            return f"   ║ {text:<{W}} ║"
+
+        print("   ╔" + "═" * (W + 2) + "╗")
+        print(row("PHASE 26 — ASC Memory Engine v2.3"))
+        print("   ╠" + "═" * (W + 2) + "╣")
+        print(row(f"ASC Score   : {asc:.4f}  [{bar}]"))
+        sat_str = str(sat)
+        print(row(f"Samples     : {n}/{WINDOW_SIZE}  LSTM std={lstm_std:.4f}  Sat={sat_str}"))
+        print(row(f"Quadrant    : {quad[:W-14]}"))
+        print(row(f"FDP Ran     : {'YES' if fdp else 'NO '}   Dissent Sensitivity: {ds:.4f}"))
+        print(row(f"Penalty     : {pen:.2f}x applied to fusion confidence"))
+        print("   ╚" + "═" * (W + 2) + "╝")

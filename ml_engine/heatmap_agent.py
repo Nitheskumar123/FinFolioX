@@ -1,237 +1,195 @@
 """
-PHASE 16: AGENT DISAGREEMENT HEATMAP (The "Boardroom Tension" Metric)
-----------------------------------------------------------------------
-Exposes the hidden ensemble variance that standard Fusion hides.
+ml_engine/heatmap_agent.py  —  Disagreement Heatmap Agent (v2.1)
+=================================================================
+Measures how much the three signal layers disagree:
+  - LSTM technical signal
+  - Sentiment score (FinBERT / MCP)
+  - Hybrid Regime label + volatility
 
-A confidence of 0.50 from three agreeing agents is SAFE.
-A confidence of 0.50 from warring agents is DANGEROUS.
+High disagreement → high GDI → confidence penalty applied before final decision.
+Low disagreement  → signals are aligned → no penalty, conviction boosted.
 
-Phase 16 calculates the Global Disagreement Index (GDI) — a single
-number from 0% (total harmony) to 100% (total chaos) — and uses it
-to automatically shrink position sizes when the boardroom is fighting.
+Interface (consumed by finfolio_system.py and langgraph_orchestrator.py):
+    result = agent.analyze(
+        lstm_score=float,     # stretched LSTM prob in [0, 1]
+        sent_score=float,     # FinBERT score in [-0.75, +0.75]
+        regime_label=str,     # "Bull" | "Bear" | "Sideways"
+        regime_vol=float,     # 21-day decimal vol (e.g. 0.012)
+    )
+    # result keys: gdi, tension, penalty, detail
 
-Three Components:
-  A. Disagreement Matrix  – Pairwise distance between every agent.
-  B. Position Sizing Penalty – GDI > 40% → Kelly allocation halved.
-  C. ASCII Visual Heatmap  – Terminal grid showing the boardroom tension.
+    agent.print_heatmap(result)  # pretty-print to console
 """
 
 import numpy as np
 
 
 # ==============================================================================
-# CONFIGURATION
+# TENSION BANDS
 # ==============================================================================
-GDI_LOW_THRESHOLD = 0.20       # Below 20% = Harmony (green)
-GDI_MED_THRESHOLD = 0.40       # 20-40% = Moderate tension (yellow)
-GDI_HIGH_THRESHOLD = 0.60      # 40-60% = High tension (orange)
-# Above 60% = Extreme tension (red)
+TENSION_BANDS = [
+    (0.20, "HARMONY",  1.00),   # all agents agree
+    (0.35, "MILD",     0.95),   # minor disagreement
+    (0.50, "MODERATE", 0.85),   # signals mixed
+    (0.65, "HIGH",     0.70),   # strong disagreement
+    (1.01, "CRITICAL", 0.50),   # complete contradiction
+]
 
-PENALTY_NONE = 1.0             # GDI < 20%: no penalty
-PENALTY_MODERATE = 0.75        # GDI 20-40%: reduce allocation by 25%
-PENALTY_HIGH = 0.50            # GDI 40-60%: reduce allocation by 50%
-PENALTY_EXTREME = 0.25         # GDI > 60%: reduce allocation by 75%
+# ==============================================================================
+# SIGNAL WEIGHTS
+# How much each pairwise disagreement matters.
+# LSTM↔Regime is most important (macro vs price action).
+# Sentiment↔LSTM is second (news vs chart).
+# Sentiment↔Regime is third (news vs macro context).
+# Vol spike adds extra disagreement cost.
+# ==============================================================================
+W_LSTM_REGIME = 0.45   # technical vs macro — most critical conflict
+W_SENT_LSTM   = 0.30   # news vs chart signal
+W_SENT_REGIME = 0.15   # news vs macro context
+W_VOL_SPIKE   = 0.10   # elevated vol worsens all disagreements
 
 
 class HeatmapAgent:
     """
-    The Boardroom Tension Monitor.
+    Group Disagreement Index (GDI) calculator.
 
-    Takes raw agent scores, normalizes them to a common [0, 1] scale,
-    calculates pairwise disagreements, and produces:
-      1. A 3x3 Disagreement Matrix
-      2. A Global Disagreement Index (GDI)
-      3. A position sizing penalty multiplier
-      4. A visual ASCII heatmap for the console
+    GDI ∈ [0, 1]:
+      0.00 → all agents perfectly aligned
+      1.00 → agents completely contradict each other
+
+    Penalty ∈ [0.50, 1.00]:
+      1.00 → no penalty (harmony)
+      0.50 → 50% confidence reduction (critical disagreement)
     """
 
     def __init__(self):
-        print("   [+] Phase 16: Heatmap Agent (Boardroom Tension) Initialized.")
+        self._last_result = None
 
-    def analyze(self, lstm_score, sent_score, regime_label, regime_vol=0.5):
+    # ==========================================================================
+    # MAIN METHOD
+    # ==========================================================================
+
+    def analyze(self, lstm_score: float,
+                sent_score: float,
+                regime_label: str,
+                regime_vol: float) -> dict:
         """
-        Main entry point. Takes raw agent scores and produces the
-        full disagreement analysis.
+        Computes the Group Disagreement Index (GDI) across all signal layers.
 
-        Args:
-            lstm_score:   Technical agent output (0.0 to 1.0)
-            sent_score:   Sentiment agent output (-1.0 to +1.0)
-            regime_label: Market regime string ("Bull", "Bear", "Sideways")
-            regime_vol:   Current volatility (used for regime normalization)
+        Parameters
+        ----------
+        lstm_score   : stretched LSTM probability ∈ [0, 1]
+                       0.0 = strong SELL signal, 1.0 = strong BUY signal
+        sent_score   : FinBERT-blended score ∈ [-0.75, +0.75]
+                       negative = bearish, positive = bullish
+        regime_label : "Bull" | "Bear" | "Sideways"
+        regime_vol   : 21-day decimal daily volatility (e.g. 0.012 = 1.2%/day)
 
-        Returns dict:
-            matrix:       3x3 numpy array of pairwise spreads
-            agents:       dict of normalized agent scores
-            gdi:          Global Disagreement Index (0.0 to 1.0)
-            gdi_pct:      GDI as a percentage string
-            tension:      "HARMONY" / "MODERATE" / "HIGH" / "EXTREME"
-            penalty:      Position sizing multiplier (0.25 to 1.0)
-            pairs:        dict of pairwise distances
+        Returns
+        -------
+        dict with keys:
+          gdi       : float ∈ [0, 1]
+          tension   : str   — "HARMONY" | "MILD" | "MODERATE" | "HIGH" | "CRITICAL"
+          penalty   : float ∈ [0.5, 1.0]  — multiplier applied to fusion confidence
+          detail    : dict  — per-component disagreement scores (for logging)
         """
-        # Step 1: Normalize all agents to the same [0, 1] scale
-        norm_lstm = max(0.0, min(1.0, lstm_score))
-        norm_sent = max(0.0, min(1.0, (sent_score + 1.0) / 2.0))
-        norm_regime = self._regime_to_score(regime_label)
+        # ── Convert all signals to [-1, +1] directional scale ─────────────────
+        #
+        # LSTM: 0.5 is neutral, 1.0 is max bullish, 0.0 is max bearish
+        #   → direction_lstm ∈ [-1, +1]
+        direction_lstm = (lstm_score - 0.5) * 2.0
 
-        agents = {
-            "LSTM": round(norm_lstm, 4),
-            "FinBERT": round(norm_sent, 4),
-            "Regime": round(norm_regime, 4),
+        # Sentiment: already ∈ [-0.75, +0.75] → rescale to [-1, +1]
+        direction_sent = float(np.clip(sent_score / 0.75, -1.0, 1.0))
+
+        # Regime: map label to directional score
+        regime_dir = {"Bull": +1.0, "Sideways": 0.0, "Bear": -1.0}.get(
+            regime_label, 0.0)
+
+        # ── Per-component disagreement ─────────────────────────────────────────
+        # Disagreement = |difference| / 2 (normalised to [0, 1])
+        # Two signals pointing in exactly opposite directions → disagreement = 1.0
+        # Two signals pointing in the same direction → disagreement = 0.0
+
+        d_lstm_regime = abs(direction_lstm - regime_dir) / 2.0
+        d_sent_lstm   = abs(direction_sent - direction_lstm) / 2.0
+        d_sent_regime = abs(direction_sent - regime_dir) / 2.0
+
+        # Vol spike component: elevated vol amplifies the cost of disagreement.
+        # Threshold: 2% daily (~32% annualised) is the "high vol" boundary.
+        vol_spike = float(np.clip((regime_vol - 0.02) / 0.03, 0.0, 1.0))
+
+        # ── Weighted GDI ──────────────────────────────────────────────────────
+        gdi_raw = (
+            W_LSTM_REGIME * d_lstm_regime
+            + W_SENT_LSTM   * d_sent_lstm
+            + W_SENT_REGIME * d_sent_regime
+            + W_VOL_SPIKE   * vol_spike
+        )
+        gdi = float(np.clip(gdi_raw, 0.0, 1.0))
+
+        # ── Tension band lookup ───────────────────────────────────────────────
+        tension = "CRITICAL"
+        penalty = 0.50
+        for threshold, band_name, band_penalty in TENSION_BANDS:
+            if gdi < threshold:
+                tension = band_name
+                penalty = band_penalty
+                break
+
+        # ── Store detail for logging ──────────────────────────────────────────
+        detail = {
+            "direction_lstm":    round(direction_lstm, 3),
+            "direction_sent":    round(direction_sent, 3),
+            "direction_regime":  round(regime_dir, 3),
+            "d_lstm_regime":     round(d_lstm_regime, 3),
+            "d_sent_lstm":       round(d_sent_lstm, 3),
+            "d_sent_regime":     round(d_sent_regime, 3),
+            "vol_spike":         round(vol_spike, 3),
+            "regime_vol":        round(regime_vol, 4),
         }
 
-        # Step 2: Calculate pairwise disagreements
-        spread_lf = abs(norm_lstm - norm_sent)      # LSTM vs FinBERT
-        spread_lr = abs(norm_lstm - norm_regime)     # LSTM vs Regime
-        spread_fr = abs(norm_sent - norm_regime)     # FinBERT vs Regime
-
-        pairs = {
-            "LSTM_vs_FinBERT": round(spread_lf, 4),
-            "LSTM_vs_Regime": round(spread_lr, 4),
-            "FinBERT_vs_Regime": round(spread_fr, 4),
-        }
-
-        # Step 3: Build the 3x3 matrix
-        matrix = np.array([
-            [0.0,       spread_lf, spread_lr],
-            [spread_lf, 0.0,       spread_fr],
-            [spread_lr, spread_fr, 0.0      ],
-        ])
-
-        # Step 4: Global Disagreement Index
-        # H5 FIX: If sentiment is frozen/missing, use only LSTM vs Regime distance
-        sentiment_frozen = abs(sent_score) < 0.001
-        if sentiment_frozen:
-            gdi = spread_lr * 1.5
-        else:
-            gdi = np.mean([spread_lf, spread_lr, spread_fr]) * 1.5
-            
-        if gdi > 0.40:
-            print(f"      ⚠️ [Heatmap] High Boardroom Tension detected: {gdi*100:.1f}%")
-            
-        gdi = max(0.0, min(1.0, gdi))  # Cap at 100%, not 20%
-
-        # Step 5: Classify tension level and penalty
-        tension, penalty = self._classify_tension(gdi)
-
-        return {
-            "matrix": matrix,
-            "agents": agents,
-            "gdi": round(gdi, 4),
-            "gdi_pct": f"{gdi * 100:.1f}%",
+        result = {
+            "gdi":     round(gdi, 4),
             "tension": tension,
-            "penalty": penalty,
-            "pairs": pairs,
+            "penalty": round(penalty, 4),
+            "detail":  detail,
         }
 
-    def _regime_to_score(self, regime_label):
-        """Convert regime label to a bullish/bearish score on [0, 1]."""
-        label = str(regime_label).strip().lower()
-        if label == "bull":
-            return 0.65
-        elif label == "bear":
-            return 0.35
-        else:
-            return 0.50  # Sideways
+        self._last_result = result
+        return result
 
-    def _classify_tension(self, gdi):
-        """Returns (tension_label, penalty_multiplier) based on GDI."""
-        if gdi < GDI_LOW_THRESHOLD:
-            return "HARMONY", PENALTY_NONE
-        elif gdi < GDI_MED_THRESHOLD:
-            return "MODERATE", PENALTY_MODERATE
-        elif gdi < GDI_HIGH_THRESHOLD:
-            return "HIGH", PENALTY_HIGH
-        else:
-            return "EXTREME", PENALTY_EXTREME
+    # ==========================================================================
+    # PRETTY PRINTER
+    # ==========================================================================
 
-    def get_sizing_penalty(self, gdi):
+    def print_heatmap(self, result: dict):
         """
-        Public API — returns the Kelly penalty multiplier for a given GDI.
-        Used by the Risk Engine to shrink position sizes.
+        Prints a formatted heatmap report to console.
+        Called by finfolio_system.py after every analyze() call.
         """
-        _, penalty = self._classify_tension(gdi)
-        return penalty
-
-    # ------------------------------------------------------------------
-    # ASCII VISUAL HEATMAP
-    # ------------------------------------------------------------------
-    @staticmethod
-    def print_heatmap(result):
-        """
-        Renders the Disagreement Matrix as a styled ASCII grid.
-
-        Color coding (via emoji):
-          0.00 - 0.20: Green  (Agreement)
-          0.20 - 0.40: Yellow (Mild tension)
-          0.40 - 0.60: Orange (High tension)
-          0.60 - 1.00: Red    (War zone)
-        """
-        agents = result["agents"]
-        matrix = result["matrix"]
-        gdi = result["gdi"]
+        gdi     = result["gdi"]
         tension = result["tension"]
         penalty = result["penalty"]
+        d       = result.get("detail", {})
 
-        # Emoji for tension level
-        tension_emoji = {
-            "HARMONY": "##",
-            "MODERATE": "!!",
-            "HIGH": "!!",
-            "EXTREME": "XX",
-        }
+        # Tension colour emoji
+        icon = {"HARMONY": "🟢", "MILD": "🟡", "MODERATE": "🟠",
+                "HIGH": "🔴", "CRITICAL": "🚨"}.get(tension, "⬜")
 
-        labels = ["LSTM", "FinBERT", "Regime"]
+        bar_len  = int(gdi * 20)
+        bar      = "█" * bar_len + "░" * (20 - bar_len)
 
-        print(f"\n   {'=' * 60}")
-        print(f"   {tension_emoji.get(tension, '??')} [Disagreement Heatmap] "
-              f"Boardroom Tension: {tension} ({gdi*100:.1f}% GDI)")
-        print(f"   {'=' * 60}")
-
-        # Agent scores row
-        print(f"   Agent Positions (Normalized 0-1 Bullish Scale):")
-        for name, score in agents.items():
-            bar_len = int(score * 20)
-            bar = "#" * bar_len + "." * (20 - bar_len)
-            print(f"      {name:8s}: {score:.4f}  [{bar}]")
-
-        # Matrix header
-        print(f"\n   Pairwise Distance Matrix:")
-        print(f"   {'':13s}| {'LSTM':^10s}| {'FinBERT':^10s}| {'Regime':^10s}|")
-        print(f"   {'-'*13}|{'-'*11}|{'-'*11}|{'-'*11}|")
-
-        for i, row_label in enumerate(labels):
-            row_str = f"   {row_label:13s}|"
-            for j in range(3):
-                if i == j:
-                    cell = f"{'--':^10s}"
-                else:
-                    val = matrix[i][j]
-                    icon = _cell_icon(val)
-                    cell = f" {val:.2f} {icon}  "
-                row_str += f"{cell}|"
-            print(row_str)
-
-        print(f"   {'-'*13}|{'-'*11}|{'-'*11}|{'-'*11}|")
-
-        # Impact line
-        if penalty < 1.0:
-            cut_pct = int((1.0 - penalty) * 100)
-            print(f"\n   !! IMPACT: {tension} tension detected. "
-                  f"Shrinking Kelly allocation by {cut_pct}%.")
-        else:
-            print(f"\n   ** IMPACT: Boardroom in harmony. "
-                  f"No position sizing penalty.")
-
-        print(f"   {'=' * 60}")
-
-
-def _cell_icon(val):
-    """Returns a text indicator for the heatmap cell."""
-    if val < 0.20:
-        return "[OK]"
-    elif val < 0.40:
-        return "[~~]"
-    elif val < 0.60:
-        return "[!!]"
-    else:
-        return "[XX]"
+        print(f"\n   ── Disagreement Heatmap ─────────────────────────────")
+        print(f"      GDI    : {gdi:.4f}  [{bar}]  {icon} {tension}")
+        print(f"      Penalty: {penalty:.2f}×  (confidence multiplier)")
+        print(f"      ── Component breakdown ──────────────────────────")
+        print(f"         LSTM↔Regime  : {d.get('d_lstm_regime', 0):.3f}  "
+              f"(LSTM={d.get('direction_lstm', 0):+.2f}  "
+              f"Regime={d.get('direction_regime', 0):+.2f})")
+        print(f"         Sent↔LSTM    : {d.get('d_sent_lstm', 0):.3f}  "
+              f"(Sent={d.get('direction_sent', 0):+.2f})")
+        print(f"         Sent↔Regime  : {d.get('d_sent_regime', 0):.3f}")
+        print(f"         Vol spike    : {d.get('vol_spike', 0):.3f}  "
+              f"(daily_vol={d.get('regime_vol', 0):.4f})")
+        print(f"   ────────────────────────────────────────────────────")

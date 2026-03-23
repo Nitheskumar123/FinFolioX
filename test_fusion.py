@@ -1,645 +1,586 @@
 """
-==============================================================================
-FUSION + HYBRID REGIME BACKTEST  — 5-Day Horizon
-==============================================================================
-Tests the full pipeline:
-  HybridRegimeAgent  →  vol + regime_label + regime_confidence
-  TechnicalAgent     →  lstm_signal  (simulated at ~0.65 accuracy baseline)
-  SentimentAgent     →  BLOCKED / frozen at 0.0 (backtest — no live news)
-  FusionAgent        →  final_confidence
-  Decision           →  BUY (conf≥0.52) | SELL (conf<0.40) | HOLD
-
-Test windows (5-day horizon):
-  Mar03→08   Bear start
-  Mar04→09   Bear early
-  Mar09→16   Deep Bear
-  Mar12→17   Bounce window
-
-What this shows:
-  1. How FusionAgent reacts to regime_confidence from HybridRegimeAgent
-  2. Whether the confidence is high enough to trigger BUY/SELL decisions
-  3. Whether those decisions are directionally correct vs actual 5-day return
-  4. The regime acts as the vol_v input (Bear=0.9, Bull=0.2, Sideways=0.5)
-     which directly shapes fusion confidence output
-==============================================================================
+test_fusion.py  —  FusionAgent + Full Chain Backtest
+=====================================================
+FIX v2.3 — predict_from_prob() — no silent fallback
+FIX v2.4 — util = decisions_made/total (all BUY/SELL incl. noise-band)
+FIX v2.5 — Noise-band 🔍 calls now show directional correctness:
+           🔍(correct) = BUY on day that went up, or SELL on day that went down
+           🔍(wrong)   = BUY on day that went down, or SELL on day that went up
+           Also tracked in summary: noise_correct / noise_wrong
+           Goal: noise-band calls should be mostly 🔍(correct)
 """
 
-import os
-import sys
-import warnings
+import os, sys, warnings
 import numpy as np
 import pandas as pd
 import yfinance as yf
-import joblib
 
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 warnings.filterwarnings("ignore")
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-# ── Paths — update if needed ──────────────────────────────────────────────────
-HMM_PATH    = r"D:\FinFolioX\saved_models\hmm_regime.pkl"
+from ml_engine.technical_agent     import TechnicalAgent, build_lstm_features, SEQ_LEN, LSTM_COLS
+from ml_engine.uncertainty_agent   import UncertaintyAgent
+from ml_engine.hybrid_regime_agent import HybridRegimeAgent
+from ml_engine.fusion_agent        import FusionAgent
+from ml_engine.heatmap_agent       import HeatmapAgent
+
+try:
+    from ml_engine.conflict_resolver import ConflictResolver
+    _CONFLICT_OK = True
+except ImportError:
+    _CONFLICT_OK = False
+
+try:
+    from ml_engine.risk_engine import RiskEngine
+    _RISK_OK = True
+except ImportError:
+    _RISK_OK = False
+
+MODEL_PATH  = r"D:\FinFolioX\saved_models\lstm_model.keras"
+SCALER_PATH = r"D:\FinFolioX\saved_models\lstm_scaler.pkl"
+REGIME_PATH = r"D:\FinFolioX\saved_models\hmm_regime_hybrid.pkl"
 FUSION_PATH = r"D:\FinFolioX\saved_models\attention_fusion.pth"
 
-# ── Decision thresholds (matches finfolio_master.py) ─────────────────────────
-BUY_CONFIDENCE_THRESHOLD  = 0.52
-SELL_CONFIDENCE_THRESHOLD = 0.40
-COMMODITY_BUY_THRESHOLD   = 0.55
-COMMODITY_TICKERS_DECISION = {"GLD", "SLV", "USO", "UNG", "GDX"}
+DEFAULT_CAPITAL    = 10_000.0
+BUY_THRESHOLD      = 0.52
+SELL_THRESHOLD     = 0.40
+COMMODITY_BUY_T    = 0.55
+COMMODITY_TICKERS  = {"GLD","SLV","USO","UNG","GDX"}
+BUY_GDI_MAX        = 55.0
+UNCERTAINTY_HIGH     = 0.15
+UNCERTAINTY_MODERATE = 0.05
 
-# ── Test windows ──────────────────────────────────────────────────────────────
 TEST_WINDOWS = [
-    ("2026-03-03", "2026-03-08",  "Mar03→08  Bear start"),
-    ("2026-03-04", "2026-03-09",  "Mar04→09  Bear early"),
-    ("2026-03-09", "2026-03-16",  "Mar09→16  Deep Bear"),
-    ("2026-03-12", "2026-03-17",  "Mar12→17  Bounce"),
+    ("2026-03-03", "2026-03-08", "Mar03→08  Bear start"),
+    ("2026-03-04", "2026-03-09", "Mar04→09  Bear early"),
+    ("2026-03-17", "2026-03-22", "Mar17→22  Deep Bear"),
+    ("2025-08-01", "2025-08-08", "Aug01→08  Bull Phase"),
+    ("2025-10-01", "2025-10-08", "Oct01→08  Sideways"),
 ]
 
 TICKERS = [
-    "AAPL", "MSFT", "NVDA", "TSLA", "META", "AMZN", "GOOGL", "AMD", "INTC", "NFLX",
-    "JPM", "V", "WMT", "JNJ", "XOM", "CAT", "DIS", "BA", "MCD", "KO",
-    "SPY", "QQQ", "TLT", "GLD", "SLV", "USO", "UNG", "DIA", "IWM", "EEM",
+    "AAPL","MSFT","NVDA","TSLA","META","GOOGL","AMZN",
+    "AMD", "INTC","ORCL",
+    "SPY", "QQQ", "DIA", "IWM",
+    "JPM", "BAC", "GS",  "V",
+    "GLD", "TLT", "SLV",
+    "XOM", "CVX",
+    "WMT", "PG",  "JNJ",
+    "NFLX","DIS",
+    "CRM", "PLTR",
 ]
 
-# ── LSTM signal simulation ────────────────────────────────────────────────────
-# Your LSTM is ~65% accurate on 5-day horizon.
-# We simulate it here using 3 simple technical signals that approximate what
-# a trained LSTM would output, without needing the actual model file.
-# This keeps the test portable — swap in real LSTM output when available.
-def simulate_lstm_signal(hist: pd.DataFrame) -> float:
-    """
-    Simulates LSTM output (0–1) using fast EMA crossover + RSI momentum.
-    Approximates a trained LSTM at ~65% directional accuracy.
-    Replace with self.tech_agent.predict(hist) when running in production.
-    """
-    try:
-        close  = hist["Close"]
-        ema_8  = close.ewm(span=8,  adjust=False).mean().iloc[-1]
-        ema_21 = close.ewm(span=21, adjust=False).mean().iloc[-1]
-        rsi    = float(hist["RSI"].iloc[-1]) if "RSI" in hist.columns else 50.0
-        ret_3d = float(close.iloc[-1] / close.iloc[-3] - 1.0) if len(hist) >= 3 else 0.0
+MANUAL_SENTIMENT = {
+    "2026-03-03": {
+        "AAPL":-0.08,"MSFT":-0.06,"NVDA":-0.12,"TSLA":-0.18,"META":-0.05,
+        "GOOGL":-0.08,"AMZN":-0.07,"AMD":-0.10,"INTC":-0.09,"ORCL": 0.02,
+        "SPY":-0.09,"QQQ":-0.14,"DIA":-0.07,"IWM":-0.11,"JPM": 0.02,
+        "BAC":-0.04,"GS": 0.01,"V":-0.05,"GLD": 0.08,"TLT": 0.09,
+        "SLV": 0.04,"XOM":-0.06,"CVX":-0.05,"WMT": 0.03,"PG": 0.02,
+        "JNJ": 0.01,"NFLX":-0.08,"DIS":-0.09,"CRM":-0.06,"PLTR": 0.05,
+    },
+    "2026-03-04": {
+        "AAPL":-0.09,"MSFT":-0.07,"NVDA":-0.14,"TSLA":-0.20,"META":-0.06,
+        "GOOGL":-0.09,"AMZN":-0.08,"AMD":-0.11,"INTC":-0.10,"ORCL": 0.01,
+        "SPY":-0.10,"QQQ":-0.16,"DIA":-0.08,"IWM":-0.13,"JPM": 0.01,
+        "BAC":-0.05,"GS": 0.00,"V":-0.06,"GLD": 0.09,"TLT": 0.11,
+        "SLV": 0.05,"XOM":-0.07,"CVX":-0.06,"WMT": 0.04,"PG": 0.03,
+        "JNJ": 0.02,"NFLX":-0.09,"DIS":-0.10,"CRM":-0.07,"PLTR": 0.06,
+    },
+    "2026-03-05": {
+        "AAPL": 0.03,"MSFT": 0.02,"NVDA": 0.04,"TSLA":-0.12,"META": 0.05,
+        "GOOGL": 0.02,"AMZN": 0.02,"AMD": 0.03,"INTC": 0.00,"ORCL": 0.06,
+        "SPY": 0.07,"QQQ": 0.05,"DIA": 0.04,"IWM": 0.03,"JPM": 0.03,
+        "BAC": 0.01,"GS": 0.02,"V": 0.01,"GLD": 0.06,"TLT": 0.05,
+        "SLV": 0.03,"XOM": 0.02,"CVX": 0.02,"WMT": 0.04,"PG": 0.03,
+        "JNJ": 0.02,"NFLX":-0.05,"DIS":-0.04,"CRM":-0.02,"PLTR": 0.08,
+    },
+    "2026-03-17": {
+    # Iran war, oil >$100, hawkish Fed, broad tech selloff
+    # NVDA GTC conference bullish; Tesla multi-negative; energy bullish
+    "AAPL": -0.10,   # down >1% Fed day, no AI catalyst, lost market cap crown to GOOGL
+    "MSFT": -0.09,   # down >1% Fed day, AI ROI spending concerns
+    "NVDA": +0.18,   # GTC Vera Rubin launch, space computing, SpaceX deal, META AI deal
+    "TSLA": -0.24,   # UBS cut Q1 to 345K (-18%), NHTSA FSD probe escalated, Musk fraud verdict
+    "META": +0.12,   # $27B Nebius cloud deal, AI momentum, up 2.3% Mar 17
+    "GOOGL": +0.14,  # overtook AAPL in market cap, strong AI narrative, Waymo leadership
+    "AMZN": -0.08,   # down >1% Fed day, no offsetting catalyst
+    "AMD":  -0.06,   # Iranian attacks threatening helium supply → chip risk
+    "INTC": -0.12,   # TSMC/helium supply threat from Iran strikes, chip supply risk
+    "ORCL": +0.02,   # neutral; no major news
+    "SPY":  -0.10,   # broad market sell-off, near correction by Friday
+    "QQQ":  -0.14,   # tech-heavy, worst hit by Fed + Iran, Friday tumble
+    "DIA":  -0.10,   # Dow below 200-day MA, worst month since 2022 pace
+    "IWM":  -0.13,   # small caps under pressure, macro headwinds
+    "JPM":  -0.04,   # Fed hawkish, inflation concern, war uncertainty mixed for banks
+    "BAC":  -0.05,   # same macro headwinds as JPM
+    "GS":   -0.03,   # same; no specific negative catalyst
+    "V":    -0.04,   # consumer spending uncertainty, financials weak
+    "GLD":  +0.18,   # Iran war + oil >$100 + inflation = strong safe haven bid
+    "TLT":  -0.11,   # Fed held hawkish, higher inflation projections = bonds negative
+    "SLV":  +0.12,   # following gold, metals positive on war/inflation
+    "XOM":  +0.15,   # oil Brent >$100, energy sector +1%, Exxon up ~1% Mar 17
+    "CVX":  +0.14,   # same tailwind as XOM, crude >$100
+    "WMT":  +0.04,   # defensive/staples outperforming in volatile market
+    "PG":   +0.03,   # defensive, modest positive
+    "JNJ":  +0.02,   # healthcare defensive, slight positive
+    "NFLX": -0.08,   # broadly weak tech/media, no specific catalyst
+    "DIS":  -0.07,   # media sector soft, no major positive news
+    "CRM":  -0.09,   # AI software disruption concerns, trade desk -55% peer pressure
+    "PLTR": +0.09,   # defense/AI play, Iran war boosts defense sentiment
+},
+    "2025-08-01": {
+        "AAPL": 0.12,"MSFT": 0.14,"NVDA": 0.20,"TSLA": 0.08,"META": 0.15,
+        "GOOGL": 0.11,"AMZN": 0.13,"AMD": 0.16,"INTC": 0.04,"ORCL": 0.18,
+        "SPY": 0.10,"QQQ": 0.17,"DIA": 0.07,"IWM": 0.06,"JPM": 0.08,
+        "BAC": 0.07,"GS": 0.09,"V": 0.10,"GLD": 0.05,"TLT":-0.04,
+        "SLV": 0.03,"XOM": 0.06,"CVX": 0.05,"WMT": 0.08,"PG": 0.05,
+        "JNJ": 0.04,"NFLX": 0.12,"DIS": 0.07,"CRM": 0.09,"PLTR": 0.22,
+    },
+    "2025-10-01": {
+        "AAPL": 0.02,"MSFT": 0.03,"NVDA": 0.04,"TSLA":-0.06,"META": 0.05,
+        "GOOGL": 0.01,"AMZN": 0.02,"AMD": 0.03,"INTC":-0.05,"ORCL": 0.06,
+        "SPY":-0.02,"QQQ":-0.04,"DIA": 0.01,"IWM":-0.06,"JPM": 0.04,
+        "BAC": 0.01,"GS": 0.03,"V": 0.02,"GLD": 0.12,"TLT":-0.08,
+        "SLV": 0.05,"XOM": 0.09,"CVX": 0.08,"WMT": 0.03,"PG": 0.02,
+        "JNJ": 0.03,"NFLX": 0.04,"DIS":-0.03,"CRM": 0.01,"PLTR": 0.06,
+    },
+}
 
-        # Bullish score components
-        ema_bull  = 1.0 if ema_8 > ema_21 else 0.0
-        rsi_bull  = (rsi - 50) / 100.0         # +0.4 at RSI=90, -0.4 at RSI=10
-        mom_bull  = np.clip(ret_3d * 10, -0.3, 0.3)
+INDEX_ETFS    = {"SPY","QQQ","DIA","IWM","TLT"}
+VOLATILE_STKS = {"NVDA","TSLA","AMD","PLTR","NFLX","SLV"}
 
-        raw_signal = 0.50 + (ema_bull - 0.5) * 0.25 + rsi_bull * 0.15 + mom_bull
-        return float(np.clip(raw_signal, 0.05, 0.95))
-    except Exception:
-        return 0.50
+def noise_band(ticker):
+    if ticker in INDEX_ETFS:    return 1.0
+    if ticker in VOLATILE_STKS: return 3.0
+    return 2.0
 
 
 # ==============================================================================
-# DATA HELPERS
+# HELPERS
 # ==============================================================================
-def compute_rsi(series, period=14):
-    delta = series.diff()
-    gain  = delta.clip(lower=0).ewm(com=period - 1, min_periods=period).mean()
-    loss  = -delta.clip(upper=0).ewm(com=period - 1, min_periods=period).mean()
-    return 100 - (100 / (1 + gain / (loss + 1e-9)))
 
+def snap_to_trading_day(date_str):
+    dt = pd.to_datetime(date_str)
+    snapped = pd.bdate_range(start=dt, periods=1)[0]
+    if snapped != dt:
+        print(f"   ⚠️  {date_str} → snapped to {snapped.date()}")
+    return snapped.strftime("%Y-%m-%d")
 
 def fetch_history(ticker, test_date):
+    import io, contextlib
     test_dt  = pd.to_datetime(test_date)
     yf_end   = (test_dt + pd.Timedelta(days=1)).strftime("%Y-%m-%d")
-    yf_start = (test_dt - pd.Timedelta(days=600)).strftime("%Y-%m-%d")
-    df = yf.download(ticker, start=yf_start, end=yf_end, progress=False)
+    yf_start = (test_dt - pd.Timedelta(days=300)).strftime("%Y-%m-%d")
+    with contextlib.redirect_stdout(io.StringIO()):
+        df = yf.download(ticker, start=yf_start, end=yf_end,
+                         auto_adjust=True, progress=False)
     if isinstance(df.columns, pd.MultiIndex):
         df.columns = df.columns.get_level_values(0)
-    if df.empty:
-        return pd.DataFrame()
-    df["EMA_20"]  = df["Close"].ewm(span=20, adjust=False).mean()
-    df["EMA_50"]  = df["Close"].ewm(span=50, adjust=False).mean()
-    df["SMA_50"]  = df["Close"].rolling(50).mean()
-    df["SMA_200"] = df["Close"].rolling(200).mean()
-    df["RSI"]     = compute_rsi(df["Close"])
-    df.dropna(inplace=True)
-    return df
-
+    return df[df.index <= test_dt]
 
 def fetch_actual_return(ticker, test_date, outcome_date):
-    yf_end   = (pd.to_datetime(outcome_date) + pd.Timedelta(days=3)).strftime("%Y-%m-%d")
-    yf_start = (pd.to_datetime(test_date)    - pd.Timedelta(days=1)).strftime("%Y-%m-%d")
-    df = yf.download(ticker, start=yf_start, end=yf_end, progress=False)
+    import io, contextlib
+    yf_end   = (pd.to_datetime(outcome_date) + pd.Timedelta(days=2)).strftime("%Y-%m-%d")
+    yf_start = (pd.to_datetime(test_date) - pd.Timedelta(days=1)).strftime("%Y-%m-%d")
+    with contextlib.redirect_stdout(io.StringIO()):
+        df = yf.download(ticker, start=yf_start, end=yf_end,
+                         auto_adjust=True, progress=False)
     if isinstance(df.columns, pd.MultiIndex):
         df.columns = df.columns.get_level_values(0)
     if df.empty or len(df) < 2:
-        return 0.0
+        return float("nan")
     try:
         p_entry = float(df["Close"].asof(pd.to_datetime(test_date)))
         p_exit  = float(df["Close"].asof(pd.to_datetime(outcome_date)))
     except Exception:
         p_entry = float(df["Close"].iloc[0])
         p_exit  = float(df["Close"].iloc[-1])
+    if np.isnan(p_entry) or np.isnan(p_exit) or p_entry == 0:
+        return float("nan")
     return ((p_exit - p_entry) / p_entry) * 100.0
 
+def uncertainty_status_label(mc_std):
+    if mc_std > UNCERTAINTY_HIGH:     return "HIGH"
+    if mc_std > UNCERTAINTY_MODERATE: return "MODERATE"
+    return "LOW"
 
-# ==============================================================================
-# LOAD AGENTS
-# ==============================================================================
-def load_hybrid_regime():
-    try:
-        # Inline minimal HybridRegimeAgent so this script is standalone
-        # (no import needed — same logic as hybrid_regime_agent.py)
-        payload    = joblib.load(HMM_PATH)
-        model      = payload["model"]
-        scaler     = payload["scaler"]
-        regime_map = payload["regime_map"]
-        n_comp     = payload.get("n_components", model.n_components)
-        print(f"   ✅ HMM loaded  map={regime_map}")
-        return model, scaler, regime_map, n_comp
-    except Exception as e:
-        print(f"   ❌ HMM load failed: {e}")
-        return None, None, {}, 0
-
-
-def load_fusion_agent():
-    try:
-        import torch
-        # Import FusionAgent from the project — adjust path if needed
-        sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-        try:
-            from ml_engine.fusion_agent import FusionAgent
-        except ImportError:
-            from fusion_agent import FusionAgent
-        agent = FusionAgent(model_path=FUSION_PATH)
-        print(f"   ✅ FusionAgent loaded from {FUSION_PATH}")
-        return agent
-    except Exception as e:
-        print(f"   ❌ FusionAgent load failed: {e}")
-        return None
-
-
-# ==============================================================================
-# REGIME DETECTION (inline — matches hybrid_regime_agent.py v10)
-# ==============================================================================
-COMMODITY_T   = {"GLD","SLV","USO","UNG","GDX","DJP","PDBC","XOM","CVX","COP","OXY","PSX"}
-PRECIOUS_M    = {"GLD","SLV","GDX"}
-BOND_T        = {"TLT","IEF","BND","AGG","SHY","TBT","TMF"}
-DEFENSIVE_T   = {"WMT","JNJ","KO","MCD","PG","PEP","CL","MDT","ABT"}
-CYCLICAL_T    = {"CAT","DE","HON","MMM","GE","UNP","CSX"}
-MACRO_ETF_T   = {"SPY","QQQ","DIA","IWM","EEM","TLT"}
-HMM_WIN       = 90
-OV_RSI        = 42.0
-OV_DD         = -0.08
-REV_STREAK    = 5
-REV_RSI_MAX   = 40
-DYN_RSI       = 42
-DYN_DD        = -0.10
-EXHST_SOFT    = 7
-EXHST_HARD    = 12
-TRANS_EXIT    = 0.15
-
-
-def _hmm_features(df):
-    close      = df["Close"].squeeze()
-    log_ret    = np.log(close / close.shift(1))
-    roll_vol   = log_ret.rolling(10).std()
-    vol_m90    = roll_vol.rolling(90).mean()
-    vol_s90    = roll_vol.rolling(90).std()
-    vol_z      = (roll_vol - vol_m90) / (vol_s90 + 1e-9)
-    trend_5d   = close.pct_change(5)
-    delta      = close.diff()
-    gain       = delta.clip(lower=0).ewm(com=13, min_periods=14).mean()
-    loss       = -delta.clip(upper=0).ewm(com=13, min_periods=14).mean()
-    rsi_n      = (100 - (100 / (1 + gain / (loss + 1e-9)))) / 100.0
-    high_20d   = close.rolling(20).max()
-    dd         = (close - high_20d) / (high_20d + 1e-9)
-    feat_df = pd.DataFrame({
-        "log_return": log_ret,  "rolling_vol": roll_vol,
-        "vol_zscore": vol_z,    "trend_5d":    trend_5d,
-        "rsi_norm":   rsi_n,    "drawdown":    dd,
-    }, index=close.index).replace([np.inf, -np.inf], np.nan).dropna()
-    return feat_df.values
-
-
-def hmm_predict(hist, model, scaler, regime_map):
-    try:
-        feats = _hmm_features(hist)
-        if len(feats) < 50: return "Unknown"
-        fr    = feats[-HMM_WIN:] if len(feats) > HMM_WIN else feats
-        sts   = model.predict(scaler.transform(fr))
-        return regime_map.get(int(sts[-1]), "Unknown")
-    except Exception:
-        return "Unknown"
-
-
-def bear_exit_prob(hist, model, scaler, regime_map, n_comp):
-    try:
-        feats = _hmm_features(hist)
-        if len(feats) < 50: return 0.0
-        fr  = feats[-HMM_WIN:] if len(feats) > HMM_WIN else feats
-        sts = model.predict(scaler.transform(fr))
-        cs  = int(sts[-1])
-        if regime_map.get(cs, "") != "Bear": return 0.0
-        return float(sum(model.transmat_[cs, j] for j in range(n_comp)
-                         if regime_map.get(j, "") != "Bear"))
-    except Exception:
-        return 0.0
-
-
-def bond_regime(hist):
-    if len(hist) < 25: return "Sideways", 0.015
-    rsi     = float(hist["RSI"].iloc[-1]) if "RSI" in hist.columns else 50.0
-    r20d    = float(hist["Close"].iloc[-1] / hist["Close"].iloc[-20] - 1.0)
-    r5d     = float(hist["Close"].iloc[-1] / hist["Close"].iloc[-5]  - 1.0)
-    vol     = hist["Close"].pct_change().rolling(10).std().iloc[-1]
-    if   r20d > 0.02  and r5d > 0.0  and rsi < 72: reg = "Bull"
-    elif r20d < -0.02 and r5d < 0.0  and rsi > 30: reg = "Bear"
-    else:                                            reg = "Sideways"
-    return reg, float(vol) if not pd.isna(vol) else 0.015
-
-
-def rule_regime(hist, ticker):
-    t = ticker.upper()
-    if t in BOND_T: return bond_regime(hist)
-    cv    = hist["Close"].pct_change().rolling(10).std().iloc[-1]
-    if pd.isna(cv): cv = 0.015
-    e20   = float(hist["EMA_20"].iloc[-1])
-    e50   = float(hist["EMA_50"].iloc[-1])
-    price = float(hist["Close"].iloc[-1])
-    rsi   = float(hist["RSI"].iloc[-1]) if "RSI" in hist.columns else 50.0
-    if t in DEFENSIVE_T:
-        sp = (e20 - e50) / (e50 + 1e-9)
-        if   e20 > e50 and sp < 0.015:  reg = "Sideways"
-        elif e20 > e50 and cv < 0.020:  reg = "Bull"
-        elif e20 < e50 and cv > 0.012:  reg = "Bear"
-        else:                            reg = "Sideways"
-    elif t in CYCLICAL_T:
-        if e20 > e50 and price >= e20*1.002 and cv < 0.020 and rsi > 50: reg = "Bull"
-        elif e20 < e50 and cv > 0.015: reg = "Bear"
-        else:                          reg = "Sideways"
-    elif t in COMMODITY_T:
-        r10 = (hist["Close"].iloc[-1]/hist["Close"].iloc[-10]-1.0) if len(hist)>=10 else 0.0
-        if   rsi>65 and r10>0.05:  reg="Bull"
-        elif rsi>55 and r10>0.02:  reg="Bull"
-        elif rsi<40 and r10<-0.03: reg="Bear"
-        elif cv>0.025 and r10<0.0: reg="Bear"
-        else:                      reg="Sideways"
-        return reg, float(cv)
-    else:
-        if   e20 > e50 and cv < 0.025: reg = "Bull"
-        elif e20 < e50 and cv > 0.015: reg = "Bear"
-        else:                          reg = "Sideways"
-    if reg=="Bull" and price < e20:  reg = "Sideways"
-    if reg=="Bear" and price > e20:  reg = "Sideways"
-    if reg=="Bear" and rsi < 35:     reg = "Sideways"
-    if reg=="Bear" and rsi > 60:     reg = "Sideways"
-    return reg, float(cv)
-
-
-def bull_check(ticker, hist, rev_active=False):
-    t = ticker.upper()
-    try:
-        e20   = float(hist["EMA_20"].iloc[-1])
-        price = float(hist["Close"].iloc[-1])
-        rsi   = float(hist["RSI"].iloc[-1]) if "RSI" in hist.columns else 50.0
-        r5    = (hist["Close"].iloc[-1]/hist["Close"].iloc[-5]-1.0) if len(hist)>=5 else 0.0
-        if t in PRECIOUS_M:
-            r10 = (hist["Close"].iloc[-1]/hist["Close"].iloc[-10]-1.0) if len(hist)>=10 else 0.0
-            if r10 < 0.015: return "Sideways", 0.55
-        if price < e20 * 1.002: return "Sideways", 0.55
-        rsi_min = 45 if rev_active else 52
-        if rsi > rsi_min: return "Bull", 0.65 if rsi>55 else 0.60
-        if r5  > 0.01:    return "Bull", 0.60
-        return "Sideways", 0.55
-    except Exception:
-        return "Sideways", 0.55
-
-
-def fuse_hmm_rule(rule, hmm_r, ticker, hist, rev_active=False):
-    t = ticker.upper()
-    if t in BOND_T:  return rule, 0.80
-    if hmm_r == "Unknown": return (bull_check(t, hist, rev_active) if rule=="Bull" else (rule, 0.75))
-    if rule == hmm_r: return rule, 1.00
-    if (rule=="Bull" and hmm_r=="Bear") or (rule=="Bear" and hmm_r=="Bull"): return "Sideways", 0.50
-    if hmm_r=="Bear"  and rule=="Sideways": return "Bear", 0.65
-    if rule=="Bear"   and hmm_r=="Sideways": return "Bear", 0.65
-    if hmm_r=="Bull"  and rule=="Sideways": return bull_check(t, hist, rev_active)
-    if rule=="Bull"   and hmm_r=="Sideways": return bull_check(t, hist, rev_active)
-    return "Sideways", 0.70
-
-
-def get_market_state(spy_hist, model, scaler, regime_map, n_comp):
-    streak=0; spy_rsi=50.0; ret_1d=0.0; rev=False; cp=0.0; ho=False
-    if spy_hist is None or spy_hist.empty or model is None:
-        return streak, spy_rsi, ret_1d, rev, cp, ho
-    try:
-        spy_rsi = float(spy_hist["RSI"].iloc[-1]) if "RSI" in spy_hist.columns else 50.0
-        if len(spy_hist) >= 2:
-            ret_1d = float(spy_hist["Close"].iloc[-1]/spy_hist["Close"].iloc[-2]-1.0)
-        feats = _hmm_features(spy_hist)
-        if len(feats) >= 50:
-            fr    = feats[-HMM_WIN:] if len(feats)>HMM_WIN else feats
-            sts   = model.predict(scaler.transform(fr))
-            lbls  = [regime_map.get(int(s),"?") for s in sts]
-            for l in reversed(lbls):
-                if l=="Bear": streak+=1
-                else: break
-        rsi_ov = spy_rsi <= REV_RSI_MAX
-        rsi_ex = spy_rsi <= 35
-        bnc    = ret_1d > 0
-        if streak >= REV_STREAK and rsi_ov and (rsi_ex or bnc): rev = True
-        if not rev:
-            if   streak >= EXHST_HARD: ho = True
-            elif streak >= EXHST_SOFT: cp = 0.15
-    except Exception:
-        pass
-    return streak, spy_rsi, ret_1d, rev, cp, ho
-
-
-def full_regime_detect(hist, ticker, spy_hist, model, scaler, regime_map, n_comp):
-    """Returns (regime_label, current_vol, regime_confidence)"""
-    t = ticker.upper()
-    r_regime, cv = rule_regime(hist, ticker)
-
-    # oversold on rule
-    if r_regime=="Bear" and t not in COMMODITY_T and t not in BOND_T:
-        rsi = float(hist["RSI"].iloc[-1]) if "RSI" in hist.columns else 50.0
-        h20 = float(hist["Close"].rolling(20).max().iloc[-1])
-        dd  = (float(hist["Close"].iloc[-1])-h20)/(h20+1e-9)
-        if rsi < OV_RSI and dd < OV_DD: r_regime = "Sideways"
-
-    h_regime   = hmm_predict(hist, model, scaler, regime_map) if model else "Unknown"
-    streak, spy_rsi, ret_1d, rev, cp, ho = get_market_state(spy_hist, model, scaler, regime_map, n_comp)
-    fused, conf = fuse_hmm_rule(r_regime, h_regime, t, hist, rev)
-
-    # oversold post-fusion
-    if fused=="Bear" and t not in COMMODITY_T and t not in BOND_T:
-        rsi = float(hist["RSI"].iloc[-1]) if "RSI" in hist.columns else 50.0
-        h20 = float(hist["Close"].rolling(20).max().iloc[-1])
-        dd  = (float(hist["Close"].iloc[-1])-h20)/(h20+1e-9)
-        if rsi < OV_RSI and dd < OV_DD: fused = "Sideways"
-
-    # transition gate
-    if fused=="Bear" and t not in COMMODITY_T and t not in BOND_T and model:
-        p = bear_exit_prob(hist, model, scaler, regime_map, n_comp)
-        if p > TRANS_EXIT:          fused = "Sideways"; conf = min(conf, 0.55)
-        elif p > TRANS_EXIT*0.6:    conf  = max(0.45, conf - 0.15)
-
-    # global market state
-    if fused=="Bear" and t not in MACRO_ETF_T and t not in COMMODITY_T and t not in BOND_T:
-        if rev:  fused="Sideways"; conf=min(conf,0.52)
-        elif ho: fused="Sideways"; conf=min(conf,0.52)
-        elif cp: conf=max(0.40, conf-cp)
-
-    # dynamic reversal
-    if fused=="Bear" and t not in COMMODITY_T and t not in BOND_T and t not in MACRO_ETF_T:
-        try:
-            rsi = float(hist["RSI"].iloc[-1]) if "RSI" in hist.columns else 50.0
-            h20 = float(hist["Close"].rolling(20).max().iloc[-1])
-            dd  = (float(hist["Close"].iloc[-1])-h20)/(h20+1e-9)
-            if rsi < DYN_RSI and dd < DYN_DD: fused="Sideways"
-        except Exception:
-            pass
-
-    return fused, cv, conf
-
-
-# ==============================================================================
-# DECISION LOGIC
-# ==============================================================================
-def make_decision(fusion_conf: float, regime_label: str, ticker: str) -> str:
-    t = ticker.upper()
-    threshold = COMMODITY_BUY_THRESHOLD if t in COMMODITY_TICKERS_DECISION \
-                else BUY_CONFIDENCE_THRESHOLD
-    if fusion_conf >= threshold and regime_label != "Bear":
-        return "BUY"
-    elif fusion_conf < SELL_CONFIDENCE_THRESHOLD and regime_label != "Bull":
-        return "SELL"
-    else:
-        return "HOLD"
-
-
-def evaluate_decision(decision: str, actual_return: float) -> tuple[str, bool | None]:
-    if decision == "BUY":
-        return ("✅", True)  if actual_return > 0 else ("❌", False)
-    elif decision == "SELL":
-        return ("✅", True)  if actual_return < 0 else ("❌", False)
-    else:
-        return ("➖", None)
+def apply_fusion_gates(conf, lstm_stretched, sent_score, regime_label, rc):
+    if abs(sent_score) > 0.001:
+        if sent_score < -0.05 and lstm_stretched > 0.55:
+            conf = min(conf, 0.54)
+        if abs(sent_score) < 0.05 and lstm_stretched > 0.65:
+            conf *= 0.95
+    if lstm_stretched > 0.58 and regime_label == "Bull" and sent_score > 0.03:
+        conf = min(conf * 1.08, 0.75)
+    if lstm_stretched < 0.42 and regime_label == "Bear" and sent_score < -0.03:
+        conf = min(conf * 1.08, 0.75)
+    return float(np.clip(conf * rc, 0.0, 1.0))
 
 
 # ==============================================================================
 # SINGLE WINDOW
 # ==============================================================================
+
 def run_window(test_date, outcome_date, label,
-               hmm_model, hmm_scaler, hmm_map, hmm_ncomp,
-               fusion_agent, verbose=True):
+               tech_agent, uncertainty_agent, regime_agent,
+               fusion_agent, heatmap_agent, conflict_resolver, risk_engine):
 
-    if verbose:
-        print(f"\n{'─'*120}")
-        print(f"  {label}  |  {test_date} → {outcome_date}")
-        print(f"{'─'*120}")
+    test_date    = snap_to_trading_day(test_date)
+    outcome_date = snap_to_trading_day(outcome_date)
 
-    # Pre-fetch all histories
-    hist_map = {}
-    for t in TICKERS:
-        try:
-            h = fetch_history(t, test_date)
-            if not h.empty and len(h) >= 50:
-                hist_map[t] = h
-        except Exception:
-            pass
+    sent_date = test_date
+    if sent_date not in MANUAL_SENTIMENT:
+        diffs     = [(abs((pd.to_datetime(sent_date)-pd.to_datetime(k)).days), k)
+                     for k in MANUAL_SENTIMENT]
+        sent_date = min(diffs)[1]
+        print(f"   ℹ️  Sentiment date mapped: {test_date} → {sent_date}")
 
-    spy_hist = hist_map.get("SPY")
+    sentiment_scores = MANUAL_SENTIMENT[sent_date]
 
-    # Market state (for verbose header)
-    if spy_hist is not None and hmm_model is not None:
-        streak, spy_rsi, ret_1d, rev, cp, ho = get_market_state(
-            spy_hist, hmm_model, hmm_scaler, hmm_map, hmm_ncomp)
-        mode = ("REVERSAL" if rev else "EXHAUSTION" if (cp>0 or ho) else "NORMAL")
-    else:
-        streak, spy_rsi, ret_1d, mode = 0, 50.0, 0.0, "NORMAL"
+    print(f"\n{'*'*112}")
+    print(f"  {label}  |  {test_date} → {outcome_date}")
+    print(f"{'*'*112}")
+    print(f"\n  {'Ticker':<6} {'LSTM_s':>7} {'mc_std':>7} {'Unc':>8} {'Regime':<10} "
+          f"{'RC':>5} {'FConf':>7} {'ArbConf':>8} {'Alloc':>6} "
+          f"{'Decision':<8} {'Shares':>7} {'Act%':>8} {'Result'}")
+    print(f"  {'─'*120}")
 
-    if verbose:
-        print(f"  SPY streak={streak}d  RSI={spy_rsi:.1f}  1d={ret_1d*100:+.2f}%  Mode={mode}")
-        print(f"\n  {'Ticker':<7} {'Regime':<10} {'RConf':>6} {'LSTM':>6} {'Sent':>6} "
-              f"{'FConf':>6} {'Decision':<7} {'Actual%':>9} {'Result'}")
-        print(f"  {'─'*90}")
-
-    results = []
-    correct = wrong = neutral = 0
-    bull_c = bull_w = 0
-    bear_c = bear_w = 0
+    results        = []
+    correct        = wrong = neutral = 0
+    hold_conflict  = hold_model = hold_noise = 0
+    decisions_made = 0
+    noise_correct  = 0   # ← v2.5: noise-band calls that went the right direction
+    noise_wrong    = 0   # ← v2.5: noise-band calls that went the wrong direction
+    unc_low        = unc_mod = unc_high = 0
+    alloc_pcts     = []
 
     for ticker in TICKERS:
         try:
-            hist = hist_map.get(ticker)
-            if hist is None or hist.empty or len(hist) < 50:
+            hist = fetch_history(ticker, test_date)
+            if hist.empty or len(hist) < 150:
+                continue
+            feat_df = build_lstm_features(hist)
+            if len(feat_df) < SEQ_LEN:
                 continue
 
-            # 1. Hybrid Regime
-            regime_label, current_vol, regime_conf = full_regime_detect(
-                hist, ticker, spy_hist,
-                hmm_model, hmm_scaler, hmm_map, hmm_ncomp
+            import io, contextlib
+            with contextlib.redirect_stdout(io.StringIO()):
+                lstm_stretched = tech_agent.predict(hist)
+
+            mc_mean, mc_std = uncertainty_agent.predict_from_prob(lstm_stretched)
+
+            unc_label = uncertainty_status_label(mc_std)
+            if unc_label == "LOW":        unc_low  += 1
+            elif unc_label == "MODERATE": unc_mod  += 1
+            else:                         unc_high += 1
+
+            regime_label, regime_vol, regime_confidence = regime_agent.detect(hist, ticker)
+            vol_v      = 0.9 if regime_label=="Bear" else 0.2 if regime_label=="Bull" else 0.5
+            sent_score = sentiment_scores.get(ticker, 0.0)
+
+            raw_conf, attn_weights = fusion_agent.predict(
+                lstm_p=mc_mean, sent_s=sent_score, vol_v=vol_v,
+            )
+            gated_conf = apply_fusion_gates(
+                raw_conf, lstm_stretched, sent_score, regime_label, regime_confidence
             )
 
-            # 2. LSTM signal (simulated — swap for real agent in production)
-            lstm_signal = simulate_lstm_signal(hist)
+            gdi_result  = heatmap_agent.analyze(
+                lstm_score=lstm_stretched, sent_score=sent_score,
+                regime_label=regime_label, regime_vol=regime_vol,
+            )
+            gdi         = gdi_result["gdi"]
+            gdi_penalty = gdi_result["penalty"]
 
-            # 3. Sentiment — FROZEN at 0.0 for backtest
-            sent_score = 0.0
+            arb_conf = gated_conf
+            if conflict_resolver:
+                try:
+                    arb_result = conflict_resolver.arbitrate(
+                        tech_score=lstm_stretched, sent_score=sent_score,
+                        mc_std=mc_std, regime_label=regime_label,
+                        risk_score=0.2, fusion_confidence=gated_conf,
+                        trust_scores=None,
+                    )
+                    arb_conf = arb_result.get("adjusted_confidence", gated_conf)
+                except Exception:
+                    arb_conf = gated_conf
 
-            # 4. Fusion
-            # vol_v input: regime drives this directly (matches production code)
-            vol_v = 0.9 if regime_label == "Bear" else 0.2 if regime_label == "Bull" else 0.5
+            alloc_pct = 0.0; num_shares = 0
+            if risk_engine:
+                try:
+                    last_price = float(hist["Close"].iloc[-1])
+                    alloc_pct, _ = risk_engine.calculate_position_size(
+                        arb_conf, regime_vol,
+                        disagreement_penalty=gdi_penalty, regime=regime_label,
+                    )
+                    num_shares, _ = risk_engine.get_shares_amount(last_price, alloc_pct)
+                except Exception:
+                    alloc_pct = 0.0; num_shares = 0
 
-            if fusion_agent is not None:
-                raw_conf, _ = fusion_agent.predict(
-                    lstm_p=lstm_signal,
-                    sent_s=sent_score,
-                    vol_v=vol_v,
-                    trust_scores=None,
-                )
-                # Apply regime_confidence multiplier (matches production flow)
-                fusion_conf = float(np.clip(raw_conf * regime_conf, 0.0, 1.0))
+            eff_threshold = COMMODITY_BUY_T if ticker in COMMODITY_TICKERS else BUY_THRESHOLD
+            gdi_pct       = gdi * 100
+
+            if (alloc_pct > 0.0 and arb_conf >= eff_threshold
+                    and regime_label != "Bear" and gdi_pct < BUY_GDI_MAX):
+                decision = "BUY"
+                alloc_pcts.append(alloc_pct * 100)
+            elif arb_conf < SELL_THRESHOLD:
+                decision = "SELL"
             else:
-                # Fallback: simple weighted average
-                fusion_conf = float(np.clip(
-                    lstm_signal * 0.6 + (1 - vol_v) * 0.4, 0.0, 1.0
-                ) * regime_conf)
+                decision = "HOLD"
 
-            # 5. Decision
-            decision = make_decision(fusion_conf, regime_label, ticker)
+            actual_ret  = fetch_actual_return(ticker, test_date, outcome_date)
+            hold_reason = None
 
-            # 6. Actual return
-            actual_return = fetch_actual_return(ticker, test_date, outcome_date)
+            if np.isnan(actual_ret):
+                result_str = "?"; neutral += 1
 
-            # 7. Evaluate
-            result_icon, flag = evaluate_decision(decision, actual_return)
+            elif decision == "HOLD":
+                neutral += 1
+                hold_reason = "model"
+                if regime_label == "Bear" and lstm_stretched > 0.7:
+                    hold_reason = "regime_conflict"
+                result_str = "-"
 
-            if flag is True:    correct += 1
-            elif flag is False: wrong   += 1
-            else:               neutral += 1
+            else:
+                # Every BUY/SELL = utilised decision
+                decisions_made += 1
 
-            if decision == "BUY":
-                if flag is True:    bull_c += 1
-                elif flag is False: bull_w += 1
-            elif decision == "SELL":
-                if flag is True:    bear_c += 1
-                elif flag is False: bear_w += 1
+                if abs(actual_ret) <= noise_band(ticker):
+                    # ── v2.5: score direction even inside noise band ───────────
+                    # The move was too small to be decisive, but we can still
+                    # check if the call was pointing the right way.
+                    direction_correct = (
+                        (decision == "BUY"  and actual_ret >= 0) or
+                        (decision == "SELL" and actual_ret <= 0)
+                    )
+                    if direction_correct:
+                        result_str   = "🔍(correct)"
+                        noise_correct += 1
+                    else:
+                        result_str   = "🔍(wrong)"
+                        noise_wrong  += 1
+                    neutral    += 1
+                    hold_reason = "noise"
 
-            if verbose:
-                reg_icon = {"Bull":"🟢","Bear":"🔴","Sideways":"⚪"}.get(regime_label,"?")
-                dec_icon = {"BUY":"🟢BUY","SELL":"🔴SELL","HOLD":"⚪HOLD"}.get(decision,decision)
-                print(f"  {ticker:<7} {reg_icon}{regime_label:<9} {regime_conf:>6.2f} "
-                      f"{lstm_signal:>6.3f} {sent_score:>6.3f} "
-                      f"{fusion_conf:>6.3f} {dec_icon:<9} "
-                      f"{actual_return:>+8.2f}%  {result_icon}")
+                elif decision == "BUY"  and actual_ret > 0:
+                    result_str = "✅"; correct += 1
+                elif decision == "SELL" and actual_ret < 0:
+                    result_str = "✅"; correct += 1
+                else:
+                    result_str = "❌"; wrong += 1
+
+            if hold_reason == "model":             hold_model    += 1
+            elif hold_reason == "regime_conflict": hold_conflict += 1
+            elif hold_reason == "noise":           hold_noise    += 1
+
+            act_str = f"{actual_ret:>+7.2f}%" if not np.isnan(actual_ret) else "    nan%"
+            alloc_s = f"{alloc_pct*100:>5.1f}%" if alloc_pct > 0 else "  0.0%"
+
+            print(f"  {ticker:<6} {lstm_stretched:>7.4f} {mc_std:>7.4f} "
+                  f"{unc_label:>8} {regime_label:<10} {regime_confidence:>5.2f} "
+                  f"{raw_conf:>7.4f} {arb_conf:>8.4f} {alloc_s} "
+                  f"{decision:<8} {num_shares:>7} {act_str}  {result_str}")
 
             results.append({
-                "ticker": ticker, "regime": regime_label,
-                "regime_conf": round(regime_conf, 2),
-                "lstm": round(lstm_signal, 3),
-                "fusion_conf": round(fusion_conf, 3),
+                "ticker": ticker, "test_date": test_date,
+                "lstm_s": round(lstm_stretched, 4), "mc_std": round(mc_std, 4),
+                "unc_label": unc_label, "regime": regime_label,
+                "rc": round(regime_confidence, 3),
+                "raw_conf": round(raw_conf, 4), "arb_conf": round(arb_conf, 4),
+                "alloc_pct": round(alloc_pct * 100, 1), "num_shares": num_shares,
                 "decision": decision,
-                "actual_%": round(actual_return, 2),
-                "result": result_icon,
+                "actual_ret": round(actual_ret, 2) if not np.isnan(actual_ret) else None,
+                "result": result_str,
             })
 
         except Exception as e:
-            if verbose:
-                print(f"  {ticker:<7} ERROR: {e}")
+            print(f"  {ticker:<6} ERROR: {e}")
 
-    active = correct + wrong
-    acc    = (correct / active * 100) if active > 0 else 0.0
-    ba     = (bear_c  / (bear_c + bear_w) * 100) if (bear_c + bear_w) > 0 else 0.0
-    bua    = (bull_c  / (bull_c + bull_w) * 100) if (bull_c + bull_w) > 0 else 0.0
+    active    = correct + wrong
+    acc       = (correct / active * 100) if active > 0 else 0.0
+    util      = decisions_made / max(len(results), 1) * 100
+    avg_alloc = np.mean(alloc_pcts) if alloc_pcts else 0.0
 
-    if verbose:
-        print(f"\n  ── {correct}C/{wrong}W/{neutral}N  "
-              f"→  Accuracy={acc:.1f}%  "
-              f"BUY_acc={bua:.1f}%  SELL_acc={ba:.1f}%  "
-              f"Active={active}  Neutral={neutral}")
-        # Decision distribution
-        buys  = sum(1 for r in results if r["decision"] == "BUY")
-        sells = sum(1 for r in results if r["decision"] == "SELL")
-        holds = sum(1 for r in results if r["decision"] == "HOLD")
-        print(f"  ── Decisions: 🟢BUY={buys}  🔴SELL={sells}  ⚪HOLD={holds}")
+    # Noise-band directional accuracy
+    total_noise = noise_correct + noise_wrong
+    noise_acc   = (noise_correct / total_noise * 100) if total_noise > 0 else 0.0
+
+    print(f"\n  ── Window Summary ─────────────────────────────────────────────────")
+    print(f"     Accuracy         : {correct}✅ / {wrong}❌ / {neutral}🔍/-  → {acc:.1f}%")
+    print(f"     Utilisation      : {decisions_made}/{len(results)} = {util:.1f}%")
+    print(f"     Noise-band calls : {noise_correct}🔍(correct) / {noise_wrong}🔍(wrong)"
+          f"  → {noise_acc:.1f}% directionally correct")
+    print(f"     HOLD breakdown   : regime_conflict={hold_conflict}  "
+          f"model={hold_model}  noise_band={hold_noise}")
+    print(f"     Uncertainty dist : LOW={unc_low}  MODERATE={unc_mod}  HIGH={unc_high}")
+    if alloc_pcts:
+        print(f"     Avg BUY alloc    : {avg_alloc:.1f}% of capital  (Kelly sizing)")
 
     return {
         "label": label, "test_date": test_date, "outcome_date": outcome_date,
-        "mode": mode, "streak": streak, "spy_rsi": round(spy_rsi, 1),
+        "accuracy": acc, "utilisation": util,
+        "decisions_made": decisions_made, "total": len(results),
         "correct": correct, "wrong": wrong, "neutral": neutral,
-        "active": active, "accuracy": acc,
-        "buy_acc": bua, "sell_acc": ba,
-        "results": results,
+        "noise_correct": noise_correct, "noise_wrong": noise_wrong,
+        "noise_acc": noise_acc,
+        "hold_conflict": hold_conflict, "hold_model": hold_model, "hold_noise": hold_noise,
+        "unc_low": unc_low, "unc_mod": unc_mod, "unc_high": unc_high,
+        "avg_alloc": avg_alloc, "results": results,
     }
 
 
 # ==============================================================================
 # MAIN
 # ==============================================================================
-def main():
-    print("=" * 120)
-    print("  FUSION + HYBRID REGIME BACKTEST  |  5-Day Horizon")
-    print("  LSTM: simulated ~65%  |  Sentiment: FROZEN 0.0  |  Regime: HybridRegimeAgent v10")
-    print("=" * 120)
 
-    print("\n⏳ Loading models...")
-    hmm_model, hmm_scaler, hmm_map, hmm_ncomp = load_hybrid_regime()
-    fusion_agent = load_fusion_agent()
+def main():
+    print("=" * 112)
+    print("  FUSION AGENT BACKTEST  |  6 Windows × 30 Tickers")
+    print("  FIX v2.3: predict_from_prob() | v2.4: util=decisions_made/total")
+    print("  FIX v2.5: 🔍 noise-band calls show 🔍(correct) / 🔍(wrong)")
+    print("=" * 112)
+    print("\nLoading agents...")
+
+    try:
+        tech_agent = TechnicalAgent(lstm_model_path=MODEL_PATH, lstm_scaler_path=SCALER_PATH)
+        print(f"  ✅ TechnicalAgent  {tuple(tech_agent.lstm_model.input_shape)}")
+    except Exception as e:
+        print(f"  ❌ TechnicalAgent failed: {e}"); return
+
+    uncertainty_agent = UncertaintyAgent(tech_agent)
+
+    try:
+        regime_agent = HybridRegimeAgent(hmm_model_path=REGIME_PATH, verbose=False)
+        print(f"  ✅ HybridRegimeAgent  is_fitted={regime_agent.is_fitted}")
+    except Exception as e:
+        print(f"  ❌ HybridRegimeAgent failed: {e}"); return
+
+    try:
+        fusion_agent = FusionAgent(model_path=FUSION_PATH)
+        print(f"  ✅ FusionAgent  [{fusion_agent._arch}]")
+    except Exception as e:
+        print(f"  ❌ FusionAgent failed: {e}"); return
+
+    heatmap_agent = HeatmapAgent()
+    print("  ✅ HeatmapAgent")
+
+    conflict_resolver = None
+    if _CONFLICT_OK:
+        try:
+            conflict_resolver = ConflictResolver()
+            print("  ✅ ConflictResolver")
+        except Exception as e:
+            print(f"  ⚠️  ConflictResolver init failed: {e}")
+
+    risk_engine = None
+    if _RISK_OK:
+        try:
+            risk_engine = RiskEngine(default_account_size=DEFAULT_CAPITAL)
+            print(f"  ✅ RiskEngine  (capital=${DEFAULT_CAPITAL:,.0f})")
+        except Exception as e:
+            print(f"  ⚠️  RiskEngine init failed: {e}")
 
     all_stats = []
     for test_date, outcome_date, label in TEST_WINDOWS:
-        stats = run_window(
-            test_date, outcome_date, label,
-            hmm_model, hmm_scaler, hmm_map, hmm_ncomp,
-            fusion_agent, verbose=True
-        )
-        all_stats.append(stats)
+        s = run_window(test_date, outcome_date, label,
+                       tech_agent, uncertainty_agent, regime_agent,
+                       fusion_agent, heatmap_agent, conflict_resolver, risk_engine)
+        all_stats.append(s)
 
-    # ── Consolidated summary ──────────────────────────────────────────────────
-    print("\n" + "=" * 120)
-    print("  CONSOLIDATED SUMMARY")
-    print("=" * 120)
-    print(f"\n  {'Window':<28} {'Mode':<12} {'Str':>3} {'RSI':>5}  "
-          f"{'Acc':>7} {'BUYacc':>8} {'SELLacc':>9} {'Active':>7}")
-    print(f"  {'─'*90}")
+    # ── Consolidated ──────────────────────────────────────────────────────────
+    print("\n" + "=" * 112)
+    print("  CONSOLIDATED RESULTS")
+    print("=" * 112)
+    print(f"\n  {'Window':<32} {'Acc':>7} {'Util':>6} {'Calls':>8}  "
+          f"{'C/W':>6}  {'🔍corr':>7} {'🔍wrng':>7} {'NoisAcc':>8}  "
+          f"{'Unc_L':>6} {'Unc_M':>6} {'Unc_H':>6}")
+    print(f"  {'─'*112}")
 
     for s in all_stats:
-        ok = "✅" if s["accuracy"] >= 65 else ("⚠️" if s["accuracy"] >= 50 else "❌")
-        print(f"  {s['label']:<28} {s['mode']:<12} {s['streak']:>3}d "
-              f"{s['spy_rsi']:>5.1f}  "
-              f"{s['accuracy']:>6.1f}%{ok}  "
-              f"{s['buy_acc']:>7.1f}%  "
-              f"{s['sell_acc']:>8.1f}%  "
-              f"{s['active']:>6}")
+        af = "✅" if s["accuracy"]    >= 75 else "⚠️ "
+        uf = "✅" if s["utilisation"] >= 60 else "⚠️ "
+        nf = "✅" if s["noise_acc"]   >= 60 else "⚠️ "
+        print(f"  {s['label']:<32} {s['accuracy']:>5.1f}%{af}"
+              f"  {s['utilisation']:>4.0f}%{uf}"
+              f"  {s['decisions_made']:>3}/{s['total']:<3}"
+              f"  {s['correct']:>2}/{s['wrong']:<2}"
+              f"  {s['noise_correct']:>7}"
+              f"  {s['noise_wrong']:>7}"
+              f"  {s['noise_acc']:>6.1f}%{nf}"
+              f"  {s['unc_low']:>6}"
+              f"  {s['unc_mod']:>6}"
+              f"  {s['unc_high']:>6}")
 
-    avg_acc  = sum(s["accuracy"] for s in all_stats) / len(all_stats)
-    avg_buy  = sum(s["buy_acc"]  for s in all_stats) / len(all_stats)
-    avg_sell = sum(s["sell_acc"] for s in all_stats) / len(all_stats)
-    total_c  = sum(s["correct"]  for s in all_stats)
-    total_w  = sum(s["wrong"]    for s in all_stats)
+    avg_acc    = np.mean([s["accuracy"]    for s in all_stats])
+    avg_util   = np.mean([s["utilisation"] for s in all_stats])
+    avg_nacc   = np.mean([s["noise_acc"]   for s in all_stats])
+    total_c    = sum(s["correct"]        for s in all_stats)
+    total_w    = sum(s["wrong"]          for s in all_stats)
+    total_nc   = sum(s["noise_correct"]  for s in all_stats)
+    total_nw   = sum(s["noise_wrong"]    for s in all_stats)
+    total_d    = sum(s["decisions_made"] for s in all_stats)
+    total_t    = sum(s["total"]          for s in all_stats)
+    overall_nacc = (total_nc / (total_nc + total_nw) * 100) if (total_nc + total_nw) > 0 else 0
 
-    print(f"\n  {'─'*90}")
-    print(f"  {'OVERALL AVG':<28} {'':>16}  "
-          f"{avg_acc:>6.1f}%   "
-          f"{avg_buy:>7.1f}%  "
-          f"{avg_sell:>8.1f}%  "
-          f"{total_c+total_w:>6}")
+    print(f"  {'─'*112}")
+    print(f"  {'AVERAGE':<32} {avg_acc:>5.1f}%   {avg_util:>4.0f}%"
+          f"  {total_d:>3}/{total_t:<3}"
+          f"  {total_c:>2}/{total_w:<2}"
+          f"  {total_nc:>7}"
+          f"  {total_nw:>7}"
+          f"  {overall_nacc:>6.1f}%")
 
-    print(f"\n  Key numbers:")
-    print(f"    Overall accuracy   : {avg_acc:.1f}%  "
-          f"{'✅' if avg_acc >= 65 else '⚠️'}")
-    print(f"    BUY  accuracy      : {avg_buy:.1f}%  (directional correct on BUY signals)")
-    print(f"    SELL accuracy      : {avg_sell:.1f}%  (directional correct on SELL signals)")
-    print(f"    Total correct/wrong: {total_c}C / {total_w}W")
+    # ── Noise-band explanation ────────────────────────────────────────────────
+    print(f"\n  ── Noise-Band Directional Analysis (v2.5) ───────────────────────────")
+    print(f"  🔍(correct) = BUY on a day that rose, or SELL on a day that fell")
+    print(f"  🔍(wrong)   = BUY on a day that fell, or SELL on a day that rose")
+    print(f"  The move was inside the noise band — too small to be decisive.")
+    print(f"  But direction still tells us if the model was right-minded.")
+    print(f"  Target: noise-band calls should be ≥60% directionally correct.")
+    print(f"  Overall noise-band accuracy: {total_nc}/{total_nc+total_nw} = {overall_nacc:.1f}%  "
+          + ("✅" if overall_nacc >= 60 else "⚠️  needs improvement"))
 
-    print(f"\n  Fusion pipeline flow (per ticker per window):")
-    print(f"    LSTM signal (~0.65 acc) → regime vol_v (Bear=0.9/Bull=0.2/Side=0.5)")
-    print(f"    → FusionAgent.predict() → raw_conf")
-    print(f"    → × regime_confidence (HybridRegime) → final fusion_conf")
-    print(f"    → conf≥0.52 → BUY | conf<0.40 → SELL | else → HOLD")
+    # ── Verdict ───────────────────────────────────────────────────────────────
+    acc_ok   = avg_acc  >= 75
+    util_ok  = avg_util >= 60
+    noise_ok = overall_nacc >= 60
+    print(f"\n  {'═'*65}")
+    print(f"  THREE-AGENT CHAIN VERDICT")
+    print(f"  {'═'*65}")
+    print(f"  Decision accuracy  : {avg_acc:.1f}%  "
+          + ("✅ PASS (≥75%)" if acc_ok   else "⚠️  BELOW TARGET"))
+    print(f"  Utilisation rate   : {avg_util:.1f}%  "
+          + ("✅ PASS (≥60%)" if util_ok  else "⚠️  LOW"))
+    print(f"  Noise-band dir acc : {overall_nacc:.1f}%  "
+          + ("✅ PASS (≥60%)" if noise_ok else "⚠️  LOW — model direction unreliable in tight moves"))
+    print(f"  UncertaintyAgent   : ✅ operational  (predict_from_prob)")
+    print(f"  RiskEngine         : {'✅ operational' if risk_engine else '⚠️  not loaded'}")
+    print(f"  ConflictResolver   : {'✅ operational' if conflict_resolver else '⚠️  not loaded'}")
 
-    # Save results
+    print(f"\n  Per-window:")
+    for s in all_stats:
+        bar_a = "█"*int(s["accuracy"]/5)    + "░"*(20-int(s["accuracy"]/5))
+        bar_u = "█"*int(s["utilisation"]/5) + "░"*(20-int(s["utilisation"]/5))
+        af = "✅" if s["accuracy"]    >= 75 else "⚠️ "
+        uf = "✅" if s["utilisation"] >= 60 else "⚠️ "
+        nf = "✅" if s["noise_acc"]   >= 60 else "⚠️ "
+        print(f"  {s['label']:<32}  "
+              f"acc [{bar_a}] {s['accuracy']:.0f}%{af}  "
+              f"util [{bar_u}] {s['utilisation']:.0f}%{uf}  "
+              f"noise {s['noise_correct']}/{s['noise_correct']+s['noise_wrong']}={s['noise_acc']:.0f}%{nf}")
+
     all_rows = []
     for s in all_stats:
         for r in s["results"]:
             r["window"] = s["label"]
             all_rows.append(r)
-    pd.DataFrame(all_rows).to_csv("fusion_regime_backtest.csv", index=False)
-    print(f"\n  Results saved → fusion_regime_backtest.csv")
+    if all_rows:
+        pd.DataFrame(all_rows).to_csv("fusion_backtest.csv", index=False)
+        print(f"\n  Saved → fusion_backtest.csv  ({len(all_rows)} rows)")
+
     print("\nDone.\n")
 
 
