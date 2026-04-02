@@ -53,7 +53,7 @@ SCALER_PATH = r"D:\FinFolioX\saved_models\lstm_scaler.pkl"
 
 # ── Test windows ──────────────────────────────────────────────────────────────
 TEST_WINDOWS = [
-    ("2026-03-17", "2026-03-23", "Mar17->23  Bear start"),
+    ("2026-03-23", "2026-03-28", "Mar23->28  Bear start"),
     ("2026-03-04", "2026-03-09", "Mar04->09  Bear early"),
     ("2026-03-15", "2026-03-20", "Mar15->20  Deep Bear"),   # Sunday -- auto-snapped
     ("2026-03-05", "2026-03-10", "Mar05->10  Bounce"),
