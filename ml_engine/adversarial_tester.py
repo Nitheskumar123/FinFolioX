@@ -124,7 +124,7 @@ class AdversarialTester:
     # ── Model loading ─────────────────────────────────────────────────────────
     def _load_lstm(self):
         try:
-            base       = os.path.dirname(os.path.abspath(__file__))
+            base       = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
             model_path  = os.path.join(base, "saved_models", "lstm_model.keras")
             scaler_path = os.path.join(base, "saved_models", "lstm_scaler.pkl")
             self._model  = tf.keras.models.load_model(model_path)

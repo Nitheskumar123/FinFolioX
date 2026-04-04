@@ -53,11 +53,11 @@ logger = logging.getLogger("ConflictResolver")
 # FinBERT -0.12 → sent_norm 0.44 → BEAR.  FinBERT +0.12 → sent_norm 0.56 → BULL.
 BULL_DIR_THRESHOLD       = 0.55   # sent_norm or tech_score above this = BULL direction
 BEAR_DIR_THRESHOLD       = 0.45   # sent_norm or tech_score below this = BEAR direction
-EXTREME_SPREAD_BACKUP    = 0.55   # spread above this fires even without clear direction
+EXTREME_SPREAD_BACKUP    = 0.65   # tighter backup for truly extreme mismatch only
 
 UNCERTAINTY_HIGH         = 0.15   # aligned with all other modules
 SYSTEMIC_VETO_THRESHOLD  = 0.70
-HOLD_CONFIDENCE          = 0.50
+HOLD_CONFIDENCE          = 0.51
 MATERIAL_CHANGE_THRESHOLD= 0.02   # min |Δconf| to flag mild path as arbitrated
 
 # Regime-aware risk discount (v2.4 calibrated thresholds)
@@ -159,7 +159,10 @@ class ConflictResolver:
             (lstm_dir == "BEAR" and sent_dir == "BULL")
         )
         # Extreme spread backup — catches very high spread even without clear direction
-        extreme_spread = spread >= self.extreme_spread_backup
+        extreme_spread = (
+            spread >= self.extreme_spread_backup
+            and abs(sent_score) > 0.15
+        )
 
         conflict_triggered = directional_conflict or extreme_spread
 
@@ -329,9 +332,10 @@ class ConflictResolver:
             return max(fusion_confidence, bullish_val * 0.90), "ALIGN_BULL"
         else:
             reasoning.append(
-                "🌥️  Regime=Sideways → ambiguous. Forcing conservative HOLD."
+                "🌥️  Regime=Sideways → preserve directional lean (soft HOLD)."
             )
-            return HOLD_CONFIDENCE, "HOLD"
+            blend = max(fusion_confidence * 0.85, 0.48)
+            return blend, "HOLD"
 
     # ──────────────────────────────────────────────────────────────────────────
     # MILD ADJUSTMENTS (risk + uncertainty penalties)

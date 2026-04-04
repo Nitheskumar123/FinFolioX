@@ -16,6 +16,7 @@ from datetime import datetime
 # ==============================================================================
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+from api.views import BASE_DIR
 from ml_engine.technical_agent import TechnicalAgent
 from ml_engine.sentiment_agent import SentimentAgent
 from ml_engine.fusion_agent import FusionAgent
@@ -134,16 +135,15 @@ class FinFolioSystem:
     def __init__(self):
         self._print_startup_banner()
 
-        BASE_DIR   = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        MODELS_DIR = os.path.join(BASE_DIR, "saved_models")
+        MODELS_DIR = r"D:/FinFolioX/saved_models"
 
         # 1. Technical Agent
         print("\n   🔹 [1/11] Loading Technical Agent (LSTM)...")
         try:
             self.tech_agent = TechnicalAgent(
-                lstm_model_path=os.path.join(MODELS_DIR, "lstm_model.keras"),
-                lstm_scaler_path=os.path.join(MODELS_DIR, "lstm_scaler.pkl"),
-            )
+    lstm_model_path=os.path.join(MODELS_DIR, "lstm_model.keras"),
+    lstm_scaler_path=os.path.join(MODELS_DIR, "lstm_scaler.pkl"),
+)
             print("      ✅ LSTM Brain Online.")
         except Exception as e:
             print(f"      ❌ Critical Error loading Technical Agent: {e}")

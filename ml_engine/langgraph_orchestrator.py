@@ -369,9 +369,10 @@ class FinFolioGraphOrchestrator:
 
         if not sentiment_available:
             print("      ⚠️ [Fusion] Sentiment frozen — gates disabled")
-        if sentiment_available and sent_score < -0.05 and lstm_signal > 0.55:
-            print(f"      [Fusion] FinBERT veto: negative sentiment ({sent_score:.3f})")
-            final_conf = min(final_conf, 0.54)
+        if sentiment_available and sent_score < -0.10 and lstm_signal > 0.55:
+            cap = max(0.48, 0.56 + (sent_score + 0.10) * 0.10)
+            print(f"      [Fusion] FinBERT veto cap={cap:.3f} (sent={sent_score:.3f})")
+            final_conf = min(final_conf, cap)
         if sentiment_available and abs(sent_score) < 0.05 and lstm_signal > 0.65:
             final_conf = final_conf * 0.95
 
@@ -401,11 +402,16 @@ class FinFolioGraphOrchestrator:
         final_conf = final_conf * combined_modifier
         final_conf = float(np.clip(final_conf, 0.0, 1.0))
 
-        # Apply hybrid regime confidence (v2.3)
+        # Apply hybrid regime confidence only when confidence is low.
+        # High-confidence regime labels should not suppress directional signals.
         regime_confidence = state.get("regime_confidence", 0.8)
-        final_conf = float(np.clip(final_conf * regime_confidence, 0.0, 1.0))
-        print(f"      - Regime confidence: {regime_confidence:.2f}x → "
-              f"Fused Confidence (pre-ASC): {final_conf:.4f}")
+        if regime_confidence < 0.70:
+            final_conf = 0.5 + (final_conf - 0.5) * regime_confidence
+            final_conf = float(np.clip(final_conf, 0.0, 1.0))
+            print(f"      - Regime confidence low ({regime_confidence:.2f}) → "
+                  f"neutral pull to {final_conf:.4f}")
+        else:
+            print(f"      - Regime confidence high ({regime_confidence:.2f}) → no discount")
 
         return {
             "fusion_confidence": final_conf,
@@ -465,7 +471,10 @@ class FinFolioGraphOrchestrator:
                 print(f"      [ASC] REGIME CONTRADICTION (Sideways+Directional): "
                       f"{old_conf:.3f} → {working_conf:.3f}")
 
-            elif regime_label == "Bear" and working_conf > 0.50:
+            elif (regime_label == "Bear"
+                and working_conf > 0.50
+                and sent_score < 0.0
+                and lstm_signal < 0.70):
                 regime_contradiction = True
                 old_conf     = working_conf
                 working_conf = working_conf * 0.75
@@ -607,15 +616,13 @@ class FinFolioGraphOrchestrator:
         causal_mod_gdi, gdi_causal_penalty = _CausalAgent.apply_gdi_penalty(
             raw_causal_mod, gdi
         )
-        topo_mod          = state.get("topology_modifier", 1.0)
-        combined_modifier = (topo_mod + causal_mod_gdi) / 2.0
-
         if gdi_causal_penalty > 0.0:
             print(f"      [Conflict] GDI={gdi:.3f} → "
                   f"causal_mod {raw_causal_mod:.3f}→{causal_mod_gdi:.3f}")
-            adj_conf = float(np.clip(adj_conf * combined_modifier, 0.0, 1.0))
-            print(f"      [Conflict] Combined modifier "
-                  f"{combined_modifier:.3f}x → adj_conf={adj_conf:.4f}")
+            gdi_only_factor = causal_mod_gdi / max(raw_causal_mod, 1e-6)
+            adj_conf = float(np.clip(adj_conf * gdi_only_factor, 0.0, 1.0))
+            print(f"      [Conflict] GDI-only causal factor "
+                  f"{gdi_only_factor:.3f}x → adj_conf={adj_conf:.4f}")
 
         # Risk engine — stock_price passed for min viable dollar check (v2.2)
         last_price = state["hist_data"]["Close"].iloc[-1]

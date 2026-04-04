@@ -112,6 +112,8 @@ class HeatmapAgent:
         # Two signals pointing in the same direction → disagreement = 0.0
 
         d_lstm_regime = abs(direction_lstm - regime_dir) / 2.0
+        if regime_label == "Sideways":
+            d_lstm_regime *= 0.60
         d_sent_lstm   = abs(direction_sent - direction_lstm) / 2.0
         d_sent_regime = abs(direction_sent - regime_dir) / 2.0
 
