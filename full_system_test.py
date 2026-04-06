@@ -125,6 +125,7 @@ IG_STEPS_FULLTEST = 24
 #  TEST WINDOWS — 17 windows
 # ════════════════════════════════════════════════════════════════════════════════
 TEST_WINDOWS = [
+    ("2026-03-23", "2026-03-28", "Win0: Bear-IranOilShock   (Mar23→28-2026)"),
     ("2024-11-06", "2024-11-11", "Win1:  Bull-PostElection  (Nov06→11-2024)"),
     ("2024-07-30", "2024-08-05", "Win2:  Bear-YenCrash      (Jul30→Aug05-2024)"),
     ("2025-01-13", "2025-01-17", "Win3:  Sideways-Mixed     (Jan13→17-2025)"),
@@ -171,6 +172,30 @@ def noise_band(ticker):
 #  MANUAL SENTIMENT SCORES
 # ════════════════════════════════════════════════════════════════════════════════
 MANUAL_SENTIMENT = {
+    "2026-03-23": {
+    # Tech: heavy hedge-fund dumping, Iran threatens Big Tech list, IRGC named AAPL/MSFT/NVDA/GOOGL/META/ORCL
+    "AAPL": -0.14, "MSFT": -0.13, "NVDA": -0.16, "TSLA": -0.20,
+    "META": -0.13, "GOOGL": -0.14, "AMZN": -0.12, "AMD":  -0.15,
+    "INTC": -0.17, "ORCL": -0.13,
+    # Index ETFs: broad bear, all 11 S&P sectors in weekly lows
+    "SPY":  -0.14, "QQQ":  -0.18, "DIA":  -0.11, "IWM":  -0.13,
+    # Financials: selling in tech/industrials/financials per Goldman
+    "JPM":  -0.09, "BAC":  -0.10, "GS":   -0.08, "V":    -0.08,
+    # GLD near historic peak, TLT muted (rates still elevated)
+    "GLD":  +0.14, "TLT":  +0.05,
+    # SLV positive but muted vs GLD
+    "SLV":  +0.07,
+    # Energy: XOM/CVX major beneficiaries of $100+ oil
+    "XOM":  +0.18, "CVX":  +0.16,
+    # Defensives: hedge funds buying WMT/consumer staples at fastest rate since Jul 2025
+    "WMT":  +0.09, "PG":   +0.06, "JNJ":  +0.07,
+    # NFLX/DIS: consumer discretionary under pressure
+    "NFLX": -0.10, "DIS":  -0.11,
+    # CRM: tech/cloud selling broad
+    "CRM":  -0.11,
+    # PLTR: mixed — Golden Dome defense contract upside vs general tech dump; net slight negative
+    "PLTR": -0.06,
+},
     "2024-11-06": {
         "AAPL": +0.08, "MSFT": +0.07, "NVDA": +0.12, "TSLA": +0.25,
         "META": +0.10, "GOOGL":+0.06, "AMZN": +0.08, "AMD":  +0.08,
@@ -989,7 +1014,7 @@ def run_window(test_date, outcome_date, label, agents, portfolio=None):
 # ════════════════════════════════════════════════════════════════════════════════
 def main():
     print_separator()
-    print("  FinFolioX — Full System Test  (17 Windows × 30 Tickers × 17 Agents)")
+    print("  FinFolioX — Full System Test  (18 Windows × 30 Tickers × 17 Agents)")
     print_separator()
 
     print("\n  LOADING ALL 17 AGENTS...")
