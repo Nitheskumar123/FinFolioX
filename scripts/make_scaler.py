@@ -43,4 +43,4 @@ scaler.fit(combined.values)
 
 os.makedirs("saved_models", exist_ok=True)
 joblib.dump(scaler, "saved_models/scaler.pkl")
-print("✅ scaler.pkl successfully saved to saved_models/!")
+print("[OK] scaler.pkl successfully saved to saved_models/!")

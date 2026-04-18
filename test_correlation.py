@@ -1,20 +1,20 @@
 """
 ==============================================================================
-CORRELATION DIVERGENCE AGENT — BACKTEST v4  |  5-Day Horizon
+CORRELATION DIVERGENCE AGENT HOLD BACKTEST v4  |  5-Day Horizon
 ==============================================================================
 Agent v2.2 change vs v3:
   Two-tier beta scaling in correlation_agent.py:
-    Tier 2 (|SPY corr| < 0.10): scale × 0.35  ← NEW (MCD/KO fix)
-    Tier 1 (|SPY corr| < 0.20): scale × 0.50  ← unchanged
+    Tier 2 (|SPY corr| < 0.10): scale x 0.35  ← NEW (MCD/KO fix)
+    Tier 1 (|SPY corr| < 0.20): scale x 0.50  ← unchanged
 
-Test thresholds (unchanged from v3 — these were correct):
+Test thresholds (unchanged from v3 HOLD these were correct):
   RISK_THRESHOLD = 0.60
   DIVERGE_MIN    = 0.005  (0.5%)
 
 Expected improvement over v3 (75.0%):
-  MCD was scoring 0.62-0.63 with tier-1 scaling → still above 0.60 threshold
-  With tier-2 scaling (×0.35) MCD score should drop to ~0.54 → below threshold
-  MCD flips from 25% → 75% accuracy (+3 correct calls across 4 windows)
+  MCD was scoring 0.62-0.63 with tier-1 scaling -> still above 0.60 threshold
+  With tier-2 scaling (x0.35) MCD score should drop to ~0.54 -> below threshold
+  MCD flips from 25% -> 75% accuracy (+3 correct calls across 4 windows)
   Expected overall: ~77-78%
 ==============================================================================
 """
@@ -37,10 +37,10 @@ from ml_engine.correlation_agent import CorrelationDivergenceDetector
 # TEST WINDOWS
 # ==============================================================================
 TEST_WINDOWS = [
-    ("2026-03-03", "2026-03-08", "Mar03→08  Bear start"),
-    ("2026-03-04", "2026-03-09", "Mar04→09  Bear early"),
-    ("2026-03-09", "2026-03-16", "Mar09→16  Deep Bear"),
-    ("2026-03-13", "2026-03-18", "Mar13→18  Bounce"),
+    ("2026-03-03", "2026-03-08", "Mar03->08  Bear start"),
+    ("2026-03-04", "2026-03-09", "Mar04->09  Bear early"),
+    ("2026-03-09", "2026-03-16", "Mar09->16  Deep Bear"),
+    ("2026-03-13", "2026-03-18", "Mar13->18  Bounce"),
     
 ]
 
@@ -56,7 +56,7 @@ AGENT_SKIP = {
 }
 
 # ==============================================================================
-# THRESHOLDS — unchanged from v3
+# THRESHOLDS HOLD unchanged from v3
 # ==============================================================================
 RISK_THRESHOLD = 0.60
 DIVERGE_MIN    = 0.005
@@ -100,7 +100,7 @@ def patch_agent_history(agent: CorrelationDivergenceDetector, test_date: str):
 
         returns = data.pct_change().dropna()
         if len(returns) < 40:
-            print("      ⚠️  Not enough history for warm-up.")
+            print("      [WARN]  Not enough history for warm-up.")
             return
 
         seed_rows = returns.iloc[30:-1]
@@ -126,9 +126,9 @@ def patch_agent_history(agent: CorrelationDivergenceDetector, test_date: str):
             if seeded >= 60:
                 break
 
-        print(f"      ✅ Seeded {len(agent.divergence_history)} history samples.")
+        print(f"      [OK] Seeded {len(agent.divergence_history)} history samples.")
     except Exception as e:
-        print(f"      ⚠️  Warm-up failed: {e}.")
+        print(f"      [WARN]  Warm-up failed: {e}.")
 
 
 # ==============================================================================
@@ -136,10 +136,10 @@ def patch_agent_history(agent: CorrelationDivergenceDetector, test_date: str):
 # ==============================================================================
 def run_window(test_date: str, outcome_date: str, label: str,
                spy_ret: float) -> dict:
-    print(f"\n{'─'*110}")
-    print(f"  {label}  |  {test_date} → {outcome_date}  "
+    print(f"\n{'-'*110}")
+    print(f"  {label}  |  {test_date} -> {outcome_date}  "
           f"|  SPY 5d: {spy_ret*100:+.2f}%")
-    print(f"{'─'*110}")
+    print(f"{'-'*110}")
 
     agent = CorrelationDivergenceDetector(
         lookback_window=60,
@@ -153,7 +153,7 @@ def run_window(test_date: str, outcome_date: str, label: str,
 
     print(f"\n  {'Ticker':<7} {'Score':>7} {'Pred':<16} "
           f"{'Act%':>8} {'SPY%':>7} {'|Diff|':>7} {'Result':>10}")
-    print(f"  {'─'*80}")
+    print(f"  {'-'*80}")
 
     for ticker in TICKERS:
         if ticker.upper() in AGENT_SKIP:
@@ -173,14 +173,14 @@ def run_window(test_date: str, outcome_date: str, label: str,
 
             if predicts_diverge:
                 if actually_diverged:
-                    res = "✅ HI-DIV"; correct += 1; hi_c += 1; ok = True
+                    res = "[OK] HI-DIV"; correct += 1; hi_c += 1; ok = True
                 else:
-                    res = "❌ HI-SYNC"; wrong += 1; hi_w += 1; ok = False
+                    res = "[BAD] HI-SYNC"; wrong += 1; hi_w += 1; ok = False
             else:
                 if same_dir_as_spy:
-                    res = "✅ LO-SYNC"; correct += 1; lo_c += 1; ok = True
+                    res = "[OK] LO-SYNC"; correct += 1; lo_c += 1; ok = True
                 else:
-                    res = "❌ LO-DIV";  wrong += 1; lo_w += 1; ok = False
+                    res = "[BAD] LO-DIV";  wrong += 1; lo_w += 1; ok = False
 
             pred_str = "HIGH diverge" if predicts_diverge else "LOW  (track)"
             print(f"  {ticker:<7} {risk_score:>7.4f} {pred_str:<16} "
@@ -208,11 +208,11 @@ def run_window(test_date: str, outcome_date: str, label: str,
     lo_acc  = (lo_c / (lo_c + lo_w) * 100) if (lo_c + lo_w) > 0 else 0.0
     hi_rate = (hi_c + hi_w) / active * 100 if active > 0 else 0.0
 
-    print(f"\n  ── Overall  : {correct}C/{wrong}W  →  {acc:.1f}%  (active={active})")
-    print(f"  ── High div : {hi_c}C/{hi_w}W  →  {hi_acc:.1f}%  "
+    print(f"\n  -- Overall  : {correct}C/{wrong}W  ->  {acc:.1f}%  (active={active})")
+    print(f"  -- High div : {hi_c}C/{hi_w}W  ->  {hi_acc:.1f}%  "
           f"(HIGH rate: {hi_rate:.0f}%)")
-    print(f"  ── Low sync : {lo_c}C/{lo_w}W  →  {lo_acc:.1f}%")
-    print(f"  ── Skipped  : {skipped}")
+    print(f"  -- Low sync : {lo_c}C/{lo_w}W  ->  {lo_acc:.1f}%")
+    print(f"  -- Skipped  : {skipped}")
 
     if results:
         scores = [r["risk_score"] for r in results]
@@ -236,8 +236,8 @@ def main():
     v3_overall = [63.2, 89.5, 78.9, 68.4]
 
     print("=" * 110)
-    print("  CORRELATION DIVERGENCE AGENT — BACKTEST v4  |  5-Day Horizon")
-    print(f"  Agent v2.2: two-tier beta scaling (tier-2 ×0.35 for |corr|<0.10)")
+    print("  CORRELATION DIVERGENCE AGENT HOLD BACKTEST v4  |  5-Day Horizon")
+    print(f"  Agent v2.2: two-tier beta scaling (tier-2 x0.35 for |corr|<0.10)")
     print(f"  threshold={RISK_THRESHOLD}  diverge_min={DIVERGE_MIN*100:.1f}%  (unchanged from v3)")
     print(f"  v1=73.8%  v3=75.0%  target v4≥77%")
     print("=" * 110)
@@ -256,15 +256,15 @@ def main():
 
     # Consolidated summary
     print("\n" + "=" * 110)
-    print("  CONSOLIDATED SUMMARY — v4")
+    print("  CONSOLIDATED SUMMARY HOLD v4")
     print("=" * 110)
 
     print(f"\n  {'Window':<30} {'SPY%':>6} {'Overall':>9} "
           f"{'High-div':>10} {'Low-sync':>10} {'HI%':>6} {'C/W':>8} {'vs v3':>8}")
-    print(f"  {'─'*92}")
+    print(f"  {'-'*92}")
 
     for i, s in enumerate(all_stats):
-        ok    = "✅" if s["acc"] >= 70 else ("⚠️" if s["acc"] >= 55 else "❌")
+        ok    = "[OK]" if s["acc"] >= 70 else ("[WARN]" if s["acc"] >= 55 else "[BAD]")
         delta = s["acc"] - v3_overall[i]
         dsign = f"+{delta:.1f}" if delta >= 0 else f"{delta:.1f}"
         print(f"  {s['label']:<30} {s['spy_ret']:>+5.2f}%  "
@@ -280,13 +280,13 @@ def main():
     avg_hi_rt  = sum(s["hi_rate"] for s in all_stats) / len(all_stats)
     avg_v3     = sum(v3_overall)  / len(v3_overall)
 
-    print(f"\n  {'─'*92}")
+    print(f"\n  {'-'*92}")
     print(f"  {'AVERAGE':<30} {'':>6}  {avg_acc:>7.1f}%    "
           f"{avg_hi_acc:>8.1f}%   {avg_lo_acc:>8.1f}%   {avg_hi_rt:>4.0f}%")
 
     delta_v3 = avg_acc - avg_v3
-    status   = "✅ improved" if delta_v3 > 0 else "❌ regressed"
-    print(f"\n  v3={avg_v3:.1f}%  →  v4={avg_acc:.1f}%  ({status}  {delta_v3:+.1f}pp)")
+    status   = "[OK] improved" if delta_v3 > 0 else "[BAD] regressed"
+    print(f"\n  v3={avg_v3:.1f}%  ->  v4={avg_acc:.1f}%  ({status}  {delta_v3:+.1f}pp)")
     print(f"  v1=73.8%  v3=75.0%  v4={avg_acc:.1f}%")
 
     # Per-ticker accuracy
@@ -302,7 +302,7 @@ def main():
 
     print(f"\n  Per-ticker accuracy (all 4 windows):")
     print(f"  {'Ticker':<7} {'Acc':>6} {'AvgRisk':>9}  Bar")
-    print(f"  {'─'*45}")
+    print(f"  {'-'*45}")
     for ticker, st in sorted(
             ticker_stats.items(),
             key=lambda x: x[1]["c"] / max(x[1]["n"], 1),
@@ -310,7 +310,7 @@ def main():
         acc_t = st["c"] / st["n"] * 100
         avg_r = np.mean(st["scores"])
         bar   = "█" * int(acc_t / 10)
-        ok    = "✅" if acc_t >= 75 else ("⚠️" if acc_t >= 50 else "❌")
+        ok    = "[OK]" if acc_t >= 75 else ("[WARN]" if acc_t >= 50 else "[BAD]")
         print(f"  {ticker:<7} {acc_t:>5.0f}%  {avg_r:>8.3f}  {bar} {ok}")
 
     all_rows = []
@@ -319,7 +319,7 @@ def main():
             r["window"] = s["label"]
             all_rows.append(r)
     pd.DataFrame(all_rows).to_csv("corr_agent_v4_backtest.csv", index=False)
-    print(f"\n  Saved → corr_agent_v4_backtest.csv")
+    print(f"\n  Saved -> corr_agent_v4_backtest.csv")
     print(f"  threshold={RISK_THRESHOLD}  diverge_min={DIVERGE_MIN*100:.1f}%")
     print("\nDone.\n")
 

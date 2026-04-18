@@ -4,11 +4,11 @@ PHASE 24: TOPOLOGICAL SHAPE AGENT (Persistent Homology)
 Implements Research Idea 1: TDA + Persistent Homology for Market Structure.
 
 CHANGELOG:
-  v1.0 — original release
-  v1.1 — FIX-A: entropy_threshold raised 0.75 → 0.90.
+  v1.0 HOLD original release
+  v1.1 HOLD FIX-A: entropy_threshold raised 0.75 -> 0.90.
           With 0.75, all 30 tickers scored 0.78-0.91 on persistence entropy,
           causing every single ticker to be classified CHAOTIC.  The threshold
-          was saturated — the classifier had no discriminative power at all.
+          was saturated HOLD the classifier had no discriminative power at all.
           At 0.90 only genuinely disordered attractors exceed the bar.
 """
 
@@ -23,7 +23,7 @@ try:
 except ImportError:
     RIPSER_AVAILABLE = False
     logger.warning(
-        "ripser not installed — TopologyAgent running in FALLBACK mode. "
+        "ripser not installed HOLD TopologyAgent running in FALLBACK mode. "
         "Install with: pip install ripser persim"
     )
 
@@ -36,15 +36,15 @@ except ImportError:
 
 class TopologyAgent:
     """
-    The Topological Shape Agent — Phase 24 v1.1.
+    The Topological Shape Agent HOLD Phase 24 v1.1.
 
     Detects the geometric structure of the market's attractor manifold
     using Takens Delay Embedding + Persistent Homology.
 
     Key Topological Signals:
-      betti0 (H0) : Connected components → fragmentation score
-      betti1 (H1) : Independent 1-cycles (loops) → oscillation score
-      entropy     : Shannon entropy of persistence lifetimes → chaos score
+      betti0 (H0) : Connected components -> fragmentation score
+      betti1 (H1) : Independent 1-cycles (loops) -> oscillation score
+      entropy     : Shannon entropy of persistence lifetimes -> chaos score
 
     Final Output:
       topology_chaos_score  float 0–1
@@ -63,7 +63,7 @@ class TopologyAgent:
         dimension: int           = 3,
         lookback: int            = 60,     # must be ≥60 for stable TDA
         betti1_threshold: float  = 0.35,
-        entropy_threshold: float = 0.90,   # FIX-A: raised from 0.75 → 0.90
+        entropy_threshold: float = 0.90,   # FIX-A: raised from 0.75 -> 0.90
     ):
         """
         Args:
@@ -72,10 +72,10 @@ class TopologyAgent:
             lookback          : Number of historical bars (must be ≥ 60).
                                 With lookback=30, n_points = 30-(3-1)*5 = 20,
                                 which is too small for stable persistence diagrams.
-                                lookback=60 gives n_points=50 — the safe minimum.
-            betti1_threshold  : H1 score above which → LOOP regime (0.35).
-            entropy_threshold : Entropy score above which → CHAOTIC (0.90).
-                                FIX-A: was 0.75 — all tickers exceeded it, causing
+                                lookback=60 gives n_points=50 HOLD the safe minimum.
+            betti1_threshold  : H1 score above which -> LOOP regime (0.35).
+            entropy_threshold : Entropy score above which -> CHAOTIC (0.90).
+                                FIX-A: was 0.75 HOLD all tickers exceeded it, causing
                                 27/30 to be mis-classified as CHAOTIC.
         """
         self.time_delay        = time_delay
@@ -91,12 +91,12 @@ class TopologyAgent:
                 "Overriding to 60. Pass lookback≥60 to suppress this warning."
             )
 
-        status = "✅" if self._ready else "⚠️  (ripser missing — using fallback)"
+        status = "[OK]" if self._ready else "[WARN]  (ripser missing HOLD using fallback)"
         print(f"   [+] Phase 24 v1.1: Topological Shape Agent (TDA) Initialized. {status}")
 
-    # ──────────────────────────────────────────────────────────────────────
+    # ----------------------------------------------------------------------
     # PUBLIC API
-    # ──────────────────────────────────────────────────────────────────────
+    # ----------------------------------------------------------------------
 
     def analyze(self, hist_df):
         """
@@ -157,9 +157,9 @@ class TopologyAgent:
             logger.error(f"TopologyAgent.analyze failed: {exc}", exc_info=True)
             return self._fallback_result(f"error:{exc}")
 
-    # ──────────────────────────────────────────────────────────────────────
-    # STEP 1 — DATA PREPARATION
-    # ──────────────────────────────────────────────────────────────────────
+    # ----------------------------------------------------------------------
+    # STEP 1 HOLD DATA PREPARATION
+    # ----------------------------------------------------------------------
 
     def _prepare_series(self, hist_df):
         series = hist_df["Close"].values[-self.lookback:].astype(float).flatten()
@@ -168,17 +168,17 @@ class TopologyAgent:
             return np.zeros_like(series)
         return (series - mn) / (mx - mn)
 
-    # ──────────────────────────────────────────────────────────────────────
-    # STEP 2 — TAKENS DELAY EMBEDDING
-    # ──────────────────────────────────────────────────────────────────────
+    # ----------------------------------------------------------------------
+    # STEP 2 HOLD TAKENS DELAY EMBEDDING
+    # ----------------------------------------------------------------------
 
     def _takens_embedding(self, series):
         """
         Reconstruct the dynamical attractor via Takens (1981) delay embedding.
 
         n_points = lookback - (dimension - 1) * time_delay
-        With lookback=60, dim=3, τ=5  →  n_points = 60 - 10 = 50  (safe)
-        With lookback=30, dim=3, τ=5  →  n_points = 30 - 10 = 20  (too small)
+        With lookback=60, dim=3, τ=5  ->  n_points = 60 - 10 = 50  (safe)
+        With lookback=30, dim=3, τ=5  ->  n_points = 30 - 10 = 20  (too small)
         """
         τ        = self.time_delay
         d        = self.dimension
@@ -197,9 +197,9 @@ class TopologyAgent:
                 cloud[i, k] = series[i + k * τ]
         return cloud
 
-    # ──────────────────────────────────────────────────────────────────────
-    # STEP 3 — VIETORIS-RIPS PERSISTENCE
-    # ──────────────────────────────────────────────────────────────────────
+    # ----------------------------------------------------------------------
+    # STEP 3 HOLD VIETORIS-RIPS PERSISTENCE
+    # ----------------------------------------------------------------------
 
     def _compute_persistence(self, point_cloud):
         try:
@@ -209,12 +209,12 @@ class TopologyAgent:
             logger.warning(f"ripser computation failed: {exc}")
             return None
 
-    # ──────────────────────────────────────────────────────────────────────
-    # STEP 4 — FEATURE EXTRACTION
-    # ──────────────────────────────────────────────────────────────────────
+    # ----------------------------------------------------------------------
+    # STEP 4 HOLD FEATURE EXTRACTION
+    # ----------------------------------------------------------------------
 
     def _score_h0(self, h0_diagram):
-        """H0 (Betti-0): Connected components → fragmentation score."""
+        """H0 (Betti-0): Connected components -> fragmentation score."""
         if len(h0_diagram) == 0:
             return 0.5
         finite = h0_diagram[np.isfinite(h0_diagram[:, 1])]
@@ -226,7 +226,7 @@ class TopologyAgent:
         return float(np.clip(0.6 * frag_score + 0.4 * life_score, 0.0, 1.0))
 
     def _score_h1(self, h1_diagram):
-        """H1 (Betti-1): Independent loops → oscillation / mean-reversion score."""
+        """H1 (Betti-1): Independent loops -> oscillation / mean-reversion score."""
         if len(h1_diagram) == 0:
             return 0.0
         finite = h1_diagram[np.isfinite(h1_diagram[:, 1])]
@@ -241,7 +241,7 @@ class TopologyAgent:
     def _persistence_entropy_score(self, h0_diagram, h1_diagram):
         """
         Persistence Entropy: Shannon entropy of all bar lifetimes.
-        High entropy → complex, disordered topology → pre-crash signal.
+        High entropy -> complex, disordered topology -> pre-crash signal.
         """
         all_lifetimes = []
         for diag in [h0_diagram, h1_diagram]:
@@ -268,24 +268,24 @@ class TopologyAgent:
         raw_norm      = float(entropy / (max_ent + 1e-10))
         return float(np.clip(0.6 * raw_norm + 0.4 * np.tanh(cv * 2.0), 0.0, 1.0))
 
-    # ──────────────────────────────────────────────────────────────────────
-    # STEP 5 — INTERPRETATION
-    # ──────────────────────────────────────────────────────────────────────
+    # ----------------------------------------------------------------------
+    # STEP 5 HOLD INTERPRETATION
+    # ----------------------------------------------------------------------
 
     def _classify_structure(self, betti1_score: float, entropy_score: float) -> str:
         """
         Map topological features to a dominant market structure label.
 
         Priority order (most specific first):
-          1. LOOP    — H1 loops dominate  (betti1 ≥ 0.35)
-          2. CHAOTIC — entropy is very high (entropy ≥ 0.90)   ← FIX-A
-          3. TREND   — very few loops AND low entropy (clean attractor)
-          4. SMOOTH  — everything else (transitional)
+          1. LOOP    HOLD H1 loops dominate  (betti1 ≥ 0.35)
+          2. CHAOTIC HOLD entropy is very high (entropy ≥ 0.90)   ← FIX-A
+          3. TREND   HOLD very few loops AND low entropy (clean attractor)
+          4. SMOOTH  HOLD everything else (transitional)
         """
         if betti1_score >= self.betti1_threshold:
             return "LOOP"        # Oscillating / mean-reverting
         elif entropy_score >= self.entropy_threshold:
-            return "CHAOTIC"     # Complex, disordered — FIX-A threshold
+            return "CHAOTIC"     # Complex, disordered HOLD FIX-A threshold
         elif betti1_score < 0.12 and entropy_score < 0.50:
             return "TREND"       # Clean directional attractor
         else:
@@ -308,9 +308,9 @@ class TopologyAgent:
             base_mod = min(base_mod * 1.05, 1.10)
         return float(np.clip(base_mod, 0.85, 1.10))
 
-    # ──────────────────────────────────────────────────────────────────────
+    # ----------------------------------------------------------------------
     # SERIALISATION
-    # ──────────────────────────────────────────────────────────────────────
+    # ----------------------------------------------------------------------
 
     @staticmethod
     def _serialise_diagrams(diagrams):
@@ -325,9 +325,9 @@ class TopologyAgent:
         h1 = _convert(diagrams[1]) if len(diagrams) > 1 else []
         return h0, h1
 
-    # ──────────────────────────────────────────────────────────────────────
+    # ----------------------------------------------------------------------
     # FALLBACK
-    # ──────────────────────────────────────────────────────────────────────
+    # ----------------------------------------------------------------------
 
     def _fallback_result(self, reason: str = ""):
         logger.info(f"TopologyAgent returning fallback result. Reason: {reason}")
@@ -345,9 +345,9 @@ class TopologyAgent:
             "status":               f"fallback:{reason}" if reason else "fallback",
         }
 
-    # ──────────────────────────────────────────────────────────────────────
+    # ----------------------------------------------------------------------
     # CONSOLE REPORT
-    # ──────────────────────────────────────────────────────────────────────
+    # ----------------------------------------------------------------------
 
     @staticmethod
     def _print_report(result):
@@ -355,15 +355,15 @@ class TopologyAgent:
         bar_len = int(score * 30)
         bar     = "█" * bar_len + "░" * (30 - bar_len)
 
-        print("\n   ╔══════════════════════════════════════════════════╗")
-        print("   ║   PHASE 24 v1.1 — TOPOLOGICAL SHAPE AGENT (TDA) ║")
-        print("   ╠══════════════════════════════════════════════════╣")
+        print("\n   ╔==================================================╗")
+        print("   ║   PHASE 24 v1.1 HOLD TOPOLOGICAL SHAPE AGENT (TDA) ║")
+        print("   ╠==================================================╣")
         print(f"   ║  H0 Fragmentation Score : {result['betti0']:.4f}                ║")
         print(f"   ║  H1 Oscillation Score   : {result['betti1']:.4f}                ║")
         print(f"   ║  Persistence Entropy    : {result['persistence_entropy']:.4f}                ║")
-        print("   ╠══════════════════════════════════════════════════╣")
+        print("   ╠==================================================╣")
         print(f"   ║  Topology Chaos Score   : {score:.4f}  [{bar}]  ║")
         print(f"   ║  Dominant Structure     : {result['dominant_structure']:<16s}          ║")
         print(f"   ║  Market Shape Signal    : {result['market_shape_signal']:<16s}          ║")
         print(f"   ║  Fusion Modifier        : {result['topology_modifier']:.4f}x               ║")
-        print("   ╚══════════════════════════════════════════════════╝")
+        print("   ╚==================================================╝")

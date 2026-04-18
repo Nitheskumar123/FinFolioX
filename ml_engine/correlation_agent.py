@@ -1,28 +1,28 @@
 """
-ml_engine/correlation_agent.py  —  CorrelationDivergenceDetector v2.2
+ml_engine/correlation_agent.py  HOLD  CorrelationDivergenceDetector v2.2
 =======================================================================
 CHANGES vs v2.1:
 
-  Fix 4 — Two-tier beta scaling (MCD/KO fix)
+  Fix 4 HOLD Two-tier beta scaling (MCD/KO fix)
     v2.1 used a single LOW_BETA_SCALE_FACTOR=0.50 for all tickers
     with |SPY corr| < 0.20. MCD (corr=-0.09) was scaled enough to
-    drop from 0.79 → 0.63 but still above the 0.60 threshold, so
+    drop from 0.79 -> 0.63 but still above the 0.60 threshold, so
     it kept getting flagged as HIGH divergence incorrectly.
 
     v2.2 adds a second tier for extremely decorrelated tickers
     (|SPY corr| < 0.10): scale factor = 0.35 (stronger suppression).
-    This drops MCD from 0.63 → ~0.55, below the threshold.
+    This drops MCD from 0.63 -> ~0.55, below the threshold.
 
-    Tier 1: 0.10 ≤ |corr| < 0.20  → scale × 0.50  (moderate low-beta)
-    Tier 2:       |corr| < 0.10   → scale × 0.35  (extremely decorrelated)
+    Tier 1: 0.10 ≤ |corr| < 0.20  -> scale x 0.50  (moderate low-beta)
+    Tier 2:       |corr| < 0.10   -> scale x 0.35  (extremely decorrelated)
 
     Tickers affected: MCD (corr≈-0.09), KO (corr≈0.02), WMT (corr≈-0.13
     is in tier 1 at 0.13, unchanged).
 
 All other fixes from v2.1 retained:
-  Fix 1 — XOM + energy equities skip (neutral 0.35)
-  Fix 2 — Beta-adjusted divergence for |SPY corr| < 0.20
-  Fix 3 — Predictive penalty gated by |SPY corr| >= 0.25
+  Fix 1 HOLD XOM + energy equities skip (neutral 0.35)
+  Fix 2 HOLD Beta-adjusted divergence for |SPY corr| < 0.20
+  Fix 3 HOLD Predictive penalty gated by |SPY corr| >= 0.25
 """
 
 import pickle
@@ -60,10 +60,10 @@ class CorrelationDivergenceDetector:
 
         self.divergence_history = self._load_history()
 
-        print("   ✅ Correlation Graph Engine Initialized.")
+        print("   [OK] Correlation Graph Engine Initialized.")
         if len(self.divergence_history) > 0:
             print(
-                f"      ✅ Divergence history restored "
+                f"      [OK] Divergence history restored "
                 f"({len(self.divergence_history)}/{lookback_window} samples)"
             )
 
@@ -104,7 +104,7 @@ class CorrelationDivergenceDetector:
         "DIA", "IWM", "EEM",
     }
 
-    # Fix 1: Energy/commodity equities — follow oil, not SPY
+    # Fix 1: Energy/commodity equities HOLD follow oil, not SPY
     COMMODITY_EQUITY_SKIP = {
         "XOM", "CVX", "COP", "OXY", "PSX", "VLO", "MPC",
     }
@@ -124,7 +124,7 @@ class CorrelationDivergenceDetector:
     def get_market_context(self, target_ticker="AAPL"):
         """
         Returns:
-            risk_score  (float 0→1) : systemic divergence risk
+            risk_score  (float 0->1) : systemic divergence risk
             corr_matrix (DataFrame) : adjacency matrix (None for skipped tickers)
         """
         clean_target = target_ticker.replace("^", "").upper()
@@ -139,7 +139,7 @@ class CorrelationDivergenceDetector:
         if clean_target in self.MACRO_TICKERS:
             print(
                 f"      ℹ️ {clean_target} is a macro/commodity ETF "
-                f"— skipping equity divergence check."
+                f"HOLD skipping equity divergence check."
             )
             return 0.3, None
 
@@ -147,7 +147,7 @@ class CorrelationDivergenceDetector:
         if clean_target in self.COMMODITY_EQUITY_SKIP:
             print(
                 f"      ℹ️ {clean_target} is a commodity-correlated equity "
-                f"— equity graph not applicable. Returning neutral score."
+                f"HOLD equity graph not applicable. Returning neutral score."
             )
             return 0.35, None
 
@@ -162,18 +162,18 @@ class CorrelationDivergenceDetector:
                 set(t.replace("^", "").upper() for t in tickers) - set(data.columns)
             )
             if missing:
-                print(f"      ⚠️ Missing Graph Nodes: {missing}. Using partial graph.")
+                print(f"      [WARN] Missing Graph Nodes: {missing}. Using partial graph.")
                 if clean_target not in data.columns:
-                    print(f"      ❌ Target {clean_target} missing. Aborting.")
+                    print(f"      [BAD] Target {clean_target} missing. Aborting.")
                     return 0.5, None
 
             # 2. Daily returns
             returns = data.pct_change().dropna()
             if len(returns) < 30:
-                print("      ⚠️ Insufficient data (need >30 days).")
+                print("      [WARN] Insufficient data (need >30 days).")
                 return 0.5, None
 
-            # 3. Adjacency matrix — last 30 days
+            # 3. Adjacency matrix HOLD last 30 days
             recent_returns = returns.tail(30)
             corr_matrix    = recent_returns.corr()
 
@@ -188,7 +188,7 @@ class CorrelationDivergenceDetector:
                     f"{corr_matrix[clean_target].get('TLT', 0.0):.3f}"
                 )
 
-            # Fix 3: Predictive divergence penalty — only for correlated tickers
+            # Fix 3: Predictive divergence penalty HOLD only for correlated tickers
             predictive_penalty = 0.0
             prev_returns       = returns.iloc[-60:-30] if len(returns) >= 60 else None
             if (prev_returns is not None
@@ -206,7 +206,7 @@ class CorrelationDivergenceDetector:
                         )
                         predictive_penalty = 0.15
 
-            # 4. Graph convolution — expected move
+            # 4. Graph convolution HOLD expected move
             target_corr_vector = corr_matrix[clean_target].drop(clean_target)
             latest_moves       = returns.iloc[-1]
             market_moves       = latest_moves.drop(clean_target)
@@ -215,7 +215,7 @@ class CorrelationDivergenceDetector:
             weight_sum = weights.sum()
 
             if weight_sum < 1e-6:
-                print("      ⚠️ Weak correlations — using market mean.")
+                print("      [WARN] Weak correlations HOLD using market mean.")
                 expected_move = market_moves.mean()
             else:
                 expected_move = (
@@ -227,21 +227,21 @@ class CorrelationDivergenceDetector:
 
             # Fix 2 + Fix 4: Two-tier beta-adjusted divergence
             if abs_spy_corr < self.VERY_LOW_BETA_CORR:
-                # Tier 2 — extremely decorrelated (MCD corr≈-0.09, KO corr≈0.02)
+                # Tier 2 HOLD extremely decorrelated (MCD corr≈-0.09, KO corr≈0.02)
                 adjusted_divergence = raw_divergence * self.VERY_LOW_BETA_SCALE
                 print(
                     f"      ℹ️ [Beta tier-2] |SPY corr|={abs_spy_corr:.2f} "
-                    f"< {self.VERY_LOW_BETA_CORR} → "
-                    f"divergence {raw_divergence:.5f} × {self.VERY_LOW_BETA_SCALE} "
+                    f"< {self.VERY_LOW_BETA_CORR} -> "
+                    f"divergence {raw_divergence:.5f} x {self.VERY_LOW_BETA_SCALE} "
                     f"= {adjusted_divergence:.5f}"
                 )
             elif abs_spy_corr < self.LOW_BETA_CORR:
-                # Tier 1 — moderate low-beta (WMT corr≈-0.13, BA corr≈0.14, JNJ≈-0.11)
+                # Tier 1 HOLD moderate low-beta (WMT corr≈-0.13, BA corr≈0.14, JNJ≈-0.11)
                 adjusted_divergence = raw_divergence * self.LOW_BETA_SCALE
                 print(
                     f"      ℹ️ [Beta tier-1] |SPY corr|={abs_spy_corr:.2f} "
-                    f"< {self.LOW_BETA_CORR} → "
-                    f"divergence {raw_divergence:.5f} × {self.LOW_BETA_SCALE} "
+                    f"< {self.LOW_BETA_CORR} -> "
+                    f"divergence {raw_divergence:.5f} x {self.LOW_BETA_SCALE} "
                     f"= {adjusted_divergence:.5f}"
                 )
             else:
@@ -268,7 +268,7 @@ class CorrelationDivergenceDetector:
             return risk_score, corr_matrix
 
         except Exception as e:
-            print(f"      ⚠️ Graph Calculation Error: {e}")
+            print(f"      [WARN] Graph Calculation Error: {e}")
             import traceback
             traceback.print_exc()
             return 0.5, None

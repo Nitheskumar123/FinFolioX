@@ -1,10 +1,10 @@
 """
-ENHANCED MCP DATA SERVER — FinFolioX v2.2 (Future Events Added)
+ENHANCED MCP DATA SERVER HOLD FinFolioX v2.2 (Future Events Added)
 ================================================================
 Model Context Protocol (MCP) Server with Real-Time Macro Intelligence.
 
 WHAT'S NEW IN v2.2:
-  NEW TIER 8 (weight 0.75) — Future Event Scout
+  NEW TIER 8 (weight 0.75) HOLD Future Event Scout
     Fetches upcoming events that could move the stock in the next 30 days:
       • Earnings date + analyst expectations (Yahoo Finance calendar API)
       • FOMC meeting dates with expected rate decision context
@@ -14,13 +14,13 @@ WHAT'S NEW IN v2.2:
     These are returned as structured text for the LLM future scorer in
     sentiment_agent.py to reason about.
 
-ALL PREVIOUS FIXES (v2.1) PRESERVED EXACTLY — nothing changed below Tier 7.
+ALL PREVIOUS FIXES (v2.1) PRESERVED EXACTLY HOLD nothing changed below Tier 7.
 
 FIXES IN v2.1:
   FIX-1: FRED RSS fallback order improved.
   FIX-2: GDELT conflict-monitor query narrowed to ticker-specific topics.
-  FIX-3: EconCalendar investing.com RSS 403 → BLS/BEA primary.
-  FIX-4: VIX numeric fetch (no RSS) → Yahoo Finance quote API.
+  FIX-3: EconCalendar investing.com RSS 403 -> BLS/BEA primary.
+  FIX-4: VIX numeric fetch (no RSS) -> Yahoo Finance quote API.
   FIX-5: Fuzzy deduplication (first 60 chars).
   FIX-6: Per-source item caps.
 """
@@ -38,18 +38,18 @@ logger = logging.getLogger("MCPServer")
 
 
 # ==============================================================================
-# CONFIGURATION — Tune weights here
+# CONFIGURATION HOLD Tune weights here
 # ==============================================================================
 TIER_WEIGHTS = {
-    "FRED":          1.50,   # Tier 0 — Central Bank / Fed
-    "SEC EDGAR":     1.00,   # Tier 1 — Regulatory filings
-    "Yahoo Finance": 0.90,   # Tier 2 — Financial news
-    "GDELT":         0.80,   # Tier 3 — Geopolitical events
-    "EconCalendar":  0.70,   # Tier 4 — Economic data releases
-    "MacroFX":       0.60,   # Tier 5 — Commodity / FX macro
-    "GoogleTrends":  0.50,   # Tier 6 — Search interest proxy
-    "Reddit r/WSB":  0.30,   # Tier 7 — Retail sentiment
-    "FutureEvents":  0.75,   # Tier 8 — Upcoming events (NEW v2.2)
+    "FRED":          1.50,   # Tier 0 HOLD Central Bank / Fed
+    "SEC EDGAR":     1.00,   # Tier 1 HOLD Regulatory filings
+    "Yahoo Finance": 0.90,   # Tier 2 HOLD Financial news
+    "GDELT":         0.80,   # Tier 3 HOLD Geopolitical events
+    "EconCalendar":  0.70,   # Tier 4 HOLD Economic data releases
+    "MacroFX":       0.60,   # Tier 5 HOLD Commodity / FX macro
+    "GoogleTrends":  0.50,   # Tier 6 HOLD Search interest proxy
+    "Reddit r/WSB":  0.30,   # Tier 7 HOLD Retail sentiment
+    "FutureEvents":  0.75,   # Tier 8 HOLD Upcoming events (NEW v2.2)
 }
 
 # Per-source item caps
@@ -62,7 +62,7 @@ SOURCE_MAX_ITEMS = {
     "MacroFX":       3,
     "GoogleTrends":  3,
     "Reddit r/WSB":  3,
-    "FutureEvents":  6,   # NEW — up to 6 forward-looking signals
+    "FutureEvents":  6,   # NEW HOLD up to 6 forward-looking signals
 }
 
 # ==============================================================================
@@ -70,8 +70,8 @@ SOURCE_MAX_ITEMS = {
 # Prevents garbage (entertainment, sports, politics) from polluting the LLM prompt.
 # A future event article must contain at least one of these keywords to be included.
 # Two tiers:
-#   FINANCE_MUST_KEYWORDS — strong market-moving signals (any one = include)
-#   FINANCE_BROAD_KEYWORDS — weaker signals (require 2 matches to include)
+#   FINANCE_MUST_KEYWORDS HOLD strong market-moving signals (any one = include)
+#   FINANCE_BROAD_KEYWORDS HOLD weaker signals (require 2 matches to include)
 # ==============================================================================
 FINANCE_MUST_KEYWORDS = [
     # Earnings & guidance
@@ -101,7 +101,7 @@ FINANCE_BROAD_KEYWORDS = [
 ]
 
 # ==============================================================================
-# FINANCE BLOCKLIST — explicit non-finance false positives
+# FINANCE BLOCKLIST HOLD explicit non-finance false positives
 # "bond" matches financial bonds but also James Bond, Bail Bond, etc.
 # Any text containing one of these phrases is immediately excluded,
 # even if it also contains a finance keyword.
@@ -133,27 +133,27 @@ def _is_finance_relevant(text: str) -> bool:
     Returns True if text passes the finance relevance gate.
 
     Two-step logic:
-      Step 1 — Blocklist check (fast reject):
+      Step 1 HOLD Blocklist check (fast reject):
         If any non-finance phrase is found (e.g. "james bond", "super bowl"),
-        return False immediately — even if the text also contains "bond" or "market".
+        return False immediately HOLD even if the text also contains "bond" or "market".
         This prevents false positives like "Who will be the next James Bond?"
         matching the financial keyword "bond".
 
-      Step 2 — Keyword match (accept):
-        Strong finance keyword → accept.
-        Two broad finance keywords together → accept.
+      Step 2 HOLD Keyword match (accept):
+        Strong finance keyword -> accept.
+        Two broad finance keywords together -> accept.
     """
     lower = text.lower()
 
-    # Step 1: Hard blocklist — reject non-finance topics immediately
+    # Step 1: Hard blocklist HOLD reject non-finance topics immediately
     if any(phrase in lower for phrase in FINANCE_BLOCKLIST):
         return False
 
-    # Step 2: Strong finance keyword → immediately relevant
+    # Step 2: Strong finance keyword -> immediately relevant
     if any(kw in lower for kw in FINANCE_MUST_KEYWORDS):
         return True
 
-    # Step 3: Two broad keywords together → probably relevant
+    # Step 3: Two broad keywords together -> probably relevant
     broad_hits = sum(1 for kw in FINANCE_BROAD_KEYWORDS if kw in lower)
     return broad_hits >= 2
 
@@ -170,7 +170,7 @@ GDELT_TOPIC_MAP = {
     "DEFAULT": ["Federal Reserve recession inflation trade war"],
 }
 
-# FOMC 2026 scheduled meeting dates (hardcoded — updated annually)
+# FOMC 2026 scheduled meeting dates (hardcoded HOLD updated annually)
 # Source: federalreserve.gov/monetarypolicy/fomccalendars.htm
 FOMC_2026_DATES = [
     ("2026-01-28", "2026-01-29"),
@@ -209,7 +209,7 @@ class MCPDataServer:
         }
         self.ticker_to_cik = {}
         self._load_sec_cik_mapping()
-        print("   🔌 [MCP Server v2.2] Initialized — 9 tiers active (Tier 8: Future Events)")
+        print("   🔌 [MCP Server v2.2] Initialized HOLD 9 tiers active (Tier 8: Future Events)")
 
     # ==========================================================================
     # UTILITIES
@@ -624,7 +624,7 @@ class MCPDataServer:
     # ==========================================================================
     # TIER 8 (NEW v2.2): Future Event Scout
     # Returns upcoming events as structured text for LLM to reason about.
-    # These are NOT scored by FinBERT — they go directly to the LLM scorer
+    # These are NOT scored by FinBERT HOLD they go directly to the LLM scorer
     # in sentiment_agent.py via the "future_events" key in the returned dict.
     # ==========================================================================
 
@@ -644,7 +644,7 @@ class MCPDataServer:
         """
         results = []
 
-        # ── A: Earnings date ─────────────────────────────────────────────────
+        # -- A: Earnings date -------------------------------------------------
         try:
             import yfinance as yf
             import io, sys, contextlib
@@ -709,7 +709,7 @@ class MCPDataServer:
         except Exception as e:
             logger.debug(f"Future: Earnings calendar fetch failed for {ticker}: {e}")
 
-        # ── B: Next FOMC meeting ──────────────────────────────────────────────
+        # -- B: Next FOMC meeting ----------------------------------------------
         try:
             today = datetime.today().date()
             next_fomc = None
@@ -739,7 +739,7 @@ class MCPDataServer:
         except Exception as e:
             logger.debug(f"Future: FOMC calendar failed: {e}")
 
-        # ── C: Forward-looking news (Google News) ─────────────────────────────
+        # -- C: Forward-looking news (Google News) -----------------------------
         forward_queries = [
             f"{ticker} upcoming announcement next week",
             f"{ticker} product launch event 2026",
@@ -761,8 +761,8 @@ class MCPDataServer:
                             clean = self._clean_text(title_elem.text)
                             clean = re.sub(r"\s+-\s+\S+$", "", clean)
                             # FIX-3: Two-gate filter:
-                            # Gate 1 — must contain forward-looking intent keyword
-                            # Gate 2 — must pass finance relevance (no Stranger Things etc.)
+                            # Gate 1 HOLD must contain forward-looking intent keyword
+                            # Gate 2 HOLD must pass finance relevance (no Stranger Things etc.)
                             fwd_kw = ["upcoming", "next", "plan", "launch", "announce",
                                       "schedule", "expect", "forecast", "will", "event",
                                       "preview", "ahead", "before", "catalyst", "earnings"]
@@ -780,7 +780,7 @@ class MCPDataServer:
             except Exception as e:
                 logger.debug(f"Future: Google forward news failed for '{query}': {e}")
 
-        # ── D: Reddit upcoming event mentions ─────────────────────────────────
+        # -- D: Reddit upcoming event mentions ---------------------------------
         try:
             url  = (f"https://www.reddit.com/r/wallstreetbets/search.json"
                     f"?q={ticker}+earnings+play+catalyst&restrict_sr=on&sort=new&limit=3")
@@ -809,7 +809,7 @@ class MCPDataServer:
         except Exception as e:
             logger.debug(f"Future: Reddit catalyst scan failed: {e}")
 
-        # ── E: BLS advance release schedule ───────────────────────────────────
+        # -- E: BLS advance release schedule -----------------------------------
         try:
             url  = "https://www.bls.gov/bls/news-release/rss.xml"
             resp = requests.get(url, headers=self.headers, timeout=6)
@@ -896,14 +896,14 @@ class MCPDataServer:
             tier_counts[src] = tier_counts.get(src, 0) + 1
 
         future_count = sum(1 for i in clean_payload if i.get("future_event"))
-        print(f"      ✅ [MCP v2.2] Assembly complete. "
+        print(f"      [OK] [MCP v2.2] Assembly complete. "
               f"{len(clean_payload)} signals ({future_count} future events).")
         print(f"         Sources: {tier_counts}")
 
         return clean_payload
 
 
-# ── import needed by fetch_future_events ─────────────────────────────────────
+# -- import needed by fetch_future_events -------------------------------------
 try:
     import pandas as pd
 except ImportError:

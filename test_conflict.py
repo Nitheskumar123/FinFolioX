@@ -1,7 +1,7 @@
 """
-test_conflict_resolver.py  —  Conflict Resolution Engine Backtest v2.5
+test_conflict_resolver.py  HOLD  Conflict Resolution Engine Backtest v2.5
 =======================================================================
-FinFolioX — Phase 13 Backtest  |  7 Windows × 30 Tickers
+FinFolioX HOLD Phase 13 Backtest  |  7 Windows x 30 Tickers
 
 Run from project root:
     python test_conflict_resolver.py
@@ -43,13 +43,13 @@ COMMODITY_TICKERS = {"GLD","SLV","USO","UNG","GDX"}
 BUY_GDI_MAX       = 55.0
 
 TEST_WINDOWS = [
-    ("2026-03-03", "2026-03-08", "Mar03→08  Bear start"),
-    ("2026-03-04", "2026-03-09", "Mar04→09  Bear early"),
-    ("2026-03-15", "2026-03-20", "Mar15→20  Deep Bear"),
-    ("2026-03-05", "2026-03-10", "Mar05→10  Bounce"),
-    ("2025-08-01", "2025-08-08", "Aug01→08  Bull Phase"),
-    ("2025-10-01", "2025-10-08", "Oct01→08  Sideways"),
-    ("2026-03-17", "2026-03-23", "Mar17→23  Iran+Fed"),
+    ("2026-03-03", "2026-03-08", "Mar03->08  Bear start"),
+    ("2026-03-04", "2026-03-09", "Mar04->09  Bear early"),
+    ("2026-03-15", "2026-03-20", "Mar15->20  Deep Bear"),
+    ("2026-03-05", "2026-03-10", "Mar05->10  Bounce"),
+    ("2025-08-01", "2025-08-08", "Aug01->08  Bull Phase"),
+    ("2025-10-01", "2025-10-08", "Oct01->08  Sideways"),
+    ("2026-03-17", "2026-03-23", "Mar17->23  Iran+Fed"),
 ]
 
 TICKERS = [
@@ -146,7 +146,7 @@ def snap_to_trading_day(date_str):
     dt = pd.to_datetime(date_str)
     snapped = pd.bdate_range(start=dt, periods=1)[0]
     if snapped != dt:
-        print(f"   ⚠️  {date_str} → snapped to {snapped.date()}")
+        print(f"   [WARN]  {date_str} -> snapped to {snapped.date()}")
     return snapped.strftime("%Y-%m-%d")
 
 def fetch_history(ticker, test_date):
@@ -209,10 +209,10 @@ def score_decision(decision, actual_ret, ticker):
     if abs(actual_ret) <= noise_band(ticker):
         ok = ((decision=="BUY" and actual_ret>=0) or
               (decision=="SELL" and actual_ret<=0))
-        return "noise", "🔍(correct)" if ok else "🔍(wrong)"
-    if decision=="BUY"  and actual_ret>0: return "correct","✅"
-    if decision=="SELL" and actual_ret<0: return "correct","✅"
-    return "wrong","❌"
+        return "noise", "[CHECK](correct)" if ok else "[CHECK](wrong)"
+    if decision=="BUY"  and actual_ret>0: return "correct","[OK]"
+    if decision=="SELL" and actual_ret<0: return "correct","[OK]"
+    return "wrong","[BAD]"
 
 
 # ==============================================================================
@@ -231,18 +231,18 @@ def run_window(test_date, outcome_date, label,
         diffs = [(abs((pd.to_datetime(sent_date)-pd.to_datetime(k)).days), k)
                  for k in MANUAL_SENTIMENT]
         sent_date = min(diffs)[1]
-        print(f"   ℹ️  Sentiment mapped: {test_date} → {sent_date}")
+        print(f"   ℹ️  Sentiment mapped: {test_date} -> {sent_date}")
 
     sentiment_scores = MANUAL_SENTIMENT[sent_date]
     cr.reset_history()
 
     print(f"\n{'*'*128}")
-    print(f"  {label}  |  {test_date} → {outcome_date}")
+    print(f"  {label}  |  {test_date} -> {outcome_date}")
     print(f"{'*'*128}")
     print(f"\n  {'Ticker':<6} {'Ruling':<14} {'LDir':<5} {'SDir':<5} {'Risk':>5} {'Sprd':>6} "
           f"{'Before':>7} {'After':>7} {'Δ':>6} "
           f"{'PreDec':<6} {'Post':<6} {'Act%':>8}  {'Pre':<14} {'Post'}")
-    print(f"  {'─'*132}")
+    print(f"  {'-'*132}")
 
     rows         = []
     pre_correct  = pre_wrong  = pre_noise  = 0
@@ -375,18 +375,18 @@ def run_window(test_date, outcome_date, label,
     arb_rate    = arb_cnt / max(n, 1) * 100
     cr_stats    = cr.get_stats()
 
-    print(f"\n  ── Window Summary ────────────────────────────────────────────────────────")
+    print(f"\n  -- Window Summary --------------------------------------------------------")
     print(f"     Arbitration      : {arb_cnt}/{n} = {arb_rate:.1f}%  "
           f"(regime discounts: {disc_cnt})")
     print(f"     Ruling breakdown :", end="")
     for r, cnt in sorted(ruling_counts.items(), key=lambda x: -x[1]):
         print(f"  {r}={cnt}", end="")
     print()
-    print(f"     Pre-arb  accuracy: {pre_correct}✅ / {pre_wrong}❌ / {pre_noise}🔍  "
-          f"→ {pre_acc:.1f}%")
-    print(f"     Post-arb accuracy: {post_correct}✅ / {post_wrong}❌ / {post_noise}🔍  "
-          f"→ {post_acc:.1f}%")
-    lf = "✅" if lift >= 0 else "⚠️ "
+    print(f"     Pre-arb  accuracy: {pre_correct}[OK] / {pre_wrong}[BAD] / {pre_noise}[CHECK]  "
+          f"-> {pre_acc:.1f}%")
+    print(f"     Post-arb accuracy: {post_correct}[OK] / {post_wrong}[BAD] / {post_noise}[CHECK]  "
+          f"-> {post_acc:.1f}%")
+    lf = "[OK]" if lift >= 0 else "[WARN] "
     print(f"     Accuracy lift    : {lift:+.1f}%  {lf}")
     print(f"     Mean conf change : {cr_stats.get('mean_conf_change_pct', 0):+.2f}%  "
           f"(max drop: {cr_stats.get('max_conf_drop', 0):.4f}  "
@@ -408,7 +408,7 @@ def run_window(test_date, outcome_date, label,
 
 def main():
     print("=" * 128)
-    print("  CONFLICT RESOLVER BACKTEST v2.5  |  7 Windows × 30 Tickers")
+    print("  CONFLICT RESOLVER BACKTEST v2.5  |  7 Windows x 30 Tickers")
     print("  FIX: Directional conflict detection + MILD_ADJUST material flag")
     print("  NO false conflicts from lstm=0+neutral-sent anymore")
     print("=" * 128)
@@ -416,34 +416,34 @@ def main():
 
     try:
         tech_agent = TechnicalAgent(lstm_model_path=MODEL_PATH, lstm_scaler_path=SCALER_PATH)
-        print(f"  ✅ TechnicalAgent  {tuple(tech_agent.lstm_model.input_shape)}")
+        print(f"  [OK] TechnicalAgent  {tuple(tech_agent.lstm_model.input_shape)}")
     except Exception as e:
-        print(f"  ❌ TechnicalAgent: {e}"); return
+        print(f"  [BAD] TechnicalAgent: {e}"); return
 
     uncertainty_agent = UncertaintyAgent(tech_agent)
 
     try:
         regime_agent = HybridRegimeAgent(hmm_model_path=REGIME_PATH, verbose=False)
-        print(f"  ✅ HybridRegimeAgent  is_fitted={regime_agent.is_fitted}")
+        print(f"  [OK] HybridRegimeAgent  is_fitted={regime_agent.is_fitted}")
     except Exception as e:
-        print(f"  ❌ HybridRegimeAgent: {e}"); return
+        print(f"  [BAD] HybridRegimeAgent: {e}"); return
 
     try:
         fusion_agent = FusionAgent(model_path=FUSION_PATH)
-        print(f"  ✅ FusionAgent  [{fusion_agent._arch}]")
+        print(f"  [OK] FusionAgent  [{fusion_agent._arch}]")
     except Exception as e:
-        print(f"  ❌ FusionAgent: {e}"); return
+        print(f"  [BAD] FusionAgent: {e}"); return
 
     heatmap_agent = HeatmapAgent()
-    print("  ✅ HeatmapAgent")
+    print("  [OK] HeatmapAgent")
 
     risk_engine = None
     if _RISK_OK:
         try:
             risk_engine = RiskEngine(default_account_size=DEFAULT_CAPITAL)
-            print(f"  ✅ RiskEngine  (capital=${DEFAULT_CAPITAL:,.0f})")
+            print(f"  [OK] RiskEngine  (capital=${DEFAULT_CAPITAL:,.0f})")
         except Exception as e:
-            print(f"  ⚠️  RiskEngine: {e}")
+            print(f"  [WARN]  RiskEngine: {e}")
 
     cr = ConflictResolver(verbose=True)
 
@@ -459,16 +459,16 @@ def main():
         all_stats.append(s)
         all_rows.extend(s["rows"])
 
-    # ── Consolidated ──────────────────────────────────────────────────────────
+    # -- Consolidated ----------------------------------------------------------
     print("\n" + "=" * 128)
     print("  CONSOLIDATED RESULTS")
     print("=" * 128)
     print(f"\n  {'Window':<32} {'Arb%':>6} {'Disc':>5} "
-          f"{'PreAcc':>7} {'PostAcc':>8} {'Lift':>6}  {'Pre✅/❌':>9} {'Post✅/❌':>9}")
-    print(f"  {'─'*110}")
+          f"{'PreAcc':>7} {'PostAcc':>8} {'Lift':>6}  {'Pre[OK]/[BAD]':>9} {'Post[OK]/[BAD]':>9}")
+    print(f"  {'-'*110}")
 
     for s in all_stats:
-        lf = "✅" if s["acc_lift"] >= 0 else "⚠️ "
+        lf = "[OK]" if s["acc_lift"] >= 0 else "[WARN] "
         print(f"  {s['label']:<32} {s['arb_rate']:>5.1f}% {s['disc_cnt']:>5}  "
               f"  {s['pre_acc']:>6.1f}%  {s['post_acc']:>7.1f}% "
               f"{s['acc_lift']:>+5.1f}%{lf}  "
@@ -489,35 +489,35 @@ def main():
     ol   = oppa - opa
     oar  = total_arb / max(total_n, 1) * 100
 
-    print(f"  {'─'*110}")
-    lf = "✅" if ol >= 0 else "⚠️ "
+    print(f"  {'-'*110}")
+    lf = "[OK]" if ol >= 0 else "[WARN] "
     print(f"  {'OVERALL':<32} {oar:>5.1f}% {total_disc:>5}  "
           f"  {opa:>6.1f}%  {oppa:>7.1f}% {ol:>+5.1f}%{lf}  "
           f"{total_pre_c:>3}/{total_pre_w:<3}  {total_post_c:>3}/{total_post_w:<3}")
 
-    # ── Ruling distribution ────────────────────────────────────────────────────
+    # -- Ruling distribution ----------------------------------------------------
     all_rulings = defaultdict(int)
     for s in all_stats:
         for r, cnt in s["ruling_counts"].items():
             all_rulings[r] += cnt
 
-    print(f"\n  ── Ruling Distribution ─────────────────────────────────────────────────────")
+    print(f"\n  -- Ruling Distribution -----------------------------------------------------")
     for ruling, cnt in sorted(all_rulings.items(), key=lambda x: -x[1]):
         pct = cnt / max(total_n, 1) * 100
         bar = "█" * int(pct / 2)
         print(f"  {ruling:<24} {cnt:>4} ({pct:>5.1f}%)  [{bar}]")
 
-    # ── Regression checks ──────────────────────────────────────────────────────
-    print(f"\n  ── v2.5 Regression Checks ───────────────────────────────────────────────────")
+    # -- Regression checks ------------------------------------------------------
+    print(f"\n  -- v2.5 Regression Checks ---------------------------------------------------")
     print(f"  Directional thresholds: bull>{cr.bull_dir_threshold}  bear<{cr.bear_dir_threshold}  "
           f"backup≥{cr.extreme_spread_backup}")
     print(f"  UNCERTAINTY_HIGH = {cr.uncertainty_high}  "
-          + ("✅" if cr.uncertainty_high == 0.15 else "❌"))
+          + ("[OK]" if cr.uncertainty_high == 0.15 else "[BAD]"))
 
     bull_ws   = [s for s in all_stats if "Bull" in s["label"] or "Sideways" in s["label"]]
     veto_bull = sum(s["ruling_counts"].get("SYSTEMIC_VETO", 0) for s in bull_ws)
     print(f"  Systemic veto in Bull/Sideways: {veto_bull}  "
-          + ("✅ No false vetoes" if veto_bull == 0 else f"⚠️  {veto_bull} unexpected"))
+          + ("[OK] No false vetoes" if veto_bull == 0 else f"[WARN]  {veto_bull} unexpected"))
 
     mild_cnt = all_rulings.get("MILD_ADJUST", 0)
     dir_cnt  = sum(all_rulings.get(r, 0) for r in ("HOLD","ALIGN_BULL","ALIGN_BEAR",
@@ -525,35 +525,35 @@ def main():
                                                      "TRUST_SENTIMENT_BULL",
                                                      "TRUST_SENTIMENT_BEAR"))
     print(f"  MILD_ADJUST count     : {mild_cnt}  ({mild_cnt/max(total_n,1)*100:.1f}%)  "
-          + ("✅ Material adjustments captured" if mild_cnt > 0 else "⚠️  None fired"))
+          + ("[OK] Material adjustments captured" if mild_cnt > 0 else "[WARN]  None fired"))
     print(f"  Directional conflicts : {dir_cnt}  ({dir_cnt/max(total_n,1)*100:.1f}%)  "
-          + ("✅ Genuine signal conflicts caught" if dir_cnt > 0 else "⚠️  None fired"))
+          + ("[OK] Genuine signal conflicts caught" if dir_cnt > 0 else "[WARN]  None fired"))
     print(f"  Arbitration rate      : {oar:.1f}%  "
-          + ("✅ Active (>15%)" if oar > 15 else "⚠️  Still low"))
+          + ("[OK] Active (>15%)" if oar > 15 else "[WARN]  Still low"))
 
-    # ── Verdict ───────────────────────────────────────────────────────────────
-    print(f"\n  {'═'*65}")
+    # -- Verdict ---------------------------------------------------------------
+    print(f"\n  {'='*65}")
     print(f"  CONFLICT RESOLVER v2.5 VERDICT")
-    print(f"  {'═'*65}")
-    print(f"  Pre-arb  accuracy  : {opa:.1f}%   " + ("✅" if opa  >= 70 else "⚠️ "))
-    print(f"  Post-arb accuracy  : {oppa:.1f}%   "+ ("✅" if oppa >= 70 else "⚠️ "))
-    print(f"  Accuracy lift      : {ol:+.1f}%    "+ ("✅ helped" if ol>0 else "~ neutral" if ol==0 else "⚠️  hurt"))
-    print(f"  Arbitration rate   : {oar:.1f}%    "+ ("✅" if oar > 15 else "⚠️  low"))
-    print(f"  False conflict fix : ✅ Directional detection prevents BEAR+NEUTRAL false fires")
-    print(f"  Mild adjust flag   : ✅ Material Δconf now counted as arbitrated")
+    print(f"  {'='*65}")
+    print(f"  Pre-arb  accuracy  : {opa:.1f}%   " + ("[OK]" if opa  >= 70 else "[WARN] "))
+    print(f"  Post-arb accuracy  : {oppa:.1f}%   "+ ("[OK]" if oppa >= 70 else "[WARN] "))
+    print(f"  Accuracy lift      : {ol:+.1f}%    "+ ("[OK] helped" if ol>0 else "~ neutral" if ol==0 else "[WARN]  hurt"))
+    print(f"  Arbitration rate   : {oar:.1f}%    "+ ("[OK]" if oar > 15 else "[WARN]  low"))
+    print(f"  False conflict fix : [OK] Directional detection prevents BEAR+NEUTRAL false fires")
+    print(f"  Mild adjust flag   : [OK] Material Δconf now counted as arbitrated")
     print(f"  Regime discounts   : {total_disc}")
 
     print(f"\n  Per-window:")
     for s in all_stats:
         bar = "█"*int(s["arb_rate"]/5) + "░"*(20-int(s["arb_rate"]/5))
-        lf  = "✅" if s["acc_lift"] >= 0 else "⚠️ "
+        lf  = "[OK]" if s["acc_lift"] >= 0 else "[WARN] "
         print(f"  {s['label']:<32}  [{bar}] {s['arb_rate']:.0f}%  "
               f"lift={s['acc_lift']:>+5.1f}%{lf}  "
-              f"pre={s['pre_acc']:.1f}% → post={s['post_acc']:.1f}%")
+              f"pre={s['pre_acc']:.1f}% -> post={s['post_acc']:.1f}%")
 
     if all_rows:
         pd.DataFrame(all_rows).to_csv("conflict_resolver_backtest.csv", index=False)
-        print(f"\n  Saved → conflict_resolver_backtest.csv  ({len(all_rows)} rows)")
+        print(f"\n  Saved -> conflict_resolver_backtest.csv  ({len(all_rows)} rows)")
 
     print("\nDone.\n")
 

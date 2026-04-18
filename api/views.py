@@ -1,5 +1,5 @@
 """
-api/views.py  —  Django REST Framework API Views (Phase 19 + Phase 26)
+api/views.py  HOLD  Django REST Framework API Views (Phase 19 + Phase 26)
 =======================================================================
 Exposes the FinFolio-X AI engine as 8 REST endpoints. Phase 26 extends
 the /api/analyze/ response with a new "ensemble_health" JSON block that
@@ -88,7 +88,7 @@ def _get_topology_agent():
         try:
             _topology_agent = TopologyAgent(time_delay=5, dimension=3, lookback=60)
         except Exception as e:
-            print(f"   ⚠️ TopologyAgent initialization failed: {e}")
+            print(f"   [WARN] TopologyAgent initialization failed: {e}")
     return _topology_agent
 
 
@@ -98,7 +98,7 @@ def _get_causal_agent():
         try:
             _causal_agent = CausalAgent(lookback=90, alpha=0.05)
         except Exception as e:
-            print(f"   ⚠️ CausalAgent initialization failed: {e}")
+            print(f"   [WARN] CausalAgent initialization failed: {e}")
     return _causal_agent
 
 
@@ -399,7 +399,7 @@ class CounterfactualQueryView(View):
                 f"instead of observed {var_last:.4f}), {ticker} would have returned "
                 f"{cf_return * 100:+.3f}% instead of the factual {factual_ret * 100:+.3f}%. "
                 f"Δ = {delta * 100:+.3f}%. "
-                f"Causal effect used: β_do({variable}→{ticker}) = {causal_effect:.5f}."
+                f"Causal effect used: β_do({variable}->{ticker}) = {causal_effect:.5f}."
             )
 
             return JsonResponse({
@@ -418,7 +418,7 @@ class CounterfactualQueryView(View):
 
 
 # ==============================================================================
-# HELPER: Convert AgentState → JSON (updated for Phase 26)
+# HELPER: Convert AgentState -> JSON (updated for Phase 26)
 # ==============================================================================
 
 def _state_to_json(state, ticker):
@@ -471,7 +471,7 @@ def _state_to_json(state, ticker):
             "delta":  _safe_float(state.get("red_team_delta", 0)),
         },
 
-        # ── Phase 26: Ensemble Health (ASC) ────────────────────────────────
+        # -- Phase 26: Ensemble Health (ASC) --------------------------------
         "ensemble_health": {
             "asc_score":             _safe_float(state.get("asc_score", 0.5)),
             "asc_reliable":          bool(state.get("asc_reliable", False)),

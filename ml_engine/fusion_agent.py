@@ -1,5 +1,5 @@
 """
-ml_engine/fusion_agent.py  —  Multi-Head Attention Fusion Agent (v2.1)
+ml_engine/fusion_agent.py  HOLD  Multi-Head Attention Fusion Agent (v2.1)
 =======================================================================
 WHAT'S NEW IN v2.1:
   - Version string added for changelog tracking.
@@ -33,12 +33,12 @@ import torch.nn.functional as F
 import numpy as np
 
 
-# ── Version ───────────────────────────────────────────────────────────────────
+# -- Version -------------------------------------------------------------------
 FUSION_AGENT_VERSION = "v2.1"
 
 
 # ==============================================================================
-# ARCHITECTURE A — Kaggle P100 model (legacy)
+# ARCHITECTURE A HOLD Kaggle P100 model (legacy)
 # ==============================================================================
 class KaggleFusion(nn.Module):
     def __init__(self, d_model=64, nhead=8, dropout=0.17):
@@ -76,19 +76,19 @@ class KaggleFusion(nn.Module):
         pooled = enc.mean(dim=1)
         conf   = self.decoder(pooled)
         # Attention proxy: use post-encoder token norms as signal importance.
-        # enc shape: (batch, 3, d_model) — one token per signal (lstm, sent, vol).
-        # L2 norm per token → larger norm = that signal drove more of the representation.
+        # enc shape: (batch, 3, d_model) HOLD one token per signal (lstm, sent, vol).
+        # L2 norm per token -> larger norm = that signal drove more of the representation.
         # Softmax-normalised so weights sum to 1 across the 3 signals.
         # Expanded to (batch, 3, 3) to match MultiHeadFusion.attn_w shape so
         # interpret_weights() works identically for both architectures.
         token_norms = enc.norm(dim=-1)                      # (batch, 3)
-        token_weights = F.softmax(token_norms, dim=-1)      # (batch, 3) — sums to 1
+        token_weights = F.softmax(token_norms, dim=-1)      # (batch, 3) HOLD sums to 1
         proxy_attn = token_weights.unsqueeze(1).expand(-1, 3, -1)  # (batch, 3, 3)
         return conf, proxy_attn
 
 
 # ==============================================================================
-# ARCHITECTURE B — Local synthetic model
+# ARCHITECTURE B HOLD Local synthetic model
 # Keys: lstm_embed, sent_embed, vol_embed, attention.*, fc1, fc2
 # ==============================================================================
 class MultiHeadFusion(nn.Module):
@@ -119,7 +119,7 @@ class MultiHeadFusion(nn.Module):
 
 
 # ==============================================================================
-# FUSION AGENT — auto-detects architecture from checkpoint keys
+# FUSION AGENT HOLD auto-detects architecture from checkpoint keys
 # ==============================================================================
 class FusionAgent:
     """
@@ -132,7 +132,7 @@ class FusionAgent:
                   Source: TechnicalAgent.predict() (NOT predict_raw())
                   UncertaintyAgent.predict_with_uncertainty() returns this as mc_mean.
         sent_s  : FinBERT blended score ∈ [-0.75, +0.75]
-        vol_v   : regime-derived proxy — 0.9 (Bear) | 0.5 (Sideways) | 0.2 (Bull)
+        vol_v   : regime-derived proxy HOLD 0.9 (Bear) | 0.5 (Sideways) | 0.2 (Bull)
                   NOT the raw decimal vol from HybridRegimeAgent.
         trust_scores: optional dict {"technical": float, "sentiment": float, "regime": float}
     """
@@ -170,7 +170,7 @@ class FusionAgent:
             keys = set(state_dict.keys())
 
             if "lstm_proj.weight" in keys:
-                # ── Kaggle architecture ───────────────────────────────────────
+                # -- Kaggle architecture ---------------------------------------
                 d_model = state_dict["lstm_proj.weight"].shape[0]
                 nhead   = hp.get("nhead",   8)
                 dropout = hp.get("dropout", 0.17)
@@ -182,7 +182,7 @@ class FusionAgent:
                       f"(d_model={d_model}, nhead={nhead})")
 
             elif "lstm_embed.weight" in keys:
-                # ── Local MultiHeadFusion architecture ────────────────────────
+                # -- Local MultiHeadFusion architecture ------------------------
                 d_model = state_dict["lstm_embed.weight"].shape[0]
                 nhead   = 4   # matches training script
                 self.model = MultiHeadFusion(
@@ -199,7 +199,7 @@ class FusionAgent:
 
             self.model.load_state_dict(state_dict)
             norm_note = "  (norm stats loaded)" if self._norm_stats else ""
-            print(f"✅ Fusion Agent {FUSION_AGENT_VERSION} loaded "
+            print(f"[OK] Fusion Agent {FUSION_AGENT_VERSION} loaded "
                   f"[{self._arch}] from {model_path}{norm_note}")
             if self._norm_stats:
                 print(f"   Norm stats: lstm μ={self._norm_stats.get('lstm_mean',0):.4f} "
@@ -210,11 +210,11 @@ class FusionAgent:
                       f"σ={self._norm_stats.get('vol_std',1):.4f}")
 
         except FileNotFoundError:
-            print("⚠️ No trained fusion model found. Using default KaggleFusion weights.")
+            print("[WARN] No trained fusion model found. Using default KaggleFusion weights.")
             self.model = KaggleFusion().to(self.device)
             self._arch = "KaggleFusion (default/untrained)"
         except Exception as e:
-            print(f"❌ Critical Error loading Fusion Agent: {e}")
+            print(f"[BAD] Critical Error loading Fusion Agent: {e}")
             raise
 
     def _normalize_input(self, val, key):
@@ -246,32 +246,61 @@ class FusionAgent:
                                sent_s: float,
                                vol_v: float) -> float:
         """
-        Directional heuristic confidence — replaces the flat 0.35 constant.
+        Directional heuristic confidence HOLD replaces the flat 0.35 constant.
 
+        FIX v2.2: Special handling for opposing LSTM/Sentiment signals (reversals).
+        
         Called when the neural network collapses (output < 0.35).
         Computes a meaningful confidence from the three input directions
         rather than returning an arbitrary constant that distorts decision
         boundaries and makes all collapsed cases indistinguishable.
 
+        CRITICAL FIX:
+        When LSTM is bearish but sentiment is clearly bullish (e.g., lstm=0.013, sent=+0.06),
+        this indicates a potential reversal. The original weighting (LSTM 0.55, Sent 0.30) 
+        could not override the bearish LSTM signal. 
+        
+        NEW LOGIC:
+        - If LSTM < 0.30 AND sent_s > 0.05: Use SENTIMENT-DOMINANT weighting (sent=0.65, lstm=0.20)
+        - Otherwise: Use original weighting (lstm=0.55, sent=0.30)
+        This allows positive sentiment to override weak LSTM signals in potential reversals.
+
         Signal composition (weights sum to 1.0):
-          LSTM  (0.55) — dominant: price trend is the primary evidence
-          Sent  (0.30) — secondary: news provides directional context
-          Vol   (0.15) — tertiary: regime proxy confirms macro context
+          STANDARD (LSTM trend is clear):
+            LSTM  (0.55) HOLD dominant: price trend is the primary evidence
+            Sent  (0.30) HOLD secondary: news provides directional context
+            Vol   (0.15) HOLD tertiary: regime proxy confirms macro context
+            
+          REVERSAL (bearish LSTM but bullish sentiment):
+            Sent  (0.65) HOLD elevated: contradictory positive sentiment suggests reversal
+            LSTM  (0.20) HOLD reduced: bearish LSTM may be lagging
+            Vol   (0.15) HOLD unchanged: regime context
 
         Mapping:
-          signal = -1.0 → all bearish  → heuristic ≈ 0.12 (strong SELL)
-          signal =  0.0 → all neutral  → heuristic = 0.40 (HOLD boundary)
-          signal = +1.0 → all bullish  → heuristic ≈ 0.75 (capped)
+          signal = -1.0 -> all bearish  -> heuristic ≈ 0.12 (strong SELL)
+          signal =  0.0 -> all neutral  -> heuristic = 0.40 (HOLD boundary)
+          signal = +1.0 -> all bullish  -> heuristic ≈ 0.75 (capped)
 
-        Range: [0.12, 0.75] — ensures decisions are still meaningful.
+        Range: [0.12, 0.75] HOLD ensures decisions are still meaningful.
         """
         # Convert all inputs to [-1, +1] directional scale
         lstm_dir = float(np.clip((lstm_p - 0.5) * 2, -1.0, 1.0))
         sent_dir = float(np.clip(sent_s / 0.75, -1.0, 1.0))
-        # vol_v=0.9(Bear)→-1, vol_v=0.5(Sideways)→0, vol_v=0.2(Bull)→+1
+        # vol_v=0.9(Bear)->-1, vol_v=0.5(Sideways)->0, vol_v=0.2(Bull)->+1
         vol_dir  = float(np.clip((0.55 - vol_v) / 0.35, -1.0, 1.0))
 
-        signal = 0.55 * lstm_dir + 0.30 * sent_dir + 0.15 * vol_dir
+        # CRITICAL FIX: Detect reversal signals (weak LSTM but strong positive sentiment)
+        is_reversal = (lstm_p < 0.30 and sent_s > 0.05)
+        
+        if is_reversal:
+            # Sentiment-dominant weighting: trust contradictory positive signal
+            # Weights: Sent=0.65, LSTM=0.20, Vol=0.15
+            signal = 0.20 * lstm_dir + 0.65 * sent_dir + 0.15 * vol_dir
+        else:
+            # Standard weighting: LSTM-dominant
+            # Weights: LSTM=0.55, Sent=0.30, Vol=0.15
+            signal = 0.55 * lstm_dir + 0.30 * sent_dir + 0.15 * vol_dir
+        
         return float(np.clip(0.40 + signal * 0.35, 0.12, 0.75))
 
     def predict(self, lstm_p: float, sent_s: float, vol_v: float,
@@ -291,7 +320,7 @@ class FusionAgent:
         Returns
         -------
         confidence : float ∈ [0.35, 1.0]  (floor at 0.35 from collapse guard)
-        focus_map  : dict — LSTM_Focus, Sentiment_Focus, Volatility_Focus
+        focus_map  : dict HOLD LSTM_Focus, Sentiment_Focus, Volatility_Focus
         """
         # Capture originals before trust_score scaling (used in heuristic fallback below)
         original_lstm = lstm_p
@@ -319,25 +348,25 @@ class FusionAgent:
 
         # Weight collapse guard:
         # The model can output near-zero when LSTM is very low (bearish signal).
-        # That is EXPECTED behaviour — a 0.001 confidence on a bearish LSTM IS correct.
+        # That is EXPECTED behaviour HOLD a 0.001 confidence on a bearish LSTM IS correct.
         # Only print a warning when the collapse is UNEXPECTED:
         #   unexpected = lstm_p ≥ 0.25 but model still collapses (suggests normalisation issue)
-        # Silently floor to 0.35 for expected cases (low-LSTM → bearish → SELL path).
+        # Silently floor to 0.35 for expected cases (low-LSTM -> bearish -> SELL path).
         if final_conf < 0.35:
-            # Collapse guard — model output is numerically near-zero.
+            # Collapse guard HOLD model output is numerically near-zero.
             # Replace with a directional heuristic computed from raw inputs.
             # This gives a meaningful confidence instead of an arbitrary constant:
-            #   flat 0.35 → every collapsed case produces identical decision boundary
-            #   heuristic → strong bearish inputs → 0.12, neutral → 0.40, etc.
+            #   flat 0.35 -> every collapsed case produces identical decision boundary
+            #   heuristic -> strong bearish inputs -> 0.12, neutral -> 0.40, etc.
             # Only log a warning for UNEXPECTED collapse (lstm_p ≥ 0.25 but still collapses),
             # which suggests a normalisation mismatch between training and inference.
-            # Expected collapse (lstm_p < 0.25 → bearish signal → low conf) is silent.
+            # Expected collapse (lstm_p < 0.25 -> bearish signal -> low conf) is silent.
             heuristic = self._heuristic_confidence(original_lstm, original_sent, original_vol)
             if original_lstm >= 0.25:
                 print(
                     f"      🔴 [Fusion] Unexpected collapse "
                     f"(model={final_conf:.4f}, lstm={original_lstm:.3f}) "
-                    f"→ heuristic={heuristic:.4f}"
+                    f"-> heuristic={heuristic:.4f}"
                 )
             final_conf = heuristic
 

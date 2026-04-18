@@ -1,5 +1,5 @@
 """
-PHASE 11: ADVERSARIAL ROBUSTNESS (v7 — Red Team)
+PHASE 11: ADVERSARIAL ROBUSTNESS (v7 HOLD Red Team)
 -------------------------------------------------
 Replaces the old AdversarialTester with v7 logic:
 
@@ -107,7 +107,7 @@ class AdversarialTester:
 
     New:
         tester.run_full_backtest(ticker, windows, raw_hist)
-        → returns dict with accuracy, bias rate, and lstm_weight
+        -> returns dict with accuracy, bias rate, and lstm_weight
     """
 
     def __init__(self, master_system,
@@ -121,7 +121,7 @@ class AdversarialTester:
         self._scaler = None
         self._load_lstm()
 
-    # ── Model loading ─────────────────────────────────────────────────────────
+    # -- Model loading ---------------------------------------------------------
     def _load_lstm(self):
         try:
             base       = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -134,10 +134,10 @@ class AdversarialTester:
             self.logger.warning(f"Could not load LSTM: {e}. "
                                 "predict_direct() will fall back to master_system.")
 
-    # ── Feature + prediction ──────────────────────────────────────────────────
+    # -- Feature + prediction --------------------------------------------------
     def _predict_direct(self, raw_df: pd.DataFrame) -> float:
         """
-        Runs raw OHLCV data through feature engineering → LSTM → float score.
+        Runs raw OHLCV data through feature engineering -> LSTM -> float score.
         Falls back to master_system.tech_agent if LSTM not loaded.
         """
         if self._model is not None and self._scaler is not None:
@@ -159,11 +159,11 @@ class AdversarialTester:
             return agent.predict_signal(raw_df)
         return agent.predict(raw_df)
 
-    # ── Crash injection ───────────────────────────────────────────────────────
+    # -- Crash injection -------------------------------------------------------
     def generate_flash_crash(self, hist_df: pd.DataFrame,
                              drop_pct: float = CRASH_MAGNITUDE) -> pd.DataFrame:
         """
-        Pure price-based crash injection — no synthetic indicator overrides.
+        Pure price-based crash injection HOLD no synthetic indicator overrides.
         The model must react to the price movement itself, not hand-crafted RSI=5.
         (Removes the old RSI=5 / MACD=-10 nuclear override.)
         """
@@ -177,7 +177,7 @@ class AdversarialTester:
         c.loc[idx, "Volume"] = c.loc[idx, "Volume"] * 5.0
         return c
 
-    # ── Signal helpers ────────────────────────────────────────────────────────
+    # -- Signal helpers --------------------------------------------------------
     @staticmethod
     def _signal(s: float) -> str:
         if s >= BUY_THRESHOLD:  return "BUY"
@@ -217,7 +217,7 @@ class AdversarialTester:
         """
         v7 definition: CONFIDENTLY WRONG.
         score far from neutral (>0.70 or <0.30) AND correct_loose is False.
-        FLAT windows (None) are skipped — can't be wrong on a FLAT move.
+        FLAT windows (None) are skipped HOLD can't be wrong on a FLAT move.
         """
         if correct_loose_val is None:
             return False
@@ -253,16 +253,16 @@ class AdversarialTester:
         return ts
 
     # =========================================================================
-    # PUBLIC API — replaces run_robustness_test()
+    # PUBLIC API HOLD replaces run_robustness_test()
     # =========================================================================
     def run_robustness_test(self, ticker: str):
         """
-        Single-ticker robustness test — same entry point as before.
+        Single-ticker robustness test HOLD same entry point as before.
         Now uses v7 feature engineering, clean crash injection,
         and v7 saturation detection. Prints a clear report card.
         """
         print("\n" + "!" * 60)
-        print(f"🧪 PHASE 11 v7: STRESS TEST — {ticker}")
+        print(f"🧪 PHASE 11 v7: STRESS TEST HOLD {ticker}")
         print("!" * 60)
 
         # Fetch data via master_system
@@ -270,9 +270,9 @@ class AdversarialTester:
         if raw_df is None:
             return
 
-        # ── Diagnostic (full history) ─────────────────────────────────────────
-        print("\n🔍 DIAGNOSTIC (most recent 100-bar window)")
-        print("─" * 50)
+        # -- Diagnostic (full history) -----------------------------------------
+        print("\n[CHECK] DIAGNOSTIC (most recent 100-bar window)")
+        print("-" * 50)
         try:
             normal_score  = self._predict_direct(raw_df)
             crashed_score = self._predict_direct(
@@ -281,44 +281,44 @@ class AdversarialTester:
             sig           = self._signal(normal_score)
             sat           = self._diag_saturated(normal_score, delta)
 
-            react = ("✅ REACTED"
+            react = ("[OK] REACTED"
                      if abs(delta) > CRASH_DELTA_THRESHOLD
-                     else "⚠️  NO REACTION")
+                     else "[WARN]  NO REACTION")
             dirn  = ("↑ MORE BULLISH (oversold-bounce)"
                      if delta < 0 else "↓ more bearish")
-            b_flag = "⚠️  SATURATION BIAS" if sat else "✅ not saturated"
+            b_flag = "[WARN]  SATURATION BIAS" if sat else "[OK] not saturated"
 
-            print(f"   Normal    : {normal_score:.6f}  → {sig}")
-            print(f"   Crashed   : {crashed_score:.6f}  → "
+            print(f"   Normal    : {normal_score:.6f}  -> {sig}")
+            print(f"   Crashed   : {crashed_score:.6f}  -> "
                   f"{self._signal(crashed_score)}")
             print(f"   Delta     : {delta:+.6f}  {react}  {dirn}")
             print(f"   Saturation: {b_flag}")
             if sat:
-                print(f"   ⚠️  Score {normal_score:.3f} is far from 0.5 AND "
+                print(f"   [WARN]  Score {normal_score:.3f} is far from 0.5 AND "
                       f"delta {abs(delta):.4f} < {DIAG_SATURATION_DELTA}.")
                 print(f"      Reduce LSTM weight for {ticker} in aggregator.")
         except Exception as e:
-            print(f"   ❌ Diagnostic failed: {e}")
+            print(f"   [BAD] Diagnostic failed: {e}")
             return
 
-        # ── Report card ───────────────────────────────────────────────────────
+        # -- Report card -------------------------------------------------------
         print("\n" + "=" * 50)
         print("🛡️  ROBUSTNESS REPORT CARD")
         print("=" * 50)
 
         score_drop = normal_score - crashed_score
         if self._crash_detected(normal_score, crashed_score):
-            print(f"✅ PASS: Model reacted to the crash.")
+            print(f"[OK] PASS: Model reacted to the crash.")
             dirn_str = ("↑ bullish (mean-reversion)"
                         if score_drop < 0 else "↓ bearish (danger detection)")
             print(f"   Score change: {score_drop:+.4f}  {dirn_str}")
         else:
-            print(f"❌ FAIL: Model ignored the crash.")
+            print(f"[BAD] FAIL: Model ignored the crash.")
             print(f"   Score change: {score_drop:+.4f} (below threshold "
                   f"{CRASH_DELTA_THRESHOLD})")
 
         if sat:
-            print(f"\n⚠️  SATURATION WARNING: Model is pinned at {normal_score:.3f}.")
+            print(f"\n[WARN]  SATURATION WARNING: Model is pinned at {normal_score:.3f}.")
             print(f"   Even a -{CRASH_MAGNITUDE*100:.0f}% crash moved it by "
                   f"only {abs(delta):.4f}. LSTM weight should be 0.0 for {ticker}.")
 
@@ -340,9 +340,9 @@ class AdversarialTester:
               strict_acc, loose_acc, robustness_rate, bias_rate,
               score_std, lstm_weight, results (list of per-window dicts)
         """
-        print(f"\n{'─'*60}")
+        print(f"\n{'-'*60}")
         print(f"📈 FULL BACKTEST: {ticker}  ({len(windows)} windows)")
-        print(f"{'─'*60}")
+        print(f"{'-'*60}")
 
         results = []
 
@@ -352,25 +352,25 @@ class AdversarialTester:
             results.append(r)
 
             if r["error"]:
-                print(f"   ⚠️  {label}: {str(r['error']).split(chr(10))[0]}")
+                print(f"   [WARN]  {label}: {str(r['error']).split(chr(10))[0]}")
                 continue
 
             dir_icon = {"UP": "📈", "DOWN": "📉", "FLAT": "➡️"}.get(
                 r["actual_dir"], "?")
-            s_ok = ("✅" if r["correct_strict"]
-                    else ("➡️ FLAT" if r["actual_dir"] == "FLAT" else "❌"))
-            l_ok = ("✅" if r["correct_loose"]
-                    else ("⬜ SKIP" if r["correct_loose"] is None else "❌"))
-            bias = "⚠️  BIAS" if r["bias_detected"] else "—"
+            s_ok = ("[OK]" if r["correct_strict"]
+                    else ("➡️ FLAT" if r["actual_dir"] == "FLAT" else "[BAD]"))
+            l_ok = ("[OK]" if r["correct_loose"]
+                    else ("⬜ SKIP" if r["correct_loose"] is None else "[BAD]"))
+            bias = "[WARN]  BIAS" if r["bias_detected"] else "HOLD"
 
-            print(f"\n   🔬 {label}  [{start} → {end}]")
-            print(f"      Score  : {r['normal_score']:.4f}  → "
+            print(f"\n   🔬 {label}  [{start} -> {end}]")
+            print(f"      Score  : {r['normal_score']:.4f}  -> "
                   f"{r['normal_signal']}")
             print(f"      Actual : {r['actual_return']:+.2%} "
                   f"{dir_icon} {r['actual_dir']}")
             print(f"      Strict:{s_ok}  Loose:{l_ok}  Bias:{bias}")
 
-        # ── Aggregate stats ───────────────────────────────────────────────────
+        # -- Aggregate stats ---------------------------------------------------
         valid   = [r for r in results
                    if not r.get("error") and r.get("actual_dir")]
         dir_r   = [r for r in valid if r["normal_signal"] != "HOLD"]
@@ -389,16 +389,16 @@ class AdversarialTester:
 
         weight  = self._recommend_weight(l_acc, b_rate, std, len(l_act))
 
-        print(f"\n{'─'*60}")
+        print(f"\n{'-'*60}")
         print(f"   Strict Acc   : {s_acc:.1f}%  ({len(s_cor)}/{len(dir_r)})")
         print(f"   Loose Acc    : {l_acc:.1f}%  ({len(l_cor)}/{len(l_act)})")
         print(f"   Robustness   : {rob:.1f}%  ({len(robust)}/{len(valid)})")
         print(f"   Bias Rate    : {b_rate*100:.1f}%  ({len(biased)}/{len(valid)})")
         print(f"   Score Std    : {std:.3f}"
-              f"{'  ⚠️  HIGH' if std > SCORE_STD_HIGH_THRESHOLD else ''}")
+              f"{'  [WARN]  HIGH' if std > SCORE_STD_HIGH_THRESHOLD else ''}")
         bar = "█" * int(weight * 10) + "░" * (10 - int(weight * 10))
         print(f"   LSTM Weight  : {bar}  {weight:.1f}")
-        print(f"{'─'*60}\n")
+        print(f"{'-'*60}\n")
 
         return dict(
             ticker=ticker,
@@ -422,14 +422,14 @@ class AdversarialTester:
             elif hasattr(self.system, "fetch_market_data"):
                 _, df = self.system.fetch_market_data(ticker)
             else:
-                print("❌ master_system has no known fetch method.")
+                print("[BAD] master_system has no known fetch method.")
                 return None
             if df is None or df.empty:
-                print(f"❌ No data returned for {ticker}.")
+                print(f"[BAD] No data returned for {ticker}.")
                 return None
             return df
         except Exception as e:
-            print(f"❌ Data fetch failed: {e}")
+            print(f"[BAD] Data fetch failed: {e}")
             return None
 
     def _run_window(self, ticker, start, end, label,

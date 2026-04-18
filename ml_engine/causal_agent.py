@@ -1,15 +1,15 @@
 """
-PHASE 25: CAUSAL DISCOVERY AGENT — Judea Pearl's Do-Calculus
+PHASE 25: CAUSAL DISCOVERY AGENT HOLD Judea Pearl's Do-Calculus
 =============================================================
 Research Idea 2 for FinFolio-X.
 
 CHANGELOG:
-  v2.0 — FIX-6: GDI Boardroom Tension wired into causal modifier.
-  v2.1 — FIX-7: Macro ETF early-exit uses own 5d momentum instead of
+  v2.0 HOLD FIX-6: GDI Boardroom Tension wired into causal modifier.
+  v2.1 HOLD FIX-7: Macro ETF early-exit uses own 5d momentum instead of
          always returning NEUTRAL.
-  v2.2 — FIX-8: MACRO_MOMENTUM_THRESHOLD raised 0.005 → 0.020 (2%).
+  v2.2 HOLD FIX-8: MACRO_MOMENTUM_THRESHOLD raised 0.005 -> 0.020 (2%).
          With 0.5% threshold, SPY (+0.58%) and QQQ (+1.11%) pre-test
-         momentum triggered UP signals that were wrong — their test-week
+         momentum triggered UP signals that were wrong HOLD their test-week
          returns were -1.17% and -0.30%, both within the ±2% NEUTRAL band.
          A 2% threshold keeps USO/UNG (large momentum) as directional while
          pushing small-momentum ETFs back to NEUTRAL where they belong.
@@ -28,7 +28,7 @@ try:
     CAUSALLEARN_AVAILABLE = True
 except ImportError:
     CAUSALLEARN_AVAILABLE = False
-    logger.warning("causal-learn not installed — CausalAgent in FALLBACK mode.")
+    logger.warning("causal-learn not installed HOLD CausalAgent in FALLBACK mode.")
 
 try:
     import dowhy
@@ -36,7 +36,7 @@ try:
     DOWHY_AVAILABLE = True
 except ImportError:
     DOWHY_AVAILABLE = False
-    logger.warning("dowhy not installed — CausalAgent in FALLBACK mode.")
+    logger.warning("dowhy not installed HOLD CausalAgent in FALLBACK mode.")
 
 try:
     import networkx as nx
@@ -66,7 +66,7 @@ GDI_PENALTY_RATE   = 0.50
 GDI_PENALTY_MAX    = 0.12
 GDI_MODIFIER_FLOOR = 0.75
 
-# FIX-8: raised from 0.005 → 0.020.
+# FIX-8: raised from 0.005 -> 0.020.
 # Rationale: small pre-test ETF momentum (SPY +0.58%, QQQ +1.11%) does NOT
 # reliably predict the following week's direction.  Only large momentum
 # signals (USO +7.78%, UNG +2.21%) have enough persistence to trade on.
@@ -77,7 +77,7 @@ MACRO_MOMENTUM_THRESHOLD = 0.020
 
 class CausalAgent:
     """
-    The Causal Discovery Agent — Phase 25 v2.2.
+    The Causal Discovery Agent HOLD Phase 25 v2.2.
 
     Key Outputs:
       causal_score         float 0–1
@@ -106,12 +106,12 @@ class CausalAgent:
         self.min_causal_effect_threshold = min_causal_effect_threshold
 
         self._ready = CAUSALLEARN_AVAILABLE and DOWHY_AVAILABLE and NETWORKX_AVAILABLE
-        status = "✅" if self._ready else "⚠️  (causal-learn / dowhy missing — fallback mode)"
+        status = "[OK]" if self._ready else "[WARN]  (causal-learn / dowhy missing HOLD fallback mode)"
         print(f"   [+] Phase 25 v2.2: Causal Discovery Agent (Do-Calculus) Initialized. {status}")
 
-    # ──────────────────────────────────────────────────────────────────────
-    # STATIC UTILITY — GDI penalty
-    # ──────────────────────────────────────────────────────────────────────
+    # ----------------------------------------------------------------------
+    # STATIC UTILITY HOLD GDI penalty
+    # ----------------------------------------------------------------------
 
     @staticmethod
     def apply_gdi_penalty(causal_modifier: float, gdi: float) -> tuple:
@@ -119,9 +119,9 @@ class CausalAgent:
         adjusted    = max(float(causal_modifier) - gdi_penalty, GDI_MODIFIER_FLOOR)
         return round(adjusted, 4), round(gdi_penalty, 4)
 
-    # ──────────────────────────────────────────────────────────────────────
+    # ----------------------------------------------------------------------
     # PUBLIC API
-    # ──────────────────────────────────────────────────────────────────────
+    # ----------------------------------------------------------------------
 
     def analyze(
         self,
@@ -202,9 +202,9 @@ class CausalAgent:
             logger.error(f"CausalAgent.analyze failed: {exc}", exc_info=True)
             return self._fallback_result(ticker, f"error:{exc}")
 
-    # ──────────────────────────────────────────────────────────────────────
-    # MACRO ETF RESULT — own-momentum directional signal  (v2.1 + FIX-8)
-    # ──────────────────────────────────────────────────────────────────────
+    # ----------------------------------------------------------------------
+    # MACRO ETF RESULT HOLD own-momentum directional signal  (v2.1 + FIX-8)
+    # ----------------------------------------------------------------------
 
     def _macro_etf_result(
         self,
@@ -215,7 +215,7 @@ class CausalAgent:
     ) -> dict:
         """
         FIX-7 + FIX-8: Use ticker's own N-day momentum.
-        MACRO_MOMENTUM_THRESHOLD is now 2% — only strong momentum
+        MACRO_MOMENTUM_THRESHOLD is now 2% HOLD only strong momentum
         (e.g. USO +7.78%, UNG +2.21%) triggers a directional signal.
         Weak momentum (SPY +0.58%, QQQ +1.11%) stays NEUTRAL.
         """
@@ -242,7 +242,7 @@ class CausalAgent:
 
         print(
             f"      ℹ️ {ticker} own {lookback_days}d return: "
-            f"{momentum_net:+.2%} → {momentum_signal}"
+            f"{momentum_net:+.2%} -> {momentum_signal}"
         )
 
         return {
@@ -263,9 +263,9 @@ class CausalAgent:
             "status":                   "macro_etf",
         }
 
-    # ──────────────────────────────────────────────────────────────────────
-    # STEP 1 — BUILD RETURNS MATRIX
-    # ──────────────────────────────────────────────────────────────────────
+    # ----------------------------------------------------------------------
+    # STEP 1 HOLD BUILD RETURNS MATRIX
+    # ----------------------------------------------------------------------
 
     def _build_returns_matrix(
         self,
@@ -310,9 +310,9 @@ class CausalAgent:
             "TARGET": target_ret,
         }
 
-    # ──────────────────────────────────────────────────────────────────────
-    # STEP 2 — PC ALGORITHM
-    # ──────────────────────────────────────────────────────────────────────
+    # ----------------------------------------------------------------------
+    # STEP 2 HOLD PC ALGORITHM
+    # ----------------------------------------------------------------------
 
     def _discover_dag(self, returns_df: pd.DataFrame):
         try:
@@ -332,9 +332,9 @@ class CausalAgent:
             logger.warning(f"PC algorithm failed: {exc}")
             return None, None
 
-    # ──────────────────────────────────────────────────────────────────────
-    # STEP 3 — NETWORKX DiGraph
-    # ──────────────────────────────────────────────────────────────────────
+    # ----------------------------------------------------------------------
+    # STEP 3 HOLD NETWORKX DiGraph
+    # ----------------------------------------------------------------------
 
     def _dag_to_networkx(self, dag, col_names: list) -> "nx.DiGraph":
         G = nx.DiGraph()
@@ -386,9 +386,9 @@ class CausalAgent:
                 break
         return G
 
-    # ──────────────────────────────────────────────────────────────────────
-    # STEP 4 — PARENTS + CONFOUNDERS
-    # ──────────────────────────────────────────────────────────────────────
+    # ----------------------------------------------------------------------
+    # STEP 4 HOLD PARENTS + CONFOUNDERS
+    # ----------------------------------------------------------------------
 
     def _get_causal_parents(self, G: "nx.DiGraph", target: str) -> list:
         if target not in G.nodes:
@@ -411,9 +411,9 @@ class CausalAgent:
             and abs(returns_df[var].corr(target_series)) > 0.15
         ]
 
-    # ──────────────────────────────────────────────────────────────────────
-    # STEP 5 — DO-CALCULUS
-    # ──────────────────────────────────────────────────────────────────────
+    # ----------------------------------------------------------------------
+    # STEP 5 HOLD DO-CALCULUS
+    # ----------------------------------------------------------------------
 
     def _estimate_causal_effects(
         self,
@@ -497,9 +497,9 @@ class CausalAgent:
         except Exception:
             return float(returns_df[treatment].corr(returns_df[outcome]))
 
-    # ──────────────────────────────────────────────────────────────────────
-    # STEP 6 — COUNTERFACTUAL
-    # ──────────────────────────────────────────────────────────────────────
+    # ----------------------------------------------------------------------
+    # STEP 6 HOLD COUNTERFACTUAL
+    # ----------------------------------------------------------------------
 
     def _counterfactual(
         self,
@@ -532,9 +532,9 @@ class CausalAgent:
         )
         return float(cf_delta), narrative
 
-    # ──────────────────────────────────────────────────────────────────────
-    # STEP 7 — CORRELATION vs CAUSAL TABLE
-    # ──────────────────────────────────────────────────────────────────────
+    # ----------------------------------------------------------------------
+    # STEP 7 HOLD CORRELATION vs CAUSAL TABLE
+    # ----------------------------------------------------------------------
 
     def _correlation_vs_causal_table(
         self,
@@ -562,9 +562,9 @@ class CausalAgent:
             })
         return sorted(table, key=lambda x: abs(x["correlation"]), reverse=True)
 
-    # ──────────────────────────────────────────────────────────────────────
+    # ----------------------------------------------------------------------
     # SCORING + MODIFIER
-    # ──────────────────────────────────────────────────────────────────────
+    # ----------------------------------------------------------------------
 
     def _compute_causal_score(
         self,
@@ -603,15 +603,15 @@ class CausalAgent:
 
         if gdi_penalty > 0.0:
             print(
-                f"      [Causal] GDI Tension penalty: {gdi:.3f} → "
+                f"      [Causal] GDI Tension penalty: {gdi:.3f} -> "
                 f"−{gdi_penalty:.3f} on causal_modifier "
-                f"({base - confounder_penalty:.3f} → {final_modifier:.3f})"
+                f"({base - confounder_penalty:.3f} -> {final_modifier:.3f})"
             )
         return final_modifier, round(gdi_penalty, 4)
 
-    # ──────────────────────────────────────────────────────────────────────
+    # ----------------------------------------------------------------------
     # SERIALISATION
-    # ──────────────────────────────────────────────────────────────────────
+    # ----------------------------------------------------------------------
 
     def _serialise_dag_edges(
         self,
@@ -633,9 +633,9 @@ class CausalAgent:
             })
         return edges
 
-    # ──────────────────────────────────────────────────────────────────────
+    # ----------------------------------------------------------------------
     # FALLBACK
-    # ──────────────────────────────────────────────────────────────────────
+    # ----------------------------------------------------------------------
 
     def _fallback_result(self, ticker: str, reason: str = "") -> dict:
         return {
@@ -679,9 +679,9 @@ class CausalAgent:
             "status":         f"fallback:{reason}" if reason else "fallback",
         }
 
-    # ──────────────────────────────────────────────────────────────────────
+    # ----------------------------------------------------------------------
     # CONSOLE REPORT
-    # ──────────────────────────────────────────────────────────────────────
+    # ----------------------------------------------------------------------
 
     @staticmethod
     def _print_report(result):
@@ -690,11 +690,11 @@ class CausalAgent:
         gdi_pen = result.get("gdi_penalty_applied", 0.0)
         bar     = "█" * int(score * 28) + "░" * (28 - int(score * 28))
 
-        print("\n   ╔══════════════════════════════════════════════════════╗")
-        print(f"   ║   PHASE 25 v2.2 — CAUSAL DISCOVERY ({ticker:<6s})        ║")
-        print("   ╠══════════════════════════════════════════════════════╣")
+        print("\n   ╔======================================================╗")
+        print(f"   ║   PHASE 25 v2.2 HOLD CAUSAL DISCOVERY ({ticker:<6s})        ║")
+        print("   ╠======================================================╣")
         for driver in result["true_causal_drivers"][:3]:
-            sig = "✓" if driver["significant"] else "~"
+            sig = "+" if driver["significant"] else "~"
             print(
                 f"   ║  {sig} P(Y|do({driver['variable']:<3s})) = "
                 f"{driver['causal_effect']:+.4f}  "
@@ -705,10 +705,10 @@ class CausalAgent:
                 f"   ║  Confounders removed: "
                 f"{', '.join(result['confounders_removed']):<28s}  ║"
             )
-        print("   ╠══════════════════════════════════════════════════════╣")
+        print("   ╠======================================================╣")
         print(f"   ║  Causal Score   : {score:.4f}  [{bar}]  ║")
-        print(f"   ║  Causal Modifier: {result['causal_modifier']:.4f}×                              ║")
+        print(f"   ║  Causal Modifier: {result['causal_modifier']:.4f}x                              ║")
         if gdi_pen > 0.0:
             print(f"   ║  GDI Penalty    : −{gdi_pen:.4f} (boardroom tension applied)    ║")
         print(f"   ║  Counterfact. Δ : {result['counterfactual_delta']:+.5f}                           ║")
-        print("   ╚══════════════════════════════════════════════════════╝")
+        print("   ╚======================================================╝")

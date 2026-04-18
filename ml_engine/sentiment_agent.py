@@ -1,27 +1,27 @@
 """
-ml_engine/sentiment_agent.py  —  FinBERT Sentiment Agent (v2.3 — Smart Future Weighting)
+ml_engine/sentiment_agent.py  HOLD  FinBERT Sentiment Agent (v2.3 HOLD Smart Future Weighting)
 ===========================================================================================
 WHAT'S NEW IN v2.3:
-  FIX-1: Formal evaluation metrics — evaluate() method added.
+  FIX-1: Formal evaluation metrics HOLD evaluate() method added.
           Reports accuracy, precision per class, Sharpe proxy (mean/std of
           5d returns when bullish), and mean return per predicted label.
           Addresses reviewer concern: "no accuracy / precision / Sharpe metric".
 
   FIX-2: LLM optional-layer documentation.
           _init_llm() now documents exactly what happens when LLM is absent:
-          dynamic_w = 0.0 → final = 1.0 × present_finbert_score (v2.1 identical).
+          dynamic_w = 0.0 -> final = 1.0 x present_finbert_score (v2.1 identical).
           Reviewer safe: "LLM is optional enhancement, not a hard dependency".
 
   FIX-3: Magic constants justified with empirical + literature basis.
-          BASE_FUTURE_WEIGHT = 0.25 — derived from Tetlock (2007) + sensitivity
+          BASE_FUTURE_WEIGHT = 0.25 HOLD derived from Tetlock (2007) + sensitivity
           analysis on 2022-2024 backtest (values 0.15–0.30 tested).
-          MAX_FUTURE_WEIGHT  = 0.40 — confirmed as natural max from proximity
-          scale × type scale; prevents future speculation dominating.
+          MAX_FUTURE_WEIGHT  = 0.40 HOLD confirmed as natural max from proximity
+          scale x type scale; prevents future speculation dominating.
 
   FIX-4: (v2.2) Dynamic blend weight based on proximity + event type.
   FIX-5: (v2.2) Event conflict detection with adaptive weight reduction.
 
-ALL v2.1 BUGS FIXED — preserved exactly:
+ALL v2.1 BUGS FIXED HOLD preserved exactly:
   BUG-1: Per-source baseline subtraction.
   BUG-2: Graduated confidence multiplier.
   BUG-3: All-negative macro-cycle detector.
@@ -92,12 +92,12 @@ PROXIMITY_SCALE = [
 ]
 
 # ==============================================================================
-# FIX-3: WEIGHT CONSTANTS — JUSTIFICATION FOR PAPER REVIEWERS
+# FIX-3: WEIGHT CONSTANTS HOLD JUSTIFICATION FOR PAPER REVIEWERS
 # ==============================================================================
 # BASE_FUTURE_WEIGHT = 0.25
 #   Rationale: Empirically tuned so that a single imminent earnings event
-#   contributes at most 35% of the final score (BASE × max_proximity × max_type
-#   = 0.25 × 1.60 × 1.00 = 0.40, then capped at MAX_FUTURE_WEIGHT=0.35).
+#   contributes at most 35% of the final score (BASE x max_proximity x max_type
+#   = 0.25 x 1.60 x 1.00 = 0.40, then capped at MAX_FUTURE_WEIGHT=0.35).
 #   Literature basis: Tetlock (2007) shows news sentiment predicts ~10–15% of
 #   next-day variance; a 25% base weight is intentionally conservative.
 #   Sensitivity: values in [0.15, 0.30] were tested; 0.25 gave best Sharpe
@@ -106,9 +106,9 @@ BASE_FUTURE_WEIGHT = 0.25
 
 # MIN_FUTURE_WEIGHT = 0.10
 #   Rationale: When future events ARE present, a weight below 10% means they
-#   contribute less than 1/10th of the final score — rendering them effectively
+#   contribute less than 1/10th of the final score HOLD rendering them effectively
 #   silent even when a strong signal exists (e.g. AAPL earnings in 5 days with
-#   LLM score +0.32 at 6.6% weight → only +0.021 added, staying "neutral").
+#   LLM score +0.32 at 6.6% weight -> only +0.021 added, staying "neutral").
 #   Floor of 0.10 ensures any validated future event has a meaningful voice.
 #   Applied only when future_events list is non-empty.
 MIN_FUTURE_WEIGHT = 0.10
@@ -145,21 +145,21 @@ class SentimentAgent:
         self._init_llm()
 
         status = "ON (v2.3 dynamic weighting)" if self._llm else "OFF (no API key)"
-        print(f"✅ Sentiment Agent Ready on {self.device} | LLM future scorer: {status}")
+        print(f"[OK] Sentiment Agent Ready on {self.device} | LLM future scorer: {status}")
 
-    # ── LLM init ──────────────────────────────────────────────────────────────
+    # -- LLM init --------------------------------------------------------------
 
     def _init_llm(self):
         """
         Initialise the Groq LLM for future event scoring.
 
-        DESIGN DECISION (for paper reviewers — Issue 2):
+        DESIGN DECISION (for paper reviewers HOLD Issue 2):
         The LLM is an OPTIONAL enhancement layer, not a hard dependency.
         The system is fully functional without it:
 
-          LLM available  → future_score from LLM, dynamic weight applied
-          LLM unavailable → future_score = 0.0, dynamic_w = 0.0
-                           → final = 1.0 × present_finbert_score (identical to v2.1)
+          LLM available  -> future_score from LLM, dynamic weight applied
+          LLM unavailable -> future_score = 0.0, dynamic_w = 0.0
+                           -> final = 1.0 x present_finbert_score (identical to v2.1)
 
         This design choice ensures:
           1. Reproducibility: all FinBERT results are deterministic regardless
@@ -182,11 +182,11 @@ class SentimentAgent:
                 temperature=0.1,
             )
         except Exception as e:
-            print(f"   ⚠️ [SentimentAgent] LLM init failed: {e}. "
-                  "Future scoring disabled — system fully functional without LLM.")
+            print(f"   [WARN] [SentimentAgent] LLM init failed: {e}. "
+                  "Future scoring disabled HOLD system fully functional without LLM.")
             self._llm = None
 
-    # ── FinBERT core (v2.1 unchanged) ─────────────────────────────────────────
+    # -- FinBERT core (v2.1 unchanged) -----------------------------------------
 
     def get_sentiment(self, text: str):
         inputs = self.tokenizer(
@@ -232,7 +232,7 @@ class SentimentAgent:
         mean_neg = abs(np.mean(corrected))
         if mean_neg > 0.05:
             offset = min(mean_neg * 0.50, 0.15)
-            print(f"   ⚠️  [FinBERT] ALL-NEGATIVE DETECTED (mean={-mean_neg:.3f}). "
+            print(f"   [WARN]  [FinBERT] ALL-NEGATIVE DETECTED (mean={-mean_neg:.3f}). "
                   f"Applying +{offset:.3f} macro-cycle correction.")
             return offset
         return 0.0
@@ -257,12 +257,12 @@ class SentimentAgent:
         elif score < -0.07: return "bearish"
         else:               return "neutral"
 
-    # ── FIX-1: Dynamic blend weight ───────────────────────────────────────────
+    # -- FIX-1: Dynamic blend weight -------------------------------------------
 
     def _compute_dynamic_weight(self, future_events: list,
                                 conflict_penalty: float) -> float:
         """
-        weight = BASE × max(proximity × type_importance across events) × conflict_penalty
+        weight = BASE x max(proximity x type_importance across events) x conflict_penalty
         Capped at MAX_FUTURE_WEIGHT.
         """
         if not future_events:
@@ -290,11 +290,11 @@ class SentimentAgent:
         dynamic_w = BASE_FUTURE_WEIGHT * max_product * conflict_penalty
         # Apply floor: when future events exist, always give them at least MIN_FUTURE_WEIGHT.
         # This prevents strong LLM signals (e.g. +0.32 earnings) from being diluted to
-        # ~0.03 contribution by a distant event date — which would leave them effectively silent.
+        # ~0.03 contribution by a distant event date HOLD which would leave them effectively silent.
         dynamic_w = max(dynamic_w, MIN_FUTURE_WEIGHT)
         return round(min(dynamic_w, MAX_FUTURE_WEIGHT), 4)
 
-    # ── FIX-5: Conflict detection ─────────────────────────────────────────────
+    # -- FIX-5: Conflict detection ---------------------------------------------
 
     def _detect_event_conflicts(self, event_scores: list) -> tuple:
         """
@@ -313,19 +313,19 @@ class SentimentAgent:
             pos_types = ", ".join(set(t for _, t, _ in positives))
             neg_types = ", ".join(set(t for _, t, _ in negatives))
             desc = (f"STRONG CONFLICT (std={std:.3f}): bullish [{pos_types}] vs "
-                    f"bearish [{neg_types}] — 50% future weight reduction.")
+                    f"bearish [{neg_types}] HOLD 50% future weight reduction.")
             return 0.50, "high", desc
 
         if std >= CONFLICT_THRESHOLD_MODERATE and positives and negatives:
             pos_types = ", ".join(set(t for _, t, _ in positives))
             neg_types = ", ".join(set(t for _, t, _ in negatives))
             desc = (f"MODERATE CONFLICT (std={std:.3f}): [{pos_types}] positive vs "
-                    f"[{neg_types}] negative — 25% future weight reduction.")
+                    f"[{neg_types}] negative HOLD 25% future weight reduction.")
             return 0.75, "moderate", desc
 
         return 1.0, "none", ""
 
-    # ── LLM future scorer ─────────────────────────────────────────────────────
+    # -- LLM future scorer -----------------------------------------------------
 
     def _score_future_events_with_llm(self, ticker: str,
                                        future_events: list) -> tuple:
@@ -336,7 +336,7 @@ class SentimentAgent:
         if not self._llm or not future_events:
             return 0.0, "neutral", [], {}
 
-        # Sort by importance × urgency for the prompt
+        # Sort by importance x urgency for the prompt
         sorted_evs = sorted(
             future_events,
             key=lambda e: (
@@ -419,7 +419,7 @@ class SentimentAgent:
             # Log
             print(f"\n   🔮 [LLM Future Scorer v2.3] {ticker}")
             print(f"   {'#':>3}  {'Type':<22} {'Score':>7}  {'Imp':>5}  {'Conf':<8} Reason")
-            print("   " + "─" * 72)
+            print("   " + "-" * 72)
             for ev_r in result.get("events", [])[:6]:
                 n    = ev_r.get("event_num", "?")
                 et   = ev_r.get("event_type", "?")[:20]
@@ -431,22 +431,22 @@ class SentimentAgent:
                 print(f"   {icon}{n:>2}  {et:<22} {sc:+6.3f}  {imp:.2f}  {conf:<8} {rsn}")
 
             if result.get("conflict_detected"):
-                print(f"\n   ⚠️  [LLM Conflict] {result.get('conflict_summary','')[:80]}")
+                print(f"\n   [WARN]  [LLM Conflict] {result.get('conflict_summary','')[:80]}")
 
             print(f"\n   🎯 Dominant event: {result.get('dominant_event','?')}")
-            print(f"   🔮 LLM overall: {overall:+.4f} → {label.upper()}")
+            print(f"   🔮 LLM overall: {overall:+.4f} -> {label.upper()}")
             if result.get("key_risk"):
-                print(f"   ⚠️  Risk: {result['key_risk'][:80]}")
+                print(f"   [WARN]  Risk: {result['key_risk'][:80]}")
             if result.get("key_opportunity"):
-                print(f"   ✅ Opportunity: {result['key_opportunity'][:80]}")
+                print(f"   [OK] Opportunity: {result['key_opportunity'][:80]}")
 
             return overall, label, event_scores, result
 
         except Exception as e:
-            print(f"   ⚠️  [LLM Future Scorer] Failed: {e}. Defaulting to neutral.")
+            print(f"   [WARN]  [LLM Future Scorer] Failed: {e}. Defaulting to neutral.")
             return 0.0, "neutral", [], {}
 
-    # ── FIX-1: FORMAL EVALUATION METRICS ─────────────────────────────────────
+    # -- FIX-1: FORMAL EVALUATION METRICS -------------------------------------
 
     def evaluate(self, ground_truth: list) -> dict:
         """
@@ -474,7 +474,7 @@ class SentimentAgent:
           precision_bear   : precision for bearish predictions
           sharpe_proxy     : mean(forward_return when bullish) /
                              std(forward_return when bullish)
-                             — measures quality of long entries
+                             HOLD measures quality of long entries
           mean_return_bull : avg 5d return when model predicted bullish
           mean_return_bear : avg 5d return when model predicted bearish
           mean_return_neutral: avg 5d return when model predicted neutral
@@ -508,7 +508,7 @@ class SentimentAgent:
             try:
                 pred_label, pred_score = self.analyze_with_mcp(ticker)
             except Exception as e:
-                print(f"   ⚠️ Skipping {ticker}: {e}")
+                print(f"   [WARN] Skipping {ticker}: {e}")
                 continue
 
             predictions.append(pred_label)
@@ -563,15 +563,15 @@ class SentimentAgent:
         print(f"\n   📐 EVALUATION RESULTS")
         print(f"      Samples              : {n}")
         print(f"      Directional accuracy : {accuracy:.1%}")
-        print(f"      Precision — Bullish  : {metrics['precision_bull']}")
-        print(f"      Precision — Bearish  : {metrics['precision_bear']}")
+        print(f"      Precision HOLD Bullish  : {metrics['precision_bull']}")
+        print(f"      Precision HOLD Bearish  : {metrics['precision_bear']}")
         print(f"      Sharpe proxy (Bull)  : {metrics['sharpe_proxy']}")
         print(f"      Mean 5d return Bull  : {metrics['mean_return_bull']}")
         print(f"      Mean 5d return Bear  : {metrics['mean_return_bear']}")
 
         return metrics
 
-    # ── MAIN PIPELINE ─────────────────────────────────────────────────────────
+    # -- MAIN PIPELINE ---------------------------------------------------------
 
     def analyze_with_mcp(self, ticker: str):
         """
@@ -584,12 +584,12 @@ class SentimentAgent:
         present_items = [i for i in mcp_payload if not i.get("future_event")]
         future_items  = [i for i in mcp_payload if i.get("future_event")]
 
-        # ── FinBERT present ───────────────────────────────────────────────────
+        # -- FinBERT present ---------------------------------------------------
         weighted_raw        = []
         weighted_corrected  = []
         total_weight        = 0.0
 
-        print(f"\n🔍 [FinBERT] Processing {len(present_items)} present signals for {ticker}...")
+        print(f"\n[CHECK] [FinBERT] Processing {len(present_items)} present signals for {ticker}...")
         print(f"   {'Source':<18} {'T':<3} {'Raw':>7} {'Base':>8} {'Corr':>8} {'Conf':>6} {'Wt':>6}")
         print("   " + "-" * 64)
 
@@ -618,7 +618,7 @@ class SentimentAgent:
             topic_tag = f" [{topic}]" if topic else ""
             print(f"   {source:<18} T{tier_num:<2} {raw:+6.3f}  {baseline:+7.3f}  "
                   f"{corrected:+7.3f}  {conf:5.2f}  {eff_w:5.2f}{topic_tag}")
-            print(f"      '{text[:65]}...' → {label.upper()}")
+            print(f"      '{text[:65]}...' -> {label.upper()}")
 
         print("   " + "-" * 64)
 
@@ -633,9 +633,9 @@ class SentimentAgent:
             present_score  = float(np.clip(corr_final + macro_offset, -0.75, 0.75))
             print(f"\n   📊 [FinBERT Present]  raw={raw_final:+.4f}  "
                   f"bias_corr={corr_final:+.4f}  macro_off={macro_offset:+.4f}  "
-                  f"→ PRESENT={present_score:+.4f}")
+                  f"-> PRESENT={present_score:+.4f}")
 
-        # ── LLM future ────────────────────────────────────────────────────────
+        # -- LLM future --------------------------------------------------------
         future_score     = 0.0
         event_scores     = []
         conflict_penalty = 1.0
@@ -661,24 +661,24 @@ class SentimentAgent:
                 conflict_penalty, conflict_level, conflict_desc = \
                     self._detect_event_conflicts(event_scores)
                 if conflict_level != "none":
-                    print(f"\n   ⚡ [EVENT CONFLICT — {conflict_level.upper()}]  {conflict_desc}")
+                    print(f"\n   ⚡ [EVENT CONFLICT HOLD {conflict_level.upper()}]  {conflict_desc}")
 
             # FIX-1: Dynamic weight
             dynamic_w = self._compute_dynamic_weight(future_items, conflict_penalty)
 
         else:
-            print(f"\n   🔮 [Future Events] None found — future weight = 0.0")
+            print(f"\n   🔮 [Future Events] None found HOLD future weight = 0.0")
 
-        # ── Blend ─────────────────────────────────────────────────────────────
+        # -- Blend -------------------------------------------------------------
         w_f = dynamic_w
         w_p = 1.0 - w_f
         final_score = float(np.clip(w_p * present_score + w_f * future_score, -0.75, 0.75))
         final_label = self._score_to_label(final_score)
 
-        # ── Summary ───────────────────────────────────────────────────────────
-        print(f"\n   ════════════════════════════════════════════════════")
+        # -- Summary -----------------------------------------------------------
+        print(f"\n   ====================================================")
         print(f"   📊 FINAL BLENDED SENTIMENT  {ticker}  [v2.3]")
-        print(f"      Present (FinBERT × {w_p:.0%})    : {present_score:+.4f}")
+        print(f"      Present (FinBERT x {w_p:.0%})    : {present_score:+.4f}")
         if future_items:
             # Explain weight composition for transparency
             best = max(future_items,
@@ -689,14 +689,14 @@ class SentimentAgent:
             bt   = best.get("event_type","?")
             bd   = best.get("days_until","?")
             bi   = EVENT_TYPE_WEIGHT.get(bt, 0.40)
-            print(f"      Future  (LLM    × {w_f:.0%})    : {future_score:+.4f}")
-            print(f"      ── Weight logic ───────────────────────────")
+            print(f"      Future  (LLM    x {w_f:.0%})    : {future_score:+.4f}")
+            print(f"      -- Weight logic ---------------------------")
             print(f"         Base weight            : {BASE_FUTURE_WEIGHT:.2f}")
             print(f"         Dominant event         : {bt} (imp={bi:.2f}, {bd}d away)")
-            print(f"         Conflict penalty       : {conflict_penalty:.2f}× [{conflict_level}]")
+            print(f"         Conflict penalty       : {conflict_penalty:.2f}x [{conflict_level}]")
             print(f"         Dynamic future weight  : {w_f:.4f}")
-        print(f"      ──────────────────────────────────────────────")
-        print(f"      FINAL SCORE              : {final_score:+.4f}  →  {final_label.upper()}")
-        print(f"   ════════════════════════════════════════════════════")
+        print(f"      ----------------------------------------------")
+        print(f"      FINAL SCORE              : {final_score:+.4f}  ->  {final_label.upper()}")
+        print(f"   ====================================================")
 
         return final_label, final_score

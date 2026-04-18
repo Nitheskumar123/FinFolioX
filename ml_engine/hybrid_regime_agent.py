@@ -1,7 +1,7 @@
 """
 ml_engine/hybrid_regime_agent.py
 ==================================
-FinFolioX — Hybrid Regime Agent v2.3.1
+FinFolioX HOLD Hybrid Regime Agent v2.3.1
 =======================================
 Backbone : Pure-NumPy GaussianHMM  (Baum-Welch EM + Viterbi)
 Amplifier: Rule-based scoring (MA, VIX, Breadth, Momentum)
@@ -16,9 +16,9 @@ Public interface consumed by orchestrator and master system:
 
     Returns
     -------
-    label : str   — "Bull" | "Bear" | "Sideways"
-    vol   : float — 21-day decimal daily vol (e.g. 0.012)
-    conf  : float — fusion confidence 0.25 – 0.98
+    label : str   HOLD "Bull" | "Bear" | "Sideways"
+    vol   : float HOLD 21-day decimal daily vol (e.g. 0.012)
+    conf  : float HOLD fusion confidence 0.25 – 0.98
 
 No hmmlearn required. Only: numpy, pandas, scikit-learn, joblib.
 """
@@ -38,9 +38,9 @@ from sklearn.preprocessing import StandardScaler
 warnings.filterwarnings("ignore")
 
 
-# ─────────────────────────────────────────────────────────────
+# -------------------------------------------------------------
 #  SILENCE HELPER
-# ─────────────────────────────────────────────────────────────
+# -------------------------------------------------------------
 @contextlib.contextmanager
 def _silent():
     old_out, old_err = sys.stdout, sys.stderr
@@ -51,9 +51,9 @@ def _silent():
         sys.stdout, sys.stderr = old_out, old_err
 
 
-# ─────────────────────────────────────────────────────────────
+# -------------------------------------------------------------
 #  SYNTHETIC DATA  (used for auto-training + validation)
-# ─────────────────────────────────────────────────────────────
+# -------------------------------------------------------------
 def _synthetic_ohlcv(start="2003-01-01", end="2024-12-31", seed=42):
     rng   = np.random.default_rng(seed)
     dates = pd.bdate_range(start=start, end=end)
@@ -99,10 +99,10 @@ def _bull_data(n=600):
                           "Close": c, "Volume": 1_000_000})
 
 
-# ══════════════════════════════════════════════════════════════
+# ==============================================================
 #  PURE-NUMPY GAUSSIAN HMM
 #  Baum-Welch EM + Viterbi. No hmmlearn dependency.
-# ══════════════════════════════════════════════════════════════
+# ==============================================================
 class GaussianHMM:
 
     def __init__(self, n_components=3, covariance_type="full",
@@ -241,9 +241,9 @@ class GaussianHMM:
             self._forward(self._log_gauss(X))[-1]))
 
 
-# ══════════════════════════════════════════════════════════════
+# ==============================================================
 #  FEATURE ENGINE
-# ══════════════════════════════════════════════════════════════
+# ==============================================================
 class FeatureEngine:
     VOL_WINDOW = 21
 
@@ -305,9 +305,9 @@ class FeatureEngine:
         return idx.dropna()
 
 
-# ══════════════════════════════════════════════════════════════
+# ==============================================================
 #  MARKET DATA FETCHER
-# ══════════════════════════════════════════════════════════════
+# ==============================================================
 class MarketDataFetcher:
     INDEX = "^GSPC"; VIX = "^VIX"; NASDAQ = "^IXIC"; RUSSELL = "^RUT"
     SECTORS = {
@@ -318,9 +318,9 @@ class MarketDataFetcher:
     }
 
     def __init__(self, lookback_days=450):
-        # 450 days → ~320 trading days.
-        # MA200 warmup consumes 200 rows → ~120 clean rows after dropna.
-        # 252 only gave ~215 trading days → 16 rows after dropna → validation FAIL.
+        # 450 days -> ~320 trading days.
+        # MA200 warmup consumes 200 rows -> ~120 clean rows after dropna.
+        # 252 only gave ~215 trading days -> 16 rows after dropna -> validation FAIL.
         self.end   = datetime.today()
         self.start = self.end - timedelta(days=lookback_days + 60)
 
@@ -362,7 +362,7 @@ class MarketDataFetcher:
             try:
                 return fn(ticker)
             except Exception as e:
-                print(f"   ⚠️  {nm} failed for {ticker}: {type(e).__name__}")
+                print(f"   [WARN]  {nm} failed for {ticker}: {type(e).__name__}")
         raise ConnectionError(f"All live sources failed for {ticker}")
 
     def fetch_all(self):
@@ -384,15 +384,15 @@ class MarketDataFetcher:
                 raise ValueError("Too few sectors.")
             data = dict(index=idx, vix=vix, nasdaq=nq, russell=rut,
                         sectors=pd.DataFrame(secs), source="live")
-            print(f"   ✅ Live data  |  {len(idx)} trading days\n")
+            print(f"   [OK] Live data  |  {len(idx)} trading days\n")
             return data
         except Exception as e:
-            print(f"\n   ❌ Live fetch failed: {e}")
+            print(f"\n   [BAD] Live fetch failed: {e}")
             print("   🔄 Falling back to synthetic market data...\n")
             return self._synthetic_fallback()
 
     def _synthetic_fallback(self):
-        print("⚠️  OFFLINE MODE — Synthetic market data.\n")
+        print("[WARN]  OFFLINE MODE HOLD Synthetic market data.\n")
         gen = _synthetic_ohlcv("2022-01-01", "2024-12-31", seed=7)
         sp  = gen["Close"].values
         rng = np.random.default_rng(7)
@@ -411,9 +411,9 @@ class MarketDataFetcher:
                     russell=russell, sectors=secs, source="synthetic")
 
 
-# ══════════════════════════════════════════════════════════════
+# ==============================================================
 #  REGIME OUTPUT DATACLASS
-# ══════════════════════════════════════════════════════════════
+# ==============================================================
 @dataclass
 class RegimeOutput:
     timestamp:      str
@@ -437,9 +437,9 @@ class RegimeOutput:
     raw_scores:     dict = field(default_factory=dict)
 
 
-# ══════════════════════════════════════════════════════════════
+# ==============================================================
 #  TICKER CONTEXT ENRICHER
-# ══════════════════════════════════════════════════════════════
+# ==============================================================
 class TickerContextEnricher:
     DEFENSIVE = {"JNJ","PG","KO","PEP","WMT","XLP","XLU","XLRE","GLD","TLT"}
     CYCLICAL  = {"NVDA","AMD","TSLA","META","AMZN","GOOGL","XLK","XLY","XLE","XLF"}
@@ -450,37 +450,37 @@ class TickerContextEnricher:
         cat = ("Defensive" if t in self.DEFENSIVE else
                "Cyclical"  if t in self.CYCLICAL  else "General")
         impact = {
-            ("Bull",    "Defensive"): "May underperform — rotate to growth",
-            ("Bull",    "Cyclical"):  "Favourable — momentum strategies apply",
-            ("Bull",    "General"):   "Positive — normal conviction entries",
-            ("Bear",    "Defensive"): "Outperform — safe-haven candidate",
-            ("Bear",    "Cyclical"):  "High risk — avoid or hedge",
-            ("Bear",    "General"):   "Caution — verify thesis before entry",
-            ("Sideways","Defensive"): "Neutral — range-bound",
-            ("Sideways","Cyclical"):  "Low conviction — avoid breakouts",
-            ("Sideways","General"):   "Low conviction — wait for clarity",
+            ("Bull",    "Defensive"): "May underperform HOLD rotate to growth",
+            ("Bull",    "Cyclical"):  "Favourable HOLD momentum strategies apply",
+            ("Bull",    "General"):   "Positive HOLD normal conviction entries",
+            ("Bear",    "Defensive"): "Outperform HOLD safe-haven candidate",
+            ("Bear",    "Cyclical"):  "High risk HOLD avoid or hedge",
+            ("Bear",    "General"):   "Caution HOLD verify thesis before entry",
+            ("Sideways","Defensive"): "Neutral HOLD range-bound",
+            ("Sideways","Cyclical"):  "Low conviction HOLD avoid breakouts",
+            ("Sideways","General"):   "Low conviction HOLD wait for clarity",
         }.get((reg, cat), "No specific guidance")
         action = {
-            "Bull":     "Normal entries — momentum / dip-buy",
-            "Bear":     "Avoid new longs — strong stock signal required",
-            "Sideways": "Reduce size — fade extremes",
+            "Bull":     "Normal entries HOLD momentum / dip-buy",
+            "Bear":     "Avoid new longs HOLD strong stock signal required",
+            "Sideways": "Reduce size HOLD fade extremes",
         }.get(reg, "Neutral")
         return {
             "ticker": t, "sector_category": cat,
             "regime_impact": impact, "suggested_action": action,
-            "note": f"⚠️  Market-level context only — not a prediction for {t}.",
+            "note": f"[WARN]  Market-level context only HOLD not a prediction for {t}.",
         }
 
 
-# ══════════════════════════════════════════════════════════════
+# ==============================================================
 #  HYBRID REGIME AGENT  ← main class used by project
 #
 #  Used as: self.master.hybrid_regime in orchestrator
 #  Key methods:
-#    detect(hist_df, ticker)  → (label, vol, confidence)   ← orchestrator
-#    analyze_regime(df)       → (label, vol)               ← test suite T1-T10
-#    analyze_full(ticker)     → RegimeOutput               ← detailed output
-# ══════════════════════════════════════════════════════════════
+#    detect(hist_df, ticker)  -> (label, vol, confidence)   ← orchestrator
+#    analyze_regime(df)       -> (label, vol)               ← test suite T1-T10
+#    analyze_full(ticker)     -> RegimeOutput               ← detailed output
+# ==============================================================
 class HybridRegimeAgent:
     """
     FinFolioX Hybrid Regime Agent v2.3.1
@@ -520,10 +520,10 @@ class HybridRegimeAgent:
         else:
             if verbose:
                 if hmm_model_path:
-                    print(f"   [HybridRegime] {hmm_model_path} not found — "
+                    print(f"   [HybridRegime] {hmm_model_path} not found HOLD "
                           "auto-training on synthetic data...")
                 else:
-                    print("   [HybridRegime] No model path given — "
+                    print("   [HybridRegime] No model path given HOLD "
                           "auto-training on synthetic data...")
             self._auto_train()
             if hmm_model_path:
@@ -533,7 +533,7 @@ class HybridRegimeAgent:
                     if verbose:
                         print(f"   [HybridRegime] Could not save: {e}")
 
-    # ── Primary interface (orchestrator + master system) ──────
+    # -- Primary interface (orchestrator + master system) ------
 
     def detect(self, df: pd.DataFrame,
                ticker: str = "") -> Tuple[str, float, float]:
@@ -544,7 +544,7 @@ class HybridRegimeAgent:
         Parameters
         ----------
         df     : hist_data (OHLCV, optionally with SMA_50/SMA_200/RSI/MACD)
-        ticker : optional — passed through for context, doesn't affect HMM
+        ticker : optional HOLD passed through for context, doesn't affect HMM
 
         Returns
         -------
@@ -562,12 +562,12 @@ class HybridRegimeAgent:
             return regime, current_vol, confidence
         except Exception as e:
             if self._verbose:
-                print(f"   [HybridRegime] detect() error: {e} — safe fallback")
+                print(f"   [HybridRegime] detect() error: {e} HOLD safe fallback")
             vol = float(df["Close"].pct_change().rolling(21).std().iloc[-1]) \
                   if len(df) > 21 else 0.015
             return "Sideways", vol, 0.50
 
-    # ── T1-T10 validation interface ───────────────────────────
+    # -- T1-T10 validation interface ---------------------------
 
     def analyze_regime(self, df: pd.DataFrame = None,
                        market_ticker: str = "^GSPC",
@@ -603,7 +603,7 @@ class HybridRegimeAgent:
         vol    = float(feat["vol_21d"].iloc[-1])
         return label, vol
 
-    # ── Full RegimeOutput (detailed production use) ────────────
+    # -- Full RegimeOutput (detailed production use) ------------
 
     def analyze_full(self, ticker: str = None) -> RegimeOutput:
         """
@@ -630,7 +630,7 @@ class HybridRegimeAgent:
 
         rule_label, rule_norm = self._rule_score_full(rule_feat)
         rule_scores           = self._raw_scores(rule_feat)
-        # Must pass iloc[-1] (Series) — _fuse() expects a Series, not a DataFrame.
+        # Must pass iloc[-1] (Series) HOLD _fuse() expects a Series, not a DataFrame.
         # Passing the full DataFrame causes KeyError:'Close' because _fuse()
         # tries row["vix"] which returns a sub-Series on a DataFrame.
         regime, confidence, conflict_flags = self._fuse(
@@ -683,7 +683,7 @@ class HybridRegimeAgent:
             out.ticker_context = self._enrich.enrich(ticker, out)
         return out
 
-    # ── Training ──────────────────────────────────────────────
+    # -- Training ----------------------------------------------
 
     def train_on_df(self, df: pd.DataFrame,
                     run_bic: bool = True) -> "HybridRegimeAgent":
@@ -697,7 +697,7 @@ class HybridRegimeAgent:
         try:
             import yfinance as yf
             if self._verbose:
-                print(f"   [HybridRegime] Downloading {ticker} {start}→{end}")
+                print(f"   [HybridRegime] Downloading {ticker} {start}->{end}")
             with _silent():
                 df = yf.download(ticker, start=start, end=end,
                                  auto_adjust=True, progress=False)
@@ -707,7 +707,7 @@ class HybridRegimeAgent:
                 raise ValueError("Too few rows")
         except Exception as e:
             if self._verbose:
-                print(f"   [HybridRegime] Download failed ({e}) — using synthetic data")
+                print(f"   [HybridRegime] Download failed ({e}) HOLD using synthetic data")
             df = _synthetic_ohlcv(start, end)
         self._fit(df, run_bic=run_bic)
         return self
@@ -761,14 +761,14 @@ class HybridRegimeAgent:
         rmap = {ss[0]: "Bear", ss[1]: "Sideways", ss[2]: "Bull"}
         if self._verbose:
             for s, lbl in rmap.items():
-                print(f"      State {s} → {lbl:8s}  avg_ret={avg_ret[s]:.5f}")
+                print(f"      State {s} -> {lbl:8s}  avg_ret={avg_ret[s]:.5f}")
         return rmap
 
-    # ── Save / Load ───────────────────────────────────────────
+    # -- Save / Load -------------------------------------------
 
     def save(self, path: str):
         if not self.is_fitted:
-            raise RuntimeError("Cannot save — model not fitted.")
+            raise RuntimeError("Cannot save HOLD model not fitted.")
         os.makedirs(os.path.dirname(path) if os.path.dirname(path) else ".",
                     exist_ok=True)
         joblib.dump({
@@ -779,7 +779,7 @@ class HybridRegimeAgent:
             "version":      "v2.3.1",
         }, path)
         if self._verbose:
-            print(f"   [HybridRegime] Saved → {path}")
+            print(f"   [HybridRegime] Saved -> {path}")
 
     def _load(self, path: str):
         p = joblib.load(path)
@@ -792,7 +792,7 @@ class HybridRegimeAgent:
             ver = p.get("version", "?")
             print(f"   [HybridRegime] Loaded {ver} ← {path}")
 
-    # ── Internal helpers ──────────────────────────────────────
+    # -- Internal helpers --------------------------------------
 
     def _hmm_predict(self, df: pd.DataFrame) -> Tuple[str, float, float]:
         feat   = self._feat.build_hmm_features(df)
@@ -914,12 +914,12 @@ class HybridRegimeAgent:
         else:
             regime     = hmm_label  # HMM wins stability
             confidence = min(0.98, 0.65 * hmm_conf + 0.35 * abs(rule_norm))
-            flags.append(f"HMM={hmm_label} vs Rules={rule_label} — soft blend (0.65/0.35)")
+            flags.append(f"HMM={hmm_label} vs Rules={rule_label} HOLD soft blend (0.65/0.35)")
 
         if regime == "Bull" and b < self.BULL_MIN_BREADTH:
             regime = "Sideways"
             confidence -= self.CONFLICT_PENALTY
-            flags.append(f"Breadth gate: {b:.1f}% < {self.BULL_MIN_BREADTH}% — Bull→Sideways")
+            flags.append(f"Breadth gate: {b:.1f}% < {self.BULL_MIN_BREADTH}% HOLD Bull->Sideways")
 
         if regime in ("Bull", "Sideways") and vix > 22:
             flags.append(f"Elevated VIX ({vix:.1f}) for {regime}")
@@ -949,7 +949,7 @@ class HybridRegimeAgent:
                          "hedge":         "Light"},
         }.get(regime, {})
 
-    # ── Helpers for validation suite ──────────────────────────
+    # -- Helpers for validation suite --------------------------
 
     def predict_all_states(self, df: pd.DataFrame) -> Tuple[np.ndarray, list]:
         """Used by T6 (persistence) and T11 (forward accuracy)."""
@@ -968,21 +968,21 @@ class HybridRegimeAgent:
         return states, labels, feat
 
 
-# ══════════════════════════════════════════════════════════════
+# ==============================================================
 #  PRETTY PRINTER  (standalone use / debugging)
-# ══════════════════════════════════════════════════════════════
+# ==============================================================
 def print_regime_output(out: RegimeOutput):
     ICONS  = {"Bull": "🟢", "Bear": "🔴", "Sideways": "🟡"}
     icon   = ICONS.get(out.regime, "❓")
     src    = "🌐 LIVE" if out.data_source == "live" else "🧪 SYNTHETIC"
-    agree  = ("✅ HMM+Rules agree" if out.hmm_agreement
-               else "⚠️  HMM/Rules disagree (soft blend)")
-    print("\n" + "═"*62)
-    print(f"  {icon}  REGIME OUTPUT  —  {out.timestamp}  [{src}]")
-    print("═"*62)
+    agree  = ("[OK] HMM+Rules agree" if out.hmm_agreement
+               else "[WARN]  HMM/Rules disagree (soft blend)")
+    print("\n" + "="*62)
+    print(f"  {icon}  REGIME OUTPUT  HOLD  {out.timestamp}  [{src}]")
+    print("="*62)
     print(f"  Regime         : {icon} {out.regime}")
     print(f"  Confidence     : {out.confidence:.0%}   ({agree})")
-    print(f"  HMM State      : {out.hmm_state}  →  {out.regime}")
+    print(f"  HMM State      : {out.hmm_state}  ->  {out.regime}")
     print(f"  Trend          : {out.trend}")
     print(f"  Volatility     : {out.volatility}  (VIX={out.vix_level})")
     print(f"  Daily Vol (dec): {out.current_vol:.4f}  (~{out.current_vol*100:.2f}%/day)")
@@ -990,18 +990,18 @@ def print_regime_output(out: RegimeOutput):
     print(f"  Breadth        : {out.breadth_pct:.1f}% sectors above MA50")
     print(f"  Momentum       : {out.momentum_score}/3  |  5d-Bias: {out.bias_5d}")
     if out.conflict_flags:
-        print("─"*62)
-        print("  ⚠️  CONFLICT FLAGS:")
+        print("-"*62)
+        print("  [WARN]  CONFLICT FLAGS:")
         for cf in out.conflict_flags:
             print(f"     • {cf}")
-    print("─"*62)
+    print("-"*62)
     print("  📋 POLICY")
     for k, v in out.policy_hint.items():
         print(f"     {k:<18}: {v}")
     if out.ticker_context:
         ctx = out.ticker_context
-        print("─"*62)
+        print("-"*62)
         print(f"  🔗 TICKER: {ctx['ticker']}  ({ctx['sector_category']})")
         print(f"     Impact  : {ctx['regime_impact']}")
         print(f"     Action  : {ctx['suggested_action']}")
-    print("═"*62)
+    print("="*62)

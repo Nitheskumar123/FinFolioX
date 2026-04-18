@@ -1,39 +1,39 @@
 """
-ml_engine/explainability_agent.py  —  ExplainabilityAgent v5 (Integrated Gradients)
+ml_engine/explainability_agent.py  HOLD  ExplainabilityAgent v5 (Integrated Gradients)
 ======================================================================================
 DROP-IN REPLACEMENT for the old perturbation-based ExplainabilityAgent.
 
 WHAT CHANGED vs original IG version:
-  FIX 2 — real F(baseline) for completeness check
+  FIX 2 HOLD real F(baseline) for completeness check
     Problem: zeros input through LSTM does NOT output exactly 0.5.
     Old code assumed F(baseline) ≈ 0.5, making completeness check always wrong.
     Fix: forward-pass the all-zeros baseline once per call to get true F(0).
     This is stored in self._last_baseline_prob for diagnostics.
 
-  FIX 3 — macd_norm soft reliability gate
+  FIX 3 HOLD macd_norm soft reliability gate
     Problem: macd_norm has only 70% aggregate expl_acc and drops to 50% in
     trending/bear markets, meaning it misleads top-driver selection those windows.
     Fix: if macd_norm wins the reliability-weighted score but its in-session
     reliability is below MACD_REL_GATE (0.60), demote it and promote the runner-up.
-    Gate is conservative — only fires when MACD is genuinely unreliable.
+    Gate is conservative HOLD only fires when MACD is genuinely unreliable.
 
 WHAT DID NOT CHANGE (interface is identical to old version):
   - Constructor:  __init__(self, technical_agent, background_data_df)
   - Method:       explain_prediction(self, recent_sequence_df)
   - Return type:  (importance_dict, top_driver)
-  - self.tech_agent.lstm_model  and  self.tech_agent.lstm_scaler  — same refs
-  - feature_names list — identical order, identical 7 names
+  - self.tech_agent.lstm_model  and  self.tech_agent.lstm_scaler  HOLD same refs
+  - feature_names list HOLD identical order, identical 7 names
 
 HOW IG WORKS HERE:
-  1. Scale the 100×7 input with lstm_scaler.
+  1. Scale the 100x7 input with lstm_scaler.
   2. Build an all-zeros baseline.
      (Zeros baseline is consistent with test_lstm.py; mean baseline was tried
      and produced the same directional results but worse completeness scores.)
-  3. FIX 2: Forward-pass baseline once → store true F(baseline).
+  3. FIX 2: Forward-pass baseline once -> store true F(baseline).
   4. Interpolate 50 steps from baseline to actual input.
   5. Run tf.GradientTape over all 50 steps in one batch.
-  6. Average gradients × (input − baseline) → per-timestep IG matrix (100×7).
-  7. Mean over 100 timesteps → per-feature scalar attribution.
+  6. Average gradients x (input − baseline) -> per-timestep IG matrix (100x7).
+  7. Mean over 100 timesteps -> per-feature scalar attribution.
   8. Sign = did this feature push the model toward BUY (+) or SELL (−)?
 
 RELIABILITY WEIGHTING (in-session):
@@ -41,7 +41,7 @@ RELIABILITY WEIGHTING (in-session):
   After >= _min_samples_for_reliability (5) calls, the agent computes:
     reliability[f] = fraction where sign(ig_f) == sign(prob − 0.5)
   Features whose sign consistently contradicts the LSTM signal are flipped.
-  Weighted score = |ig_attr| × reliability.
+  Weighted score = |ig_attr| x reliability.
   FIX 3: macd_norm is further suppressed below MACD_REL_GATE.
 """
 
@@ -79,16 +79,16 @@ class ExplainabilityAgent:
         agent = ExplainabilityAgent(tech_agent, background_data_df)
         importance_dict, top_driver = agent.explain_prediction(last_100_days_df)
 
-    importance_dict  — {feature_name: signed_ig_attribution}
+    importance_dict  HOLD {feature_name: signed_ig_attribution}
                        positive = pushed model toward BUY
                        negative = pushed model toward SELL
-    top_driver       — name of the feature with highest reliability-weighted impact
+    top_driver       HOLD name of the feature with highest reliability-weighted impact
 
     Diagnostic attributes (read after explain_prediction()):
-        self._last_base_prob      — F(x): model output on actual input
-        self._last_baseline_prob  — F(0): model output on all-zeros baseline
-        self._last_ig_sum         — sum(IG) — should approximate F(x)-F(0)
-        self._reliability         — current per-feature reliability scores
+        self._last_base_prob      HOLD F(x): model output on actual input
+        self._last_baseline_prob  HOLD F(0): model output on all-zeros baseline
+        self._last_ig_sum         HOLD sum(IG) HOLD should approximate F(x)-F(0)
+        self._reliability         HOLD current per-feature reliability scores
     """
 
     def __init__(self, technical_agent, background_data_df):
@@ -97,7 +97,7 @@ class ExplainabilityAgent:
         ----------
         technical_agent   : TechnicalAgent instance
                             Must expose .lstm_model and .lstm_scaler
-        background_data_df: pd.DataFrame (ignored — kept for API compatibility)
+        background_data_df: pd.DataFrame (ignored HOLD kept for API compatibility)
         """
         self.tech_agent    = technical_agent
         self.feature_names = FEATURE_NAMES
@@ -115,9 +115,9 @@ class ExplainabilityAgent:
 
         self.ready = self._verify_gradienttape()
         if self.ready:
-            print("      ✅ Explainability Agent (Integrated Gradients v5) Ready.")
+            print("      [OK] Explainability Agent (Integrated Gradients v5) Ready.")
         else:
-            print("      ⚠️  GradientTape check failed — falling back to perturbation.")
+            print("      [WARN]  GradientTape check failed HOLD falling back to perturbation.")
 
     # ------------------------------------------------------------------
     # Internal: verify GradientTape compatibility once at startup
@@ -134,23 +134,23 @@ class ExplainabilityAgent:
             grads = tape.gradient(out, dummy)
             return grads is not None
         except Exception as e:
-            print(f"      ⚠️  GradientTape verify error: {e}")
+            print(f"      [WARN]  GradientTape verify error: {e}")
             return False
 
     # ------------------------------------------------------------------
-    # FIX 2 — compute real F(baseline) alongside attributions
+    # FIX 2 HOLD compute real F(baseline) alongside attributions
     # ------------------------------------------------------------------
     def _compute_ig(self, scaled: np.ndarray):
         """
         Parameters
         ----------
-        scaled : np.ndarray  shape (100, 7) — already scaler-transformed
+        scaled : np.ndarray  shape (100, 7) HOLD already scaler-transformed
 
         Returns
         -------
         attributions  : dict {feature_name: float}  raw signed IG per feature
-        base_prob     : float  F(x) — model output on actual input
-        baseline_prob : float  F(0) — model output on all-zeros baseline  ← FIX 2
+        base_prob     : float  F(x) HOLD model output on actual input
+        baseline_prob : float  F(0) HOLD model output on all-zeros baseline  ← FIX 2
         """
         tf    = _get_tf()
         model = self.tech_agent.lstm_model
@@ -158,7 +158,7 @@ class ExplainabilityAgent:
 
         baseline = np.zeros_like(scaled)   # (100, 7) all zeros
 
-        # ── FIX 2: true F(baseline) ───────────────────────────────────────────
+        # -- FIX 2: true F(baseline) -------------------------------------------
         baseline_t    = tf.constant(baseline.reshape(1, SEQ_LEN, n), dtype=tf.float32)
         baseline_prob = float(model(baseline_t, training=False).numpy()[0][0])
 
@@ -246,11 +246,11 @@ class ExplainabilityAgent:
             self._reliability[feat] = (matches / total) if total > 0 else 0.5
 
     # ------------------------------------------------------------------
-    # FIX 3 — top driver selection with macd_norm gate
+    # FIX 3 HOLD top driver selection with macd_norm gate
     # ------------------------------------------------------------------
     def _select_top_driver(self, attributions: dict) -> tuple:
         """
-        1. Compute effective_score = |ig| × reliability for each feature.
+        1. Compute effective_score = |ig| x reliability for each feature.
         2. If reliability < 0.5, flip sign (feature is inverse indicator).
         3. Rank all features by score descending.
         4. FIX 3: if macd_norm wins but in-session reliability < MACD_REL_GATE,
@@ -284,14 +284,14 @@ class ExplainabilityAgent:
             print(
                 f"      [ExplAgent] macd_norm gate: rel="
                 f"{self._reliability['macd_norm']:.2f} < {MACD_REL_GATE} "
-                f"→ promoted '{ranked[1]}'"
+                f"-> promoted '{ranked[1]}'"
             )
             top = ranked[1]
 
         return top, effective[top], scores
 
     # ------------------------------------------------------------------
-    # PUBLIC API — drop-in replacement
+    # PUBLIC API HOLD drop-in replacement
     # ------------------------------------------------------------------
     def explain_prediction(self, recent_sequence_df: pd.DataFrame):
         """
@@ -318,7 +318,7 @@ class ExplainabilityAgent:
             data   = recent_sequence_df[self.feature_names].values    # (100, 7)
             scaled = self.tech_agent.lstm_scaler.transform(data)       # (100, 7)
 
-            # Compute attributions — FIX 2 gives us real baseline_prob
+            # Compute attributions HOLD FIX 2 gives us real baseline_prob
             if self.ready:
                 raw_attrs, base_prob, baseline_prob = self._compute_ig(scaled)
             else:
@@ -346,7 +346,7 @@ class ExplainabilityAgent:
             self._session_data.append(entry)
             self._update_reliability()
 
-            # Select top driver — FIX 3 gate applied inside
+            # Select top driver HOLD FIX 3 gate applied inside
             top_driver, eff_ig, scores = self._select_top_driver(raw_attrs)
 
             # Build importance_dict with reliability-adjusted signs
@@ -361,7 +361,7 @@ class ExplainabilityAgent:
             return importance_dict, top_driver
 
         except Exception as e:
-            print(f"      ⚠️ Explainability Error: {e}")
+            print(f"      [WARN] Explainability Error: {e}")
             return {}, "Error"
 
     # ------------------------------------------------------------------
@@ -375,7 +375,7 @@ class ExplainabilityAgent:
         ig_sum       = self._last_ig_sum
         expected     = self._last_base_prob - self._last_baseline_prob
         gap          = abs(ig_sum - expected)
-        status       = "✅ close" if gap < 0.15 else "⚠️ gap"
+        status       = "[OK] close" if gap < 0.15 else "[WARN] gap"
         label        = f" ({ticker})" if ticker else ""
         print(
             f"      IG completeness{label}: sum(IG)={ig_sum:+.4f}  "
@@ -397,13 +397,13 @@ class ExplainabilityAgent:
             print(f"        {feat:<14}: {rel:.2f}  {bar}{flip}{gate}")
 
     # ------------------------------------------------------------------
-    # Batch reliability — matches test_lstm.py window logic exactly
+    # Batch reliability HOLD matches test_lstm.py window logic exactly
     # ------------------------------------------------------------------
     def set_batch_reliability(self, window_data: list):
         """
         Compute and store reliability from a full batch of pre-collected IG results.
         This REPLACES the incremental _update_reliability() path and matches the
-        test_lstm.py logic exactly — all tickers contribute simultaneously.
+        test_lstm.py logic exactly HOLD all tickers contribute simultaneously.
 
         Call this AFTER running explain_prediction() for every ticker in the window,
         but BEFORE reading _reliability or calling _select_top_driver() for reporting.

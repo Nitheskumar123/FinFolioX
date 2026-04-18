@@ -15,11 +15,11 @@ def run_sanity_check():
     # 1. Load the Trained Agent
     model_path = os.path.join("saved_models", "attention_fusion.pth")
     if not os.path.exists(model_path):
-        print(f"❌ ERROR: Model not found at {model_path}. Did you run Phase 5 training?")
+        print(f"[BAD] ERROR: Model not found at {model_path}. Did you run Phase 5 training?")
         return
 
     agent = FusionAgent(model_path)
-    print("✅ Fusion Agent Loaded Successfully.\n")
+    print("[OK] Fusion Agent Loaded Successfully.\n")
 
     # ==========================================
     # TEST CASE 1: THE BULL MARKET (Calm & Up)
@@ -38,9 +38,9 @@ def run_sanity_check():
     print(f"   🧠 Attention Weights: {weights}")
     
     if conf > 0.8: 
-        print("   ✅ PASS: AI correctly bought the dip based on technicals.")
+        print("   [OK] PASS: AI correctly bought the dip based on technicals.")
     else: 
-        print("   ❌ FAIL: AI was too scared.")
+        print("   [BAD] FAIL: AI was too scared.")
     print("-" * 30)
 
     # ==========================================
@@ -60,9 +60,9 @@ def run_sanity_check():
     print(f"   🧠 Attention Weights: {weights}")
 
     if conf < 0.3:
-        print("   ✅ PASS: AI correctly ignored the trap and sold!")
+        print("   [OK] PASS: AI correctly ignored the trap and sold!")
     else:
-        print("   ❌ FAIL: AI got tricked by the chart and bought into a crash.")
+        print("   [BAD] FAIL: AI got tricked by the chart and bought into a crash.")
     print("-" * 30)
 
     # ==========================================
@@ -79,9 +79,9 @@ def run_sanity_check():
     
     # We expect Sentiment or Volatility focus to be significant (e.g., > 0.3 or 30%)
     if sent_focus > 0.25 or vol_focus > 0.25:
-        print("   ✅ PASS: The AI is paying attention to the risk factors.")
+        print("   [OK] PASS: The AI is paying attention to the risk factors.")
     else:
-        print("   ⚠️ WARNING: Attention is low. It might be guessing.")
+        print("   [WARN] WARNING: Attention is low. It might be guessing.")
 
     print("\n" + "="*60)
     print("🏆 VERIFICATION COMPLETE")

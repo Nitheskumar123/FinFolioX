@@ -59,13 +59,13 @@ COMMODITY_BUY_THRESHOLD  = 0.55
 # ==============================================================================
 try:
     from adversarial_tester import AdversarialTester
-    print("   ✅ Phase 11 (Red Team) Loaded via direct import.")
+    print("   [OK] Phase 11 (Red Team) Loaded via direct import.")
 except ImportError:
     try:
         from ml_engine.adversarial_tester import AdversarialTester
-        print("   ✅ Phase 11 (Red Team) Loaded via package import.")
+        print("   [OK] Phase 11 (Red Team) Loaded via package import.")
     except ImportError:
-        print("   ⚠️ Phase 11 Module missing. Red Team Disabled.")
+        print("   [WARN] Phase 11 Module missing. Red Team Disabled.")
         AdversarialTester = None
 
 # ==============================================================================
@@ -73,13 +73,13 @@ except ImportError:
 # ==============================================================================
 try:
     from conflict_resolver import ConflictResolver
-    print("   ✅ Phase 13 (Conflict Arbitrator) Loaded via direct import.")
+    print("   [OK] Phase 13 (Conflict Arbitrator) Loaded via direct import.")
 except ImportError:
     try:
         from ml_engine.conflict_resolver import ConflictResolver
-        print("   ✅ Phase 13 (Conflict Arbitrator) Loaded via package import.")
+        print("   [OK] Phase 13 (Conflict Arbitrator) Loaded via package import.")
     except ImportError:
-        print("   ⚠️ Phase 13 Module missing. Conflict Resolution Disabled.")
+        print("   [WARN] Phase 13 Module missing. Conflict Resolution Disabled.")
         ConflictResolver = None
 
 # ==============================================================================
@@ -144,29 +144,29 @@ class FinFolioSystem:
     lstm_model_path=os.path.join(MODELS_DIR, "lstm_model.keras"),
     lstm_scaler_path=os.path.join(MODELS_DIR, "lstm_scaler.pkl"),
 )
-            print("      ✅ LSTM Brain Online.")
+            print("      [OK] LSTM Brain Online.")
         except Exception as e:
-            print(f"      ❌ Critical Error loading Technical Agent: {e}")
+            print(f"      [BAD] Critical Error loading Technical Agent: {e}")
             sys.exit(1)
 
         # 2. Sentiment Agent
         print("   🔹 [2/11] Loading Sentiment Agent (FinBERT)...")
         try:
             self.sent_agent = SentimentAgent()
-            print("      ✅ FinBERT Model Loaded Successfully.")
+            print("      [OK] FinBERT Model Loaded Successfully.")
         except Exception as e:
             print(f"      Warning: Sentiment Agent failed ({e}). Using fallback.")
             self.sent_agent = None
 
-        # 3. Regime Agent (HMM — kept for backward compatibility)
+        # 3. Regime Agent (HMM HOLD kept for backward compatibility)
         print("   🔹 [3/11] Loading Regime Agent (HMM Market Detector)...")
         try:
             self.regime_agent = RegimeAgent(
                 model_path=os.path.join(MODELS_DIR, "hmm_regime.pkl")
             )
-            print("      ✅ Hidden Markov Model Loaded Successfully.")
+            print("      [OK] Hidden Markov Model Loaded Successfully.")
         except Exception as e:
-            print(f"      ⚠️ Warning: Regime Agent failed ({e}).")
+            print(f"      [WARN] Warning: Regime Agent failed ({e}).")
             self.regime_agent = None
 
         # 3b. Hybrid Regime Agent (Rule + HMM v2)  ← NEW
@@ -176,27 +176,27 @@ class FinFolioSystem:
         hmm_model_path=os.path.join(MODELS_DIR, "hmm_regime_hybrid.pkl"),
         verbose=True,
     )
-            print("      ✅ Hybrid Regime System Online.")
+            print("      [OK] Hybrid Regime System Online.")
         except Exception as e:
-            print(f"      ⚠️ Hybrid Regime Agent failed ({e}). Using rule-only fallback.")
+            print(f"      [WARN] Hybrid Regime Agent failed ({e}). Using rule-only fallback.")
             self.hybrid_regime = None
 
         # 4. Correlation Agent
         print("   🔹 [4/11] Loading Correlation Agent (Statistical Graph)...")
         try:
             self.corr_agent = CorrelationDivergenceDetector()
-            print("      ✅ Market Graph Engine Initialized.")
+            print("      [OK] Market Graph Engine Initialized.")
         except Exception as e:
-            print(f"      ⚠️ Warning: Correlation Agent failed ({e}).")
+            print(f"      [WARN] Warning: Correlation Agent failed ({e}).")
             self.corr_agent = None
 
         # 5. Uncertainty Agent
         print("   🔹 [5/11] Loading Uncertainty Agent (Bayesian Wrapper)...")
         try:
             self.uncertainty_agent = UncertaintyAgent(self.tech_agent)
-            print("      ✅ Uncertainty Engine Initialized.")
+            print("      [OK] Uncertainty Engine Initialized.")
         except Exception as e:
-            print(f"      ⚠️ Warning: Uncertainty Agent failed ({e}).")
+            print(f"      [WARN] Warning: Uncertainty Agent failed ({e}).")
             self.uncertainty_agent = None
 
         # 6. Fusion Agent
@@ -205,9 +205,9 @@ class FinFolioSystem:
             self.fusion_agent = FusionAgent(
                 model_path=os.path.join(MODELS_DIR, "attention_fusion.pth")
             )
-            print("      ✅ Attention Mechanism Loaded Successfully.")
+            print("      [OK] Attention Mechanism Loaded Successfully.")
         except Exception as e:
-            print(f"      ❌ Critical Error loading Fusion Agent: {e}")
+            print(f"      [BAD] Critical Error loading Fusion Agent: {e}")
             sys.exit(1)
 
         # 7. Risk Engine
@@ -216,7 +216,7 @@ class FinFolioSystem:
     default_account_size=DEFAULT_CAPITAL,
     bear_max_allocation=0.10,   # ← v2.2: cap Bear allocations at 10%
 )
-        print(f"      ✅ Risk Manager Online (Account: ${DEFAULT_CAPITAL:,.2f}).")
+        print(f"      [OK] Risk Manager Online (Account: ${DEFAULT_CAPITAL:,.2f}).")
 
         # 8. Explainability Agent (lazy init)
         print("   🔹 [8/11] Preparing Explainability Agent (Perturbation)...")
@@ -233,18 +233,18 @@ class FinFolioSystem:
         print("   🔹 [10/11] Loading Causal Discovery Agent (PC Algorithm)...")
         try:
             self.causal_agent = CausalAgent(lookback=90, alpha=0.20)
-            print("      ✅ Causal Discovery Engine Online.")
+            print("      [OK] Causal Discovery Engine Online.")
         except Exception as e:
-            print(f"      ⚠️ Warning: Causal Agent failed ({e}).")
+            print(f"      [WARN] Warning: Causal Agent failed ({e}).")
             self.causal_agent = None
 
         # 11. ASC Memory Engine (Phase 26)
         print("   🔹 [11/11] Loading ASC Memory Engine (Sycophancy Detection)...")
         try:
             self.asc_memory = AgentDecisionMemory(window_size=30)
-            print("      ✅ ASC Memory Engine Online.")
+            print("      [OK] ASC Memory Engine Online.")
         except Exception as e:
-            print(f"      ⚠️ Warning: ASC Memory Engine failed ({e}).")
+            print(f"      [WARN] Warning: ASC Memory Engine failed ({e}).")
             self.asc_memory = None
 
         # Regime Scaler (kept for backward compat)
@@ -253,9 +253,9 @@ class FinFolioSystem:
             self.regime_scaler = joblib.load(self.regime_scaler_path)
         else:
             self.regime_scaler = None
-            print("      ⚠️ Warning: Regime Scaler not found.")
+            print("      [WARN] Warning: Regime Scaler not found.")
 
-        print("\n✅ SYSTEM INITIALIZATION COMPLETE. ALL ENGINES ONLINE.\n")
+        print("\n[OK] SYSTEM INITIALIZATION COMPLETE. ALL ENGINES ONLINE.\n")
 
         # Phase hooks
         self.red_team         = AdversarialTester(self) if AdversarialTester else None
@@ -298,17 +298,17 @@ class FinFolioSystem:
             stock = yf.Ticker(ticker)
             hist  = stock.history(period="2y")
             if len(hist) < 200:
-                return None, "❌ Not enough historical data (Need > 200 days)."
+                return None, "[BAD] Not enough historical data (Need > 200 days)."
             hist["SMA_50"]  = hist["Close"].rolling(window=50).mean()
             hist["SMA_200"] = hist["Close"].rolling(window=200).mean()
             hist["RSI"]     = self._calculate_rsi(hist["Close"])
             hist["MACD"]    = self._calculate_macd(hist["Close"])
             hist.dropna(inplace=True)
             if len(hist) < 60:
-                return None, "❌ Not enough data after processing indicators."
+                return None, "[BAD] Not enough data after processing indicators."
             return stock, hist
         except Exception as e:
-            return None, f"❌ Data Connection Error: {e}"
+            return None, f"[BAD] Data Connection Error: {e}"
 
     def _analyze_technicals_and_uncertainty(self, hist):
         print("\n   📈 [Technical Analysis] Reading Charts (LSTM)...")
@@ -322,7 +322,7 @@ class FinFolioSystem:
         if self.explainability_agent is None:
             self.explainability_agent = ExplainabilityAgent(self.tech_agent, feature_df)
 
-        print("   🔍 [Explainability] Running Perturbation Analysis...")
+        print("   [CHECK] [Explainability] Running Perturbation Analysis...")
         shap_scores, top_driver = self.explainability_agent.explain_prediction(last_100_days)
         if shap_scores:
             impact_val   = shap_scores.get(top_driver, 0.0)
@@ -333,9 +333,9 @@ class FinFolioSystem:
         print("   🎲 [Uncertainty Agent] Computing confidence distance...")
         mc_mean, mc_std = self.uncertainty_agent.predict_from_prob(lstm_signal)  # ← ONLY CHANGE
 
-        uncertainty_status = "✅ High Certainty"
+        uncertainty_status = "[OK] High Certainty"
         if mc_std > UNCERTAINTY_THRESHOLD_MODERATE:
-            uncertainty_status = "⚠️ Moderate Uncertainty"
+            uncertainty_status = "[WARN] Moderate Uncertainty"
         if mc_std > UNCERTAINTY_THRESHOLD_HIGH:
             uncertainty_status = "🚨 HIGH UNCERTAINTY (Guessing)"
 
@@ -350,13 +350,13 @@ class FinFolioSystem:
         try:
             result = self.sent_agent.analyze_with_mcp(ticker)
             if not result:
-                print("      ⚠️ MCP failed to return valid data. Defaulting to neutral.")
+                print("      [WARN] MCP failed to return valid data. Defaulting to neutral.")
                 return 0.0
             sent_label, sent_score = result
             print(f"      - Sentiment Score: {sent_score:.4f} ({sent_label})")
             return sent_score
         except Exception as e:
-            print(f"      ⚠️ MCP/FinBERT Pipeline Error: {e}. Defaulting to neutral.")
+            print(f"      [WARN] MCP/FinBERT Pipeline Error: {e}. Defaulting to neutral.")
             return 0.0
 
     def _analyze_regime_module(self, hist, ticker=""):
@@ -387,37 +387,37 @@ class FinFolioSystem:
             sma_slope   = (sma_50 - sma_50_prev) / sma_50_prev
             if ret_5d < -0.015 or rsi_now < 45:
                 regime_label = "Sideways"
-                print(f"      ⚠️ Bull→Sideways: strong breakdown (5d={ret_5d:.2%}, RSI={rsi_now:.1f})")
+                print(f"      [WARN] Bull->Sideways: strong breakdown (5d={ret_5d:.2%}, RSI={rsi_now:.1f})")
             elif ret_5d < 0 and rsi_now < 55 and sma_slope < 0:
                 regime_label = "Sideways"
-                print(f"      ⚠️ Bull→Sideways: exhaustion (5d={ret_5d:.2%}, RSI={rsi_now:.1f})")
+                print(f"      [WARN] Bull->Sideways: exhaustion (5d={ret_5d:.2%}, RSI={rsi_now:.1f})")
 
         _COMMODITY = {"GLD", "SLV", "USO", "UNG", "GDX", "DJP", "PDBC"}
         if ticker.upper() in _COMMODITY:
             ret_10d = (hist["Close"].iloc[-1] / hist["Close"].iloc[-10] - 1.0) if len(hist) >= 10 else 0.0
             if rsi_now > 65 and ret_10d > 0.05:
                 regime_label = "Bull"
-                print(f"      ⚡ Commodity momentum: →Bull (RSI={rsi_now:.1f}, 10d={ret_10d:.2%})")
+                print(f"      ⚡ Commodity momentum: ->Bull (RSI={rsi_now:.1f}, 10d={ret_10d:.2%})")
             elif rsi_now > 60 and ret_10d > 0.03 and regime_label == "Bear":
                 regime_label = "Sideways"
-                print(f"      ⚡ Commodity momentum: Bear→Sideways")
+                print(f"      ⚡ Commodity momentum: Bear->Sideways")
 
         if regime_label == "Bear" and rsi_now < 35:
             regime_label = "Sideways"
-            print(f"      ⚠️ Bear→Sideways: oversold bounce risk (RSI={rsi_now:.1f})")
+            print(f"      [WARN] Bear->Sideways: oversold bounce risk (RSI={rsi_now:.1f})")
         if regime_label == "Bear" and rsi_now > 60:
             regime_label = "Sideways"
-            print(f"      ⚠️ Bear→Sideways: RSI contradicts Bear (RSI={rsi_now:.1f})")
+            print(f"      [WARN] Bear->Sideways: RSI contradicts Bear (RSI={rsi_now:.1f})")
 
-        print(f"      - Vol={current_vol:.4f}  RSI={rsi_now:.1f}  5d={ret_5d:+.2%}  → {regime_label}")
+        print(f"      - Vol={current_vol:.4f}  RSI={rsi_now:.1f}  5d={ret_5d:+.2%}  -> {regime_label}")
         return regime_label, current_vol
 
     def _analyze_correlation_module(self, ticker):
         print("\n   🕸️  [Systemic Risk] Analyzing Cross-Asset Divergence...")
         risk_score, _ = self.corr_agent.get_market_context(ticker)
-        div_status = "✅ Synced"
+        div_status = "[OK] Synced"
         if risk_score > DIVERGENCE_THRESHOLD_MINOR:
-            div_status = "⚠️ Minor Divergence"
+            div_status = "[WARN] Minor Divergence"
         if risk_score > DIVERGENCE_THRESHOLD_CRITICAL:
             div_status = "🚨 CRITICAL DIVERGENCE (Anomaly)"
         print(f"      - Divergence Score: {risk_score:.4f}  Status: {div_status}")
@@ -431,7 +431,7 @@ class FinFolioSystem:
             try:
                 universe_data[sym] = yf.download(sym, period="6mo", interval="1d", progress=False)
             except Exception as e:
-                print(f"      ⚠️ Failed to fetch {sym}: {e}")
+                print(f"      [WARN] Failed to fetch {sym}: {e}")
         return universe_data
 
     # ==========================================================================
@@ -456,7 +456,7 @@ class FinFolioSystem:
         )
         sent_score = self._analyze_sentiment_module(ticker, stock_obj, lstm_signal)
 
-        # ── Hybrid Regime Detection ← NEW ─────────────────────────────────────
+        # -- Hybrid Regime Detection ← NEW -------------------------------------
         print("\n   ⛈️  [Regime Detection] Running Hybrid Regime System...")
         if self.hybrid_regime:
             regime_label, current_vol, regime_confidence = (
@@ -469,7 +469,7 @@ class FinFolioSystem:
 
         risk_score, div_status = self._analyze_correlation_module(ticker)
 
-        # ── Phase 24: Topological Analysis ───────────────────────────────────
+        # -- Phase 24: Topological Analysis -----------------------------------
         topo_modifier  = 1.0
         topo_signal    = "UNKNOWN"
         topology_result = {}
@@ -479,7 +479,7 @@ class FinFolioSystem:
             topo_modifier   = topology_result.get("topology_modifier", 1.0)
             topo_signal     = topology_result.get("market_shape_signal", "UNKNOWN")
 
-        # ── Phase 25: Causal Discovery ────────────────────────────────────────
+        # -- Phase 25: Causal Discovery ----------------------------------------
         causal_modifier = 1.0
         causal_score    = 0.5
         causal_result   = {}
@@ -494,9 +494,9 @@ class FinFolioSystem:
                 causal_score    = causal_result.get("causal_score", 0.5)
                 print(f"      - Causal Score: {causal_score:.4f} (Modifier: {causal_modifier:.3f}x)")
             except Exception as e:
-                print(f"      ⚠️ Causal analysis failed: {e}")
+                print(f"      [WARN] Causal analysis failed: {e}")
 
-        # ── Phase 11: Red Team ────────────────────────────────────────────────
+        # -- Phase 11: Red Team ------------------------------------------------
         robustness_penalty = 0.0
         if self.red_team:
             print("\n   🛡️  [Red Team] Running Live Robustness Check...")
@@ -510,14 +510,14 @@ class FinFolioSystem:
                 )
                 robustness_delta = lstm_signal - crashed_score
                 if robustness_delta < 0.02:
-                    print(f"      ❌ Model is stubborn! (Delta: {robustness_delta:.4f})")
+                    print(f"      [BAD] Model is stubborn! (Delta: {robustness_delta:.4f})")
                     robustness_penalty = 0.2
                 else:
-                    print(f"      ✅ PASS: Model detected the crash. (Delta: {robustness_delta:.4f})")
+                    print(f"      [OK] PASS: Model detected the crash. (Delta: {robustness_delta:.4f})")
             except Exception as e:
-                print(f"      ⚠️ Red Team check failed: {e}")
+                print(f"      [WARN] Red Team check failed: {e}")
 
-        # ── Fusion ────────────────────────────────────────────────────────────
+        # -- Fusion ------------------------------------------------------------
         print("\n   🧠 [Fusion Engine] Synthesizing Intelligence Layers...")
         vol_input = 0.9 if regime_label == "Bear" else 0.2 if regime_label == "Bull" else 0.5
 
@@ -539,12 +539,12 @@ class FinFolioSystem:
 
         # Apply hybrid regime confidence ← NEW
         final_conf = float(np.clip(final_conf * regime_confidence, 0.0, 1.0))
-        print(f"      - Regime confidence: {regime_confidence:.2f}x → {final_conf:.4f}")
+        print(f"      - Regime confidence: {regime_confidence:.2f}x -> {final_conf:.4f}")
 
-        # ── FinBERT Gates ─────────────────────────────────────────────────────
+        # -- FinBERT Gates -----------------------------------------------------
         sentiment_available = abs(sent_score) > 0.001
         if not sentiment_available:
-            print("      ⚠️ [Fusion] Sentiment frozen at 0.0 — gates disabled")
+            print("      [WARN] [Fusion] Sentiment frozen at 0.0 HOLD gates disabled")
         if sentiment_available and sent_score < -0.05 and lstm_signal > 0.55:
             print(f"      [Fusion] FinBERT veto: negative sentiment ({sent_score:.3f})")
             final_conf = min(final_conf, 0.54)
@@ -555,11 +555,11 @@ class FinFolioSystem:
         lstm_regime_agree_bear = (lstm_signal < 0.42 and regime_label == "Bear" and sent_score < -0.03)
         if lstm_regime_agree_bull or lstm_regime_agree_bear:
             final_conf = min(final_conf * 1.08, 0.75)
-            print(f"      [Fusion] Consensus boost → {final_conf:.4f}")
+            print(f"      [Fusion] Consensus boost -> {final_conf:.4f}")
 
         print(f"      - Raw Fusion Confidence: {final_conf:.4f}")
 
-        # ── Phase 13: Conflict Resolution ─────────────────────────────────────
+        # -- Phase 13: Conflict Resolution -------------------------------------
         if self.conflict_resolver:
             arbitration_result = self.conflict_resolver.arbitrate(
                 tech_score=lstm_signal, sent_score=sent_score, mc_std=mc_std,
@@ -574,7 +574,7 @@ class FinFolioSystem:
             if mc_std > 0.10:
                 final_conf *= 0.8
 
-        # ── Phase 16: Disagreement Heatmap ────────────────────────────────────
+        # -- Phase 16: Disagreement Heatmap ------------------------------------
         gdi_penalty = 1.0
         gdi_value   = 0.0
         if self.heatmap_agent:
@@ -586,7 +586,7 @@ class FinFolioSystem:
             gdi_penalty = heatmap_result["penalty"]
             gdi_value   = heatmap_result["gdi"] * 100
 
-        # ── Risk Management ───────────────────────────────────────────────────
+        # -- Risk Management ---------------------------------------------------
         print("\n   [Risk Engine] Calculating Position Sizing (Kelly)...")
         alloc_pct, kelly_debug = self.risk_engine.calculate_position_size(
     final_conf, current_vol, disagreement_penalty=gdi_penalty,
@@ -594,7 +594,7 @@ class FinFolioSystem:
 )
         num_shares, cash_value = self.risk_engine.get_shares_amount(last_price, alloc_pct)
 
-        # ── Final Report ──────────────────────────────────────────────────────
+        # -- Final Report ------------------------------------------------------
         print("\n" + "█" * 72)
         print(f"🏆 FINFOLIO-X INTELLIGENCE REPORT: {ticker}")
         print("█" * 72)
@@ -604,7 +604,7 @@ class FinFolioSystem:
         print(f"   🕸️  Systemic Risk        : {risk_score:.4f} ({div_status})")
         print(f"   🌀 Topological Shape    : {topo_signal} (Mod: {topo_modifier:.2f}x)")
         print(f"   🔗 Causal Dynamics      : Score={causal_score:.4f} (Conf: {len(causal_result.get('confounders_removed', []))})")
-        print(f"   🔍 Primary SHAP Driver  : {top_driver}")
+        print(f"   [CHECK] Primary SHAP Driver  : {top_driver}")
         print("-" * 72)
 
         effective_threshold = COMMODITY_BUY_THRESHOLD if ticker in COMMODITY_TICKERS else BUY_CONFIDENCE_THRESHOLD
@@ -629,7 +629,7 @@ class FinFolioSystem:
         w_sent = weights.get("Sentiment_Focus", 0)
         w_vol  = weights.get("Volatility_Focus", 0)
         print("-" * 72)
-        print("   🔍 AI REASONING (ATTENTION WEIGHTS):")
+        print("   [CHECK] AI REASONING (ATTENTION WEIGHTS):")
         print(f"      • Technicals (Chart) : {w_lstm:.2f}")
         print(f"      • Sentiment (News)   : {w_sent:.2f}")
         print(f"      • Risk (Volatility)  : {w_vol:.2f}")
@@ -661,4 +661,4 @@ class FinFolioSystem:
         if self.red_team:
             self.red_team.run_robustness_test(ticker)
         else:
-            print("❌ Cannot run stress test: Phase 11 module not loaded.")
+            print("[BAD] Cannot run stress test: Phase 11 module not loaded.")

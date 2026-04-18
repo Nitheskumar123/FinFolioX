@@ -1,12 +1,12 @@
 """
-ml_engine/meta_agent.py  —  Self-Correcting Meta-Agent (Phase 14 + Phase 26)
+ml_engine/meta_agent.py  HOLD  Self-Correcting Meta-Agent (Phase 14 + Phase 26)
 =============================================================================
 Maintains a CSV decision ledger, evaluates past predictions T+5 days later,
 and dynamically adjusts per-agent trust multipliers via EMA. Phase 26 extends
 the ledger with two new columns: asc_score (the Agent Sycophancy Coefficient
 at decision time) and asc_reliable (whether the buffer had enough data). The
 evaluate_past_decisions() method now produces an ASC accuracy correlation
-table showing decision accuracy bucketed by ASC range (low/medium/high) —
+table showing decision accuracy bucketed by ASC range (low/medium/high) HOLD
 the core empirical validation for the IEEE paper hypothesis that high-ASC
 decisions have systematically lower outcome accuracy than low-ASC decisions.
 """
@@ -68,9 +68,9 @@ class MetaAgent:
 
         print("   [+] Phase 14+26: Meta-Agent (Self-Correcting + ASC Tracking) Initialized.")
 
-    # ──────────────────────────────────────────────────────────────────────
+    # ----------------------------------------------------------------------
     # LEDGER
-    # ──────────────────────────────────────────────────────────────────────
+    # ----------------------------------------------------------------------
 
     def _create_ledger(self):
         """Create CSV with Phase 14 + Phase 26 columns."""
@@ -127,9 +127,9 @@ class MetaAgent:
             writer.writerow(row)
         print(f"   [Meta-Agent] Decision logged: {ticker} @ ${price_at_decision:.2f} | ASC={asc_score:.3f}")
 
-    # ──────────────────────────────────────────────────────────────────────
+    # ----------------------------------------------------------------------
     # HINDSIGHT EVALUATOR
-    # ──────────────────────────────────────────────────────────────────────
+    # ----------------------------------------------------------------------
 
     def evaluate_past_decisions(self):
         """
@@ -257,7 +257,7 @@ class MetaAgent:
     def _print_asc_accuracy_table(self, df: pd.DataFrame):
         """
         Phase 26 paper validation: print accuracy bucketed by ASC range.
-        Tests hypothesis: low ASC → higher decision accuracy.
+        Tests hypothesis: low ASC -> higher decision accuracy.
         """
         evaluated = df[df["evaluated"] == "YES"].copy()
         if evaluated.empty or "asc_score" not in evaluated.columns:
@@ -284,12 +284,12 @@ class MetaAgent:
                 evaluated_valid[evaluated_valid["asc_score_num"] >= ASC_HIGH_THRESHOLD],
         }
 
-        print("\n   ╔══════════════════════════════════════════════════════════╗")
-        print("   ║   PHASE 26 — ASC ACCURACY CORRELATION TABLE              ║")
-        print("   ║   Hypothesis: Low ASC → Higher Decision Accuracy          ║")
-        print("   ╠══════════════════════════════════════════════════════════╣")
+        print("\n   ╔==========================================================╗")
+        print("   ║   PHASE 26 HOLD ASC ACCURACY CORRELATION TABLE              ║")
+        print("   ║   Hypothesis: Low ASC -> Higher Decision Accuracy          ║")
+        print("   ╠==========================================================╣")
         print(f"   ║  {'ASC Bucket':<35s} {'N':>4s}  {'Accuracy':>8s}          ║")
-        print("   ╠══════════════════════════════════════════════════════════╣")
+        print("   ╠==========================================================╣")
 
         for label, subset in buckets.items():
             n = len(subset)
@@ -301,7 +301,7 @@ class MetaAgent:
                 bar      = "█" * bar_len + "░" * (20 - bar_len)
                 print(f"   ║  {label:<35s} {n:>4d}  {accuracy:>6.1f}%  {bar}  ║")
 
-        print("   ╠══════════════════════════════════════════════════════════╣")
+        print("   ╠==========================================================╣")
 
         # Overall Pearson correlation between asc_score and correctness
         if len(evaluated_valid) >= 5:
@@ -315,11 +315,11 @@ class MetaAgent:
             except Exception:
                 pass
 
-        print("   ╚══════════════════════════════════════════════════════════╝\n")
+        print("   ╚==========================================================╝\n")
 
-    # ──────────────────────────────────────────────────────────────────────
+    # ----------------------------------------------------------------------
     # T+5 PRICE FETCH
-    # ──────────────────────────────────────────────────────────────────────
+    # ----------------------------------------------------------------------
 
     def _get_price_t5(self, ticker, decision_date):
         try:
@@ -344,9 +344,9 @@ class MetaAgent:
             logger.warning(f"T+5 price fetch failed for {ticker}: {e}")
             return None
 
-    # ──────────────────────────────────────────────────────────────────────
+    # ----------------------------------------------------------------------
     # GRADING
-    # ──────────────────────────────────────────────────────────────────────
+    # ----------------------------------------------------------------------
 
     def _grade_agent(self, agent_score, price_change_pct, agent_type):
         if agent_type == "technical":
@@ -371,9 +371,9 @@ class MetaAgent:
             return "RIGHT"
         return "WRONG"
 
-    # ──────────────────────────────────────────────────────────────────────
+    # ----------------------------------------------------------------------
     # TRUST SCORE MANAGER
-    # ──────────────────────────────────────────────────────────────────────
+    # ----------------------------------------------------------------------
 
     def _create_default_trust(self):
         default_scores = {
@@ -416,7 +416,7 @@ class MetaAgent:
             new_trust  = old_trust + EMA_ALPHA * (target - old_trust)
             new_trust  = max(TRUST_MIN, min(TRUST_MAX, new_trust))
             direction  = "+" if new_trust > old_trust else "-" if new_trust < old_trust else "="
-            print(f"      {agent_key:12s}: {old_trust:.3f} → {new_trust:.3f} "
+            print(f"      {agent_key:12s}: {old_trust:.3f} -> {new_trust:.3f} "
                   f"({direction}) [avg_reward={avg_reward:+.2f}]")
             current[agent_key] = round(new_trust, 4)
 

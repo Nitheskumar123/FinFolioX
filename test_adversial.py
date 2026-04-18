@@ -1,9 +1,9 @@
 """
-PHASE 11 — ADVERSARIAL BACKTEST + ACCURACY  (v7 — Correct Bias + Weight Floor)
+PHASE 11 HOLD ADVERSARIAL BACKTEST + ACCURACY  (v7 HOLD Correct Bias + Weight Floor)
 ================================================================================
 Changes from v6:
 
-  FIX 1 — Per-window bias detection was always 0/16:
+  FIX 1 HOLD Per-window bias detection was always 0/16:
     v6 used |crash_delta| < 0.015 to detect saturation bias at window level.
     Problem: TSLA window-level deltas are 0.032–0.189, all above 0.015, so
     nothing was flagged even though TSLA is clearly broken.
@@ -14,18 +14,18 @@ Changes from v6:
     New definition (correct):
       per-window bias = score is far from neutral (>0.70 or <1-0.70)
                         AND the prediction was wrong (correct_loose == False)
-      = "confidently wrong" — model had high conviction but got it backwards.
-    This correctly flags TSLA Mar04→09 (score=0.926, BUY on a DOWN day)
-    and Mar09→16 (score=0.955, BUY on a DOWN day).
+      = "confidently wrong" HOLD model had high conviction but got it backwards.
+    This correctly flags TSLA Mar04->09 (score=0.926, BUY on a DOWN day)
+    and Mar09->16 (score=0.955, BUY on a DOWN day).
 
-  FIX 2 — QQQ weight 1.0 from a single scored window:
-    QQQ had 3 FLAT windows skipped → only 1 scored window → 100% loose acc
-    → weight 1.0. Statistically meaningless.
+  FIX 2 HOLD QQQ weight 1.0 from a single scored window:
+    QQQ had 3 FLAT windows skipped -> only 1 scored window -> 100% loose acc
+    -> weight 1.0. Statistically meaningless.
     Fix: MIN_SCOREABLE_FOR_WEIGHT = 2. Tickers with fewer scoreable windows
     are capped at WEIGHT_UNCERTAIN (0.4) regardless of accuracy.
 
-  FIX 3 — Score volatility not surfaced:
-    TSLA scores jump 0.384 → 0.926 → 0.955 → 0.793 (std ≈ 0.25).
+  FIX 3 HOLD Score volatility not surfaced:
+    TSLA scores jump 0.384 -> 0.926 -> 0.955 -> 0.793 (std ≈ 0.25).
     High score std means the model is inconsistent on this ticker.
     Added ScoreStd column to per-ticker table and penalises weight when
     std > SCORE_STD_HIGH_THRESHOLD.
@@ -86,10 +86,10 @@ LSTM_COLS = [
 ]
 
 TEST_WINDOWS = [
-    ("2026-03-03", "2026-03-08", "Mar03→08 Bear start"),
-    ("2026-03-05", "2026-03-10", "Mar05→10 Bear early"),
-    ("2026-03-09", "2026-03-16", "Mar09→16 Deep Bear"),
-    ("2026-03-12", "2026-03-17", "Mar12→17 Bounce"),
+    ("2026-03-03", "2026-03-08", "Mar03->08 Bear start"),
+    ("2026-03-05", "2026-03-10", "Mar05->10 Bear early"),
+    ("2026-03-09", "2026-03-16", "Mar09->16 Deep Bear"),
+    ("2026-03-12", "2026-03-17", "Mar12->17 Bounce"),
 ]
 
 BUY_THRESHOLD   = 0.52
@@ -104,13 +104,13 @@ CRASH_DELTA_THRESHOLD = 0.01
 DIAG_SATURATION_SCORE = 0.70
 DIAG_SATURATION_DELTA = 0.015
 
-# Per-window bias threshold — overridden by --bias-score-threshold
+# Per-window bias threshold HOLD overridden by --bias-score-threshold
 # "confidently wrong" = score > BIAS_SCORE_THRESHOLD AND correct_loose==False
 DEFAULT_BIAS_SCORE_THRESHOLD = 0.70
 BIAS_SCORE_THRESHOLD = DEFAULT_BIAS_SCORE_THRESHOLD   # set at runtime
 
 # Weight recommendations
-MIN_SCOREABLE_FOR_WEIGHT = 2    # fewer → cap at WEIGHT_UNCERTAIN
+MIN_SCOREABLE_FOR_WEIGHT = 2    # fewer -> cap at WEIGHT_UNCERTAIN
 WEIGHT_HIGH      = 1.0
 WEIGHT_MEDIUM    = 0.6
 WEIGHT_UNCERTAIN = 0.4          # not enough data to trust the number
@@ -228,27 +228,27 @@ def _window_bias(score: float, correct_loose_val) -> bool:
     """
     Per-window bias = CONFIDENTLY WRONG.
 
-    v6 bug: used |crash_delta| < 0.015 which was too tight —
+    v6 bug: used |crash_delta| < 0.015 which was too tight HOLD
     TSLA window deltas of 0.03-0.19 all passed, giving 0 detections.
 
     v7 fix: bias fires when BOTH are true:
       1. score is far from neutral (> BIAS_SCORE_THRESHOLD or < 1-threshold)
          meaning the model was highly confident
-      2. correct_loose is False (the prediction was wrong — not just FLAT)
+      2. correct_loose is False (the prediction was wrong HOLD not just FLAT)
 
-    FLAT windows (correct_loose=None) are never biased — skip, not penalise.
+    FLAT windows (correct_loose=None) are never biased HOLD skip, not penalise.
     Correct predictions are never biased regardless of score magnitude.
 
     Expected for TSLA:
-      Mar04→09: score=0.926 (>0.70), correct_loose=False → BIASED ✅
-      Mar09→16: score=0.955 (>0.70), correct_loose=False → BIASED ✅
-      Mar03→08: score=0.384 (<0.30), correct_loose=False → BIASED ✅
-      Mar13→18: score=0.793 (>0.70), correct_loose=None  → not biased (FLAT)
+      Mar04->09: score=0.926 (>0.70), correct_loose=False -> BIASED [OK]
+      Mar09->16: score=0.955 (>0.70), correct_loose=False -> BIASED [OK]
+      Mar03->08: score=0.384 (<0.30), correct_loose=False -> BIASED [OK]
+      Mar13->18: score=0.793 (>0.70), correct_loose=None  -> not biased (FLAT)
     """
     if correct_loose_val is None:
-        return False   # FLAT window — skip, not penalise
+        return False   # FLAT window HOLD skip, not penalise
     if correct_loose_val:
-        return False   # correct — no bias regardless of score
+        return False   # correct HOLD no bias regardless of score
     return (score > BIAS_SCORE_THRESHOLD
             or score < (1.0 - BIAS_SCORE_THRESHOLD))
 
@@ -270,10 +270,10 @@ def _recommend_weight(loose_acc: float, bias_rate: float,
     Returns recommended LSTM weight (0.0–1.0) for the aggregator.
 
     Penalisation cascade (applied in order):
-      1. Too few scored windows → WEIGHT_UNCERTAIN
-      2. High bias rate (>=50%) → WEIGHT_NONE
+      1. Too few scored windows -> WEIGHT_UNCERTAIN
+      2. High bias rate (>=50%) -> WEIGHT_NONE
       3. Accuracy-based base weight
-      4. High score std (>0.20) → one step down the weight ladder
+      4. High score std (>0.20) -> one step down the weight ladder
     """
     if n_scoreable < MIN_SCOREABLE_FOR_WEIGHT:
         return WEIGHT_UNCERTAIN
@@ -299,39 +299,39 @@ def _recommend_weight(loose_acc: float, bias_rate: float,
 # DIAGNOSTIC
 # ==============================================================================
 def run_diagnostic(raw_hist: pd.DataFrame, model, scaler, ticker: str):
-    print(f"\n{'─'*64}")
-    print(f"🔍 DIAGNOSTIC  ({ticker})")
-    print(f"{'─'*64}")
+    print(f"\n{'-'*64}")
+    print(f"[CHECK] DIAGNOSTIC  ({ticker})")
+    print(f"{'-'*64}")
     feat = build_features(raw_hist)
     seq  = feat[LSTM_COLS].tail(SEQ_LEN)
     print(f"   Shape      : {seq.shape}   (expected ({SEQ_LEN}, {len(LSTM_COLS)}))")
     try:
         score = predict_direct(raw_hist, model, scaler)
         sig   = _signal(score)
-        stuck = "⚠️  stuck at 0.5" if abs(score - 0.5) <= 0.001 else "✅"
-        print(f"   Normal     : {score:.6f}  → {sig}  {stuck}")
+        stuck = "[WARN]  stuck at 0.5" if abs(score - 0.5) <= 0.001 else "[OK]"
+        print(f"   Normal     : {score:.6f}  -> {sig}  {stuck}")
 
         c_score = predict_direct(
             generate_flash_crash(raw_hist, CRASH_MAGNITUDE), model, scaler)
         delta   = score - c_score
-        react   = ("✅ REACTED"
+        react   = ("[OK] REACTED"
                    if abs(delta) > CRASH_DELTA_THRESHOLD
-                   else "⚠️  NO REACTION")
+                   else "[WARN]  NO REACTION")
         dirn    = ("↑ MORE BULLISH (oversold-bounce)"
                    if delta < 0 else "↓ more bearish")
         sat     = _diag_saturated(score, delta)
-        b_flag  = "⚠️  SATURATION BIAS DETECTED" if sat else "✅ not saturated"
+        b_flag  = "[WARN]  SATURATION BIAS DETECTED" if sat else "[OK] not saturated"
 
-        print(f"   Crashed    : {c_score:.6f}  → {_signal(c_score)}")
+        print(f"   Crashed    : {c_score:.6f}  -> {_signal(c_score)}")
         print(f"   Delta      : {delta:+.6f}  {react}  {dirn}")
         print(f"   Saturation : {b_flag}")
         if sat:
-            print(f"   ⚠️  Score {score:.3f} far from 0.5 AND delta "
+            print(f"   [WARN]  Score {score:.3f} far from 0.5 AND delta "
                   f"{abs(delta):.4f} < {DIAG_SATURATION_DELTA}.")
             print(f"      Reduce LSTM weight for this ticker in the aggregator.")
     except Exception as e:
-        print(f"   ❌ {e}")
-    print(f"{'─'*64}\n")
+        print(f"   [BAD] {e}")
+    print(f"{'-'*64}\n")
 
 
 # ==============================================================================
@@ -405,22 +405,22 @@ def run_window_test(ticker, start, end, label, raw_hist, model, scaler,
 # ==============================================================================
 def _failure_reason(r: dict) -> str:
     if r.get("correct_strict"):
-        return "—"
+        return "HOLD"
     if r.get("bias_detected"):
         return (f"Confidently wrong "
-                f"(score={r['normal_score']:.3f}) — reduce LSTM weight")
+                f"(score={r['normal_score']:.3f}) HOLD reduce LSTM weight")
     sig = r.get("normal_signal", "?")
     act = r.get("actual_dir",    "?")
     ret = r.get("actual_return", 0)
     sc  = r.get("normal_score",  0)
     if act == "FLAT":
-        return f"FLAT move ({ret:+.2%}) — ambiguous"
+        return f"FLAT move ({ret:+.2%}) HOLD ambiguous"
     if sig == "BUY" and act == "DOWN":
         return f"Over-bullish ({sc:.3f}) in downtrend"
     if sig == "SELL" and act == "UP":
         return f"Over-bearish ({sc:.3f}) in uptrend"
     if sig == "HOLD":
-        return "HOLD — no directional call"
+        return "HOLD HOLD no directional call"
     return "Unknown"
 
 
@@ -429,7 +429,7 @@ def _failure_reason(r: dict) -> str:
 # ==============================================================================
 def run_backtest(tickers: list, flat_threshold: float):
     print("\n" + "=" * 72)
-    print("🧪 PHASE 11 — ADVERSARIAL BACKTEST + ACCURACY  (v7)")
+    print("🧪 PHASE 11 HOLD ADVERSARIAL BACKTEST + ACCURACY  (v7)")
     print("=" * 72)
     print(f"   Tickers              : {', '.join(tickers)}")
     print(f"   Windows              : {len(TEST_WINDOWS)}")
@@ -441,58 +441,58 @@ def run_backtest(tickers: list, flat_threshold: float):
     print(f"   Min scored windows   : {MIN_SCOREABLE_FOR_WEIGHT} "
           f"(else weight capped at {WEIGHT_UNCERTAIN})")
     print(f"   Score std penalty    : std>{SCORE_STD_HIGH_THRESHOLD} "
-          f"→ one weight step down")
+          f"-> one weight step down")
     print("=" * 72)
 
     print("\n⚙️  Loading LSTM + scaler...")
     try:
         model  = tf.keras.models.load_model(LSTM_MODEL_PATH)
         scaler = joblib.load(LSTM_SCALER_PATH)
-        print(f"   ✅ Input shape: {tuple(model.input_shape)}")
+        print(f"   [OK] Input shape: {tuple(model.input_shape)}")
     except Exception as e:
-        print(f"   ❌ {e}")
+        print(f"   [BAD] {e}")
         sys.exit(1)
 
     all_results = []
 
     for ticker in tickers:
-        print(f"\n{'─'*72}")
+        print(f"\n{'-'*72}")
         print(f"📈 TICKER: {ticker}")
-        print(f"{'─'*72}")
+        print(f"{'-'*72}")
         try:
             raw = yf.Ticker(ticker).history(period="2y")
             if raw.empty:
-                print("   ❌ No data. Skipping.")
+                print("   [BAD] No data. Skipping.")
                 continue
-            print(f"   ✅ {len(raw)} rows  "
-                  f"({raw.index[0].date()} → {raw.index[-1].date()})")
+            print(f"   [OK] {len(raw)} rows  "
+                  f"({raw.index[0].date()} -> {raw.index[-1].date()})")
         except Exception as e:
-            print(f"   ❌ {e}")
+            print(f"   [BAD] {e}")
             continue
 
         run_diagnostic(raw, model, scaler, ticker)
 
         for (start, end, label) in TEST_WINDOWS:
-            print(f"\n   🔬 {label}  [{start} → {end}]")
+            print(f"\n   🔬 {label}  [{start} -> {end}]")
             r = run_window_test(
                 ticker, start, end, label, raw, model, scaler, flat_threshold)
             all_results.append(r)
 
             if r["error"]:
-                print(f"      ⚠️  {str(r['error']).split(chr(10))[0]}")
+                print(f"      [WARN]  {str(r['error']).split(chr(10))[0]}")
                 continue
 
             dir_icon = {"UP": "📈", "DOWN": "📉", "FLAT": "➡️"}.get(
                 r["actual_dir"], "?")
-            s_ok = ("✅" if r["correct_strict"]
-                    else ("➡️FLAT" if r["actual_dir"] == "FLAT" else "❌"))
-            l_ok = ("✅" if r["correct_loose"]
-                    else ("⬜SKIP" if r["correct_loose"] is None else "❌"))
-            rob  = "✅" if r["crash_detected"] else "❌"
-            bias = "⚠️ BIAS" if r["bias_detected"] else "—"
+            s_ok = ("[OK]" if r["correct_strict"]
+                    else ("➡️FLAT" if r["actual_dir"] == "FLAT" else "[BAD]"))
+            l_ok = ("[OK]" if r["correct_loose"]
+                    else ("⬜SKIP" if r["correct_loose"] is None else "[BAD]"))
+            rob  = "[OK]" if r["crash_detected"] else "[BAD]"
+            bias = "[WARN] BIAS" if r["bias_detected"] else "HOLD"
             cdir = "↑rise" if r["score_delta"] < 0 else "↓drop"
 
-            print(f"      Normal  : {r['normal_score']:.6f}  → {r['normal_signal']}")
+            print(f"      Normal  : {r['normal_score']:.6f}  -> {r['normal_signal']}")
             print(f"      Crashed : {r['crashed_score']:.6f}  "
                   f"(delta={r['score_delta']:+.5f} {cdir})  "
                   f"Robust:{rob}  Bias:{bias}")
@@ -501,7 +501,7 @@ def run_backtest(tickers: list, flat_threshold: float):
             print(f"      Strict:{s_ok}  Loose:{l_ok}  "
                   f"{'← ' + _failure_reason(r) if not r['correct_strict'] else ''}")
 
-    # ── Summary ────────────────────────────────────────────────────────────────
+    # -- Summary ----------------------------------------------------------------
     print(f"\n\n{'█'*72}")
     print("📊  ACCURACY & ROBUSTNESS SUMMARY  (v7)")
     print(f"{'█'*72}\n")
@@ -511,10 +511,10 @@ def run_backtest(tickers: list, flat_threshold: float):
     skipped = [r for r in all_results if r.get("error")]
 
     if not valid:
-        print("   ❌ No valid results.")
+        print("   [BAD] No valid results.")
         return
 
-    # ── Per-ticker table ───────────────────────────────────────────────────────
+    # -- Per-ticker table -------------------------------------------------------
     rows = []
     agent_weights = {}
     ticker_stats  = {}
@@ -550,22 +550,22 @@ def run_backtest(tickers: list, flat_threshold: float):
         )
 
         if len(l_act) < MIN_SCOREABLE_FOR_WEIGHT:
-            w_note = f"⚠️  {weight:.1f} (only {len(l_act)} sample)"
+            w_note = f"[WARN]  {weight:.1f} (only {len(l_act)} sample)"
         elif bias_rate >= 0.50:
             w_note = f"⛔ {weight:.1f} (high bias)"
         elif score_std > SCORE_STD_HIGH_THRESHOLD:
-            w_note = f"⚠️  {weight:.1f} (high std)"
+            w_note = f"[WARN]  {weight:.1f} (high std)"
         else:
-            w_note = f"✅ {weight:.1f}"
+            w_note = f"[OK] {weight:.1f}"
 
         rows.append({
             "Ticker":     ticker,
             "Windows":    len(t),
             "Scored":     len(l_act),
-            "Strict✅":   f"{len(s_cor)}/{len(dir_r)} ({s_acc:.0f}%)",
-            "Loose✅":    f"{len(l_cor)}/{len(l_act)} ({l_acc:.0f}%)",
+            "Strict[OK]":   f"{len(s_cor)}/{len(dir_r)} ({s_acc:.0f}%)",
+            "Loose[OK]":    f"{len(l_cor)}/{len(l_act)} ({l_acc:.0f}%)",
             "FLAT⬜":     flats,
-            "Bias⚠️":    f"{biased}/{len(t)}",
+            "Bias[WARN]":    f"{biased}/{len(t)}",
             "ScoreStd":   f"{score_std:.3f}",
             "CrashDet":   f"{crash_p}/{len(t)}",
             "LSTMWeight": w_note,
@@ -573,14 +573,14 @@ def run_backtest(tickers: list, flat_threshold: float):
 
     print(tabulate(rows, headers="keys", tablefmt="rounded_outline"))
 
-    # ── Detailed window table ──────────────────────────────────────────────────
+    # -- Detailed window table --------------------------------------------------
     print("\n\n📋  DETAILED WINDOW RESULTS\n")
     det = []
     for r in valid:
-        s_ok = ("✅" if r["correct_strict"]
-                else ("➡️FLAT" if r["actual_dir"] == "FLAT" else "❌"))
-        l_ok = ("✅" if r["correct_loose"]
-                else ("⬜SKIP" if r["correct_loose"] is None else "❌"))
+        s_ok = ("[OK]" if r["correct_strict"]
+                else ("➡️FLAT" if r["actual_dir"] == "FLAT" else "[BAD]"))
+        l_ok = ("[OK]" if r["correct_loose"]
+                else ("⬜SKIP" if r["correct_loose"] is None else "[BAD]"))
         det.append({
             "Ticker":  r["ticker"],
             "Window":  r["window"],
@@ -590,14 +590,14 @@ def run_backtest(tickers: list, flat_threshold: float):
             "Score":   f"{r['normal_score']:.4f}",
             "Crash":   f"{r['crashed_score']:.4f}",
             "Delta":   f"{r['score_delta']:+.4f}",
-            "Robust":  "✅" if r["crash_detected"] else "❌",
-            "Bias":    "⚠️" if r["bias_detected"] else "—",
+            "Robust":  "[OK]" if r["crash_detected"] else "[BAD]",
+            "Bias":    "[WARN]" if r["bias_detected"] else "HOLD",
             "Strict":  s_ok,
             "Loose":   l_ok,
         })
     print(tabulate(det, headers="keys", tablefmt="rounded_outline"))
 
-    # ── Totals ─────────────────────────────────────────────────────────────────
+    # -- Totals -----------------------------------------------------------------
     dir_all   = [r for r in valid if r["normal_signal"] != "HOLD"]
     s_cor_all = [r for r in dir_all if r["correct_strict"]]
     l_act_all = [r for r in dir_all if r["correct_loose"] is not None]
@@ -611,7 +611,7 @@ def run_backtest(tickers: list, flat_threshold: float):
     rob   = len(rob_all)   / len(valid)      * 100 if valid     else 0.0
     bias  = len(bias_all)  / len(valid)      * 100 if valid     else 0.0
 
-    print(f"\n{'─'*60}")
+    print(f"\n{'-'*60}")
     print(f"   Total Windows        : {len(valid)}")
     print(f"   Directional Signals  : {len(dir_all)}")
     print(f"   FLAT windows (skip)  : {len(flat_all)}")
@@ -628,18 +628,18 @@ def run_backtest(tickers: list, flat_threshold: float):
           f"({len(bias_all)}/{len(valid)})")
     if skipped:
         print(f"   Skipped/Errors       : {len(skipped)}")
-    print(f"{'─'*60}")
+    print(f"{'-'*60}")
 
     grade_acc = l_acc
-    if   grade_acc >= 75 and rob >= 75: grade = "🏆 A — Production Ready"
-    elif grade_acc >= 60 and rob >= 60: grade = "🥈 B — Needs Tuning"
-    elif grade_acc >= 50:               grade = "🥉 C — Marginal"
-    else:                               grade = "❌ F — Retrain"
+    if   grade_acc >= 75 and rob >= 75: grade = "🏆 A HOLD Production Ready"
+    elif grade_acc >= 60 and rob >= 60: grade = "🥈 B HOLD Needs Tuning"
+    elif grade_acc >= 50:               grade = "🥉 C HOLD Marginal"
+    else:                               grade = "[BAD] F HOLD Retrain"
 
     print(f"\n   SYSTEM GRADE (loose) : {grade}")
-    print(f"{'─'*60}")
+    print(f"{'-'*60}")
 
-    # ── Failure analysis ───────────────────────────────────────────────────────
+    # -- Failure analysis -------------------------------------------------------
     print("\n📌  FAILURE ANALYSIS BY TICKER\n")
     for ticker in tickers:
         st = ticker_stats.get(ticker)
@@ -649,18 +649,18 @@ def run_backtest(tickers: list, flat_threshold: float):
                  if not r["correct_strict"]
                  and r.get("normal_signal") != "HOLD"]
         std_note = (
-            f"  [score std={st['score_std']:.3f} ⚠️  HIGH VOLATILITY]"
+            f"  [score std={st['score_std']:.3f} [WARN]  HIGH VOLATILITY]"
             if st["score_std"] > SCORE_STD_HIGH_THRESHOLD
             else f"  [score std={st['score_std']:.3f}]"
         )
         if not fails:
-            print(f"   {ticker}: ✅ All correct{std_note}")
+            print(f"   {ticker}: [OK] All correct{std_note}")
             continue
         print(f"   {ticker}:{std_note}")
         for r in fails:
             print(f"      {r['window']:<25}  {_failure_reason(r)}")
 
-    # ── Crash behaviour ────────────────────────────────────────────────────────
+    # -- Crash behaviour --------------------------------------------------------
     print("\n⚡  CRASH BEHAVIOUR ANALYSIS\n")
     up   = sum(1 for r in valid if r["score_delta"] < -CRASH_DELTA_THRESHOLD)
     down = sum(1 for r in valid if r["score_delta"] >  CRASH_DELTA_THRESHOLD)
@@ -668,19 +668,19 @@ def run_backtest(tickers: list, flat_threshold: float):
                if abs(r["score_delta"]) <= CRASH_DELTA_THRESHOLD)
     print(f"   ↑ Score RISES  (oversold-bounce logic) : {up}/{len(valid)}")
     print(f"   ↓ Score DROPS  (danger detection)      : {down}/{len(valid)}")
-    print(f"   → No reaction                          : {no}/{len(valid)}")
+    print(f"   -> No reaction                          : {no}/{len(valid)}")
     if up > down:
         print()
-        print("   ⚠️  Model treats large crashes as BUY opportunities "
+        print("   [WARN]  Model treats large crashes as BUY opportunities "
               "(mean-reversion bias).")
         print("      Safe for V-shaped bounces. Dangerous in sustained bears.")
         print("      Recommendation: retrain with 2020 COVID + 2022 bear data.")
 
-    # ── Agent weight recommendations ───────────────────────────────────────────
-    print(f"\n{'─'*60}")
+    # -- Agent weight recommendations -------------------------------------------
+    print(f"\n{'-'*60}")
     print("🤖  MULTI-AGENT LSTM WEIGHT RECOMMENDATIONS\n")
     print("   Weights account for: accuracy, bias rate, score volatility,")
-    print("   and minimum sample size. Remaining weight → sentiment + regime.\n")
+    print("   and minimum sample size. Remaining weight -> sentiment + regime.\n")
 
     for ticker, weight in agent_weights.items():
         st    = ticker_stats.get(ticker, {})
@@ -695,27 +695,27 @@ def run_backtest(tickers: list, flat_threshold: float):
         if st.get("score_std", 0) > SCORE_STD_HIGH_THRESHOLD:
             notes.append(f"score std={st['score_std']:.3f}")
         note_str = f"  [{', '.join(notes)}]" if notes else ""
-        label = ("✅ high trust"   if weight >= 0.8
-                 else "⚠️  medium" if weight >= 0.5
+        label = ("[OK] high trust"   if weight >= 0.8
+                 else "[WARN]  medium" if weight >= 0.5
                  else "⛔ excluded")
         print(f"   {ticker:<6}  {bar}  {weight:.1f}  {label}{note_str}")
 
     print(f"\n   JSON (paste into your aggregator config):")
     print(f"   {json.dumps({'lstm_weights': agent_weights}, indent=4)}")
 
-    # ── Retraining advice ──────────────────────────────────────────────────────
+    # -- Retraining advice ------------------------------------------------------
     bad_tickers = [t for t, w in agent_weights.items() if w < 0.3]
     if bad_tickers:
-        print(f"\n{'─'*60}")
+        print(f"\n{'-'*60}")
         print("🔧  RETRAINING ADVICE\n")
         for ticker in bad_tickers:
             st = ticker_stats.get(ticker, {})
             print(f"   {ticker}:")
             print(f"      1. Add 2022 bear market data to training set.")
-            print(f"      2. Add class weights — bearish sequences are "
+            print(f"      2. Add class weights HOLD bearish sequences are "
                   f"underrepresented.")
             if st.get("score_std", 0) > SCORE_STD_HIGH_THRESHOLD:
-                print(f"      3. Score std={st['score_std']:.3f} is high — "
+                print(f"      3. Score std={st['score_std']:.3f} is high HOLD "
                       f"consider a ticker-specific LSTM head or separate model.")
             else:
                 print(f"      3. Consider a ticker-specific LSTM head if "
@@ -729,7 +729,7 @@ def run_backtest(tickers: list, flat_threshold: float):
 # ==============================================================================
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        description="Phase 11 — Adversarial LSTM backtest (v7)"
+        description="Phase 11 HOLD Adversarial LSTM backtest (v7)"
     )
     parser.add_argument(
         "--ticker", nargs="+", default=["AAPL"],

@@ -10,7 +10,7 @@ FINAL_DATA_PATH = os.path.join("data", "processed", "LSTM_training_data.csv")
 
 def preprocess_data():
     if not os.path.exists(INPUT_PATH):
-        print("❌ Feature data not found. Run add_indicators.py first.")
+        print("[BAD] Feature data not found. Run add_indicators.py first.")
         return
 
     df = pd.read_csv(INPUT_PATH, index_col=0)
@@ -36,7 +36,7 @@ def preprocess_data():
     # Converting back to DataFrame just for saving
     scaled_df = pd.DataFrame(scaled_data, columns=features)
     scaled_df.to_csv(FINAL_DATA_PATH, index=False)
-    print(f"✅ Scaled data ready for Kaggle: {FINAL_DATA_PATH}")
+    print(f"[OK] Scaled data ready for Kaggle: {FINAL_DATA_PATH}")
 
 if __name__ == "__main__":
     preprocess_data()

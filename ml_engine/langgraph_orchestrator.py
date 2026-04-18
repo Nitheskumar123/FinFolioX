@@ -1,19 +1,19 @@
 """
-ml_engine/langgraph_orchestrator.py  —  LangGraph Multi-Agent Orchestrator (v2.4)
+ml_engine/langgraph_orchestrator.py  HOLD  LangGraph Multi-Agent Orchestrator (v2.4)
 ===================================================================================
 CHANGELOG:
-  v2.1 — FinBERT sanity gate, fusion probability centering, ASC prob centering.
-  v2.2 — PATCH-A: asc_saturated flag. PATCH-B: regime_contradiction check.
+  v2.1 HOLD FinBERT sanity gate, fusion probability centering, ASC prob centering.
+  v2.2 HOLD PATCH-A: asc_saturated flag. PATCH-B: regime_contradiction check.
           PATCH-C: AgentState gains asc_saturated and regime_contradiction.
-  v2.3 — Hybrid Regime System integrated.
+  v2.3 HOLD Hybrid Regime System integrated.
           node_market_context uses HybridRegimeAgent (Rule + HMM v2).
           regime_confidence added to AgentState and applied in node_fusion_engine.
-  v2.4 — Root-cause fix: LSTM bullish protection in decision logic.
-          FIX A: conf >= 0.75 in Bear → BUY (LSTM overwhelmingly bullish).
-          FIX B: Bear + conf <= 0.50 + lstm <= 0.65 → SELL (lean bearish guard).
+  v2.4 HOLD Root-cause fix: LSTM bullish protection in decision logic.
+          FIX A: conf >= 0.75 in Bear -> BUY (LSTM overwhelmingly bullish).
+          FIX B: Bear + conf <= 0.50 + lstm <= 0.65 -> SELL (lean bearish guard).
           FIX C: SELL boundary <= 0.40, only when lstm_signal <= 0.65.
                  Prevents ConflictResolver SYSTEMIC_VETO from converting
-                 bullish LSTM (0.99 → arb_conf=0.40) into a SELL.
+                 bullish LSTM (0.99 -> arb_conf=0.40) into a SELL.
 """
 
 import os
@@ -46,8 +46,8 @@ REGIME_CONTRADICTION_PENALTY        = 0.80
 
 # v2.4: LSTM bullish protection thresholds
 STRONG_CONF_BEAR_BUY    = 0.75   # FIX A: override Bear block when LSTM overwhelmingly bullish
-BEAR_LEAN_SELL_MAX      = 0.50   # FIX B: Bear + conf <= this → SELL (tightened from 0.60)
-BULLISH_LSTM_PROTECT    = 0.65   # FIX C: if lstm > this, SELL branch is suppressed → HOLD
+BEAR_LEAN_SELL_MAX      = 0.50   # FIX B: Bear + conf <= this -> SELL (tightened from 0.60)
+BULLISH_LSTM_PROTECT    = 0.65   # FIX C: if lstm > this, SELL branch is suppressed -> HOLD
 
 
 # ==============================================================================
@@ -196,7 +196,7 @@ class FinFolioGraphOrchestrator:
         }
 
     # -------------------------------------------------------------------------
-    # NODE 2: Market Context  — uses HybridRegimeAgent (v2.3)
+    # NODE 2: Market Context  HOLD uses HybridRegimeAgent (v2.3)
     # -------------------------------------------------------------------------
     def node_market_context(self, state: AgentState) -> AgentState:
         print("[Node 2: Market Context] Analyzing volatility and systemic risk...")
@@ -260,11 +260,11 @@ class FinFolioGraphOrchestrator:
                                   else "bearish" if sent_score < -0.07
                                   else "neutral")
             else:
-                print("      ⚠️ MCP returned no result — using neutral (0.0)")
+                print("      [WARN] MCP returned no result HOLD using neutral (0.0)")
         except Exception as e:
             import traceback
             traceback.print_exc()
-            print(f"      ⚠️ Sentiment pipeline error: {e} — using neutral (0.0)")
+            print(f"      [WARN] Sentiment pipeline error: {e} HOLD using neutral (0.0)")
 
         return {
             "sent_score":        sent_score,
@@ -345,7 +345,7 @@ class FinFolioGraphOrchestrator:
         return {"counterfactual_verdict": verdict}
 
     # -------------------------------------------------------------------------
-    # NODE 5: Fusion Engine  — applies regime_confidence (v2.3)
+    # NODE 5: Fusion Engine  HOLD applies regime_confidence (v2.3)
     # -------------------------------------------------------------------------
     def node_fusion_engine(self, state: AgentState) -> AgentState:
         print("[Node 5: Fusion Engine] Synthesizing intelligence layers...")
@@ -368,7 +368,7 @@ class FinFolioGraphOrchestrator:
         sentiment_available = abs(sent_score) > 0.001
 
         if not sentiment_available:
-            print("      ⚠️ [Fusion] Sentiment frozen — gates disabled")
+            print("      [WARN] [Fusion] Sentiment frozen HOLD gates disabled")
         if sentiment_available and sent_score < -0.10 and lstm_signal > 0.55:
             cap = max(0.48, 0.56 + (sent_score + 0.10) * 0.10)
             print(f"      [Fusion] FinBERT veto cap={cap:.3f} (sent={sent_score:.3f})")
@@ -388,7 +388,7 @@ class FinFolioGraphOrchestrator:
         )
         if lstm_regime_agree_bull or lstm_regime_agree_bear:
             final_conf = min(final_conf * 1.08, 0.75)
-            print(f"      [Fusion] Consensus boost → {final_conf:.4f}")
+            print(f"      [Fusion] Consensus boost -> {final_conf:.4f}")
 
         topo_mod          = state.get("topology_modifier", 1.0)
         caus_mod          = state.get("causal_modifier", 1.0)
@@ -408,10 +408,10 @@ class FinFolioGraphOrchestrator:
         if regime_confidence < 0.70:
             final_conf = 0.5 + (final_conf - 0.5) * regime_confidence
             final_conf = float(np.clip(final_conf, 0.0, 1.0))
-            print(f"      - Regime confidence low ({regime_confidence:.2f}) → "
+            print(f"      - Regime confidence low ({regime_confidence:.2f}) -> "
                   f"neutral pull to {final_conf:.4f}")
         else:
-            print(f"      - Regime confidence high ({regime_confidence:.2f}) → no discount")
+            print(f"      - Regime confidence high ({regime_confidence:.2f}) -> no discount")
 
         return {
             "fusion_confidence": final_conf,
@@ -462,14 +462,14 @@ class FinFolioGraphOrchestrator:
                 working_conf = 0.50 + ((working_conf - 0.50) * REGIME_CONTRADICTION_PENALTY)
                 working_conf = float(np.clip(working_conf, 0.0, 1.0))
                 print(f"      [ASC] REGIME CONTRADICTION (Bull+LowConf): "
-                      f"{old_conf:.3f} → {working_conf:.3f}")
+                      f"{old_conf:.3f} -> {working_conf:.3f}")
 
             elif regime_label == "Sideways" and (working_conf > 0.70 or working_conf < 0.35):
                 regime_contradiction = True
                 old_conf     = working_conf
                 working_conf = 0.50 + (working_conf - 0.50) * 0.50
                 print(f"      [ASC] REGIME CONTRADICTION (Sideways+Directional): "
-                      f"{old_conf:.3f} → {working_conf:.3f}")
+                      f"{old_conf:.3f} -> {working_conf:.3f}")
 
             elif (regime_label == "Bear"
                 and working_conf > 0.50
@@ -481,7 +481,7 @@ class FinFolioGraphOrchestrator:
                 working_conf = max(working_conf, 0.41)
                 working_conf = float(np.clip(working_conf, 0.0, 1.0))
                 print(f"      [ASC] REGIME CONTRADICTION (Bear+Bullish): "
-                      f"{old_conf:.3f} → {working_conf:.3f}")
+                      f"{old_conf:.3f} -> {working_conf:.3f}")
 
             asc_result    = self.asc_memory.compute_asc()
             asc_score     = asc_result["asc"]
@@ -517,7 +517,7 @@ class FinFolioGraphOrchestrator:
 
             adjusted_conf = float(np.clip(working_conf * penalty, 0.0, 1.0))
             if penalty < 1.0:
-                print(f"      - Confidence: {working_conf:.4f} → "
+                print(f"      - Confidence: {working_conf:.4f} -> "
                       f"{adjusted_conf:.4f} (ASC penalty)")
 
             effective_threshold = (
@@ -559,7 +559,7 @@ class FinFolioGraphOrchestrator:
             return default_asc_state
 
     # -------------------------------------------------------------------------
-    # NODE 6: Conflict Resolution  — v2.4 LSTM bullish protection
+    # NODE 6: Conflict Resolution  HOLD v2.4 LSTM bullish protection
     # -------------------------------------------------------------------------
     def node_conflict_resolution(self, state: AgentState) -> AgentState:
         print("[Node 6: Conflict Resolution] Arbitrating agent disagreements...")
@@ -617,14 +617,14 @@ class FinFolioGraphOrchestrator:
             raw_causal_mod, gdi
         )
         if gdi_causal_penalty > 0.0:
-            print(f"      [Conflict] GDI={gdi:.3f} → "
-                  f"causal_mod {raw_causal_mod:.3f}→{causal_mod_gdi:.3f}")
+            print(f"      [Conflict] GDI={gdi:.3f} -> "
+                  f"causal_mod {raw_causal_mod:.3f}->{causal_mod_gdi:.3f}")
             gdi_only_factor = causal_mod_gdi / max(raw_causal_mod, 1e-6)
             adj_conf = float(np.clip(adj_conf * gdi_only_factor, 0.0, 1.0))
             print(f"      [Conflict] GDI-only causal factor "
-                  f"{gdi_only_factor:.3f}x → adj_conf={adj_conf:.4f}")
+                  f"{gdi_only_factor:.3f}x -> adj_conf={adj_conf:.4f}")
 
-        # Risk engine — stock_price passed for min viable dollar check (v2.2)
+        # Risk engine HOLD stock_price passed for min viable dollar check (v2.2)
         last_price = state["hist_data"]["Close"].iloc[-1]
         alloc_pct, _ = self.master.risk_engine.calculate_position_size(
             adj_conf,
@@ -637,7 +637,7 @@ class FinFolioGraphOrchestrator:
             last_price, alloc_pct
         )
 
-        # ── Decision Logic  v2.4 ──────────────────────────────────────────────
+        # -- Decision Logic  v2.4 ----------------------------------------------
         if state.get("final_decision") == "HOLD":
             # ASC forced hold upstream
             decision   = "HOLD"
@@ -653,7 +653,7 @@ class FinFolioGraphOrchestrator:
                 else BUY_CONFIDENCE_THRESHOLD
             )
 
-            # ── BUY paths ─────────────────────────────────────────────────────
+            # -- BUY paths -----------------------------------------------------
             normal_buy = (
                 alloc_pct > 0.0
                 and adj_conf >= effective_threshold
@@ -663,7 +663,7 @@ class FinFolioGraphOrchestrator:
             )
 
             # FIX A v2.4: high-confidence Bear override
-            # ConflictResolver may floor a 0.99 LSTM → 0.40; use adj_conf after
+            # ConflictResolver may floor a 0.99 LSTM -> 0.40; use adj_conf after
             # arbitration but also check STRONG_CONF_BEAR_BUY directly.
             # If the regime arbitration has kept adj_conf >= 0.75, LSTM is
             # genuinely overwhelmingly bullish even inside Bear.
@@ -681,7 +681,7 @@ class FinFolioGraphOrchestrator:
                     print(f"      [Conflict] v2.4 Bear override BUY "
                           f"(adj_conf={adj_conf:.3f} >= {STRONG_CONF_BEAR_BUY})")
 
-            # ── Bull low-confidence: HOLD not SELL ───────────────────────────
+            # -- Bull low-confidence: HOLD not SELL ---------------------------
             elif adj_conf < 0.40 and regime_label == "Bull":
                 decision   = "HOLD"
                 alloc_pct  = 0.0
@@ -689,16 +689,16 @@ class FinFolioGraphOrchestrator:
                 cash_value = 0.0
                 print("      [Conflict] Bull regime: downgraded to HOLD (FIX-4).")
 
-            # ── FIX C v2.4: SELL only when LSTM also agrees bearish/neutral ──
-            # Prevents: LSTM=0.99 → SYSTEMIC_VETO → adj_conf=0.40 → SELL
-            # Instead:  LSTM=0.99 + adj_conf=0.40 → lstm > 0.65 → HOLD
+            # -- FIX C v2.4: SELL only when LSTM also agrees bearish/neutral --
+            # Prevents: LSTM=0.99 -> SYSTEMIC_VETO -> adj_conf=0.40 -> SELL
+            # Instead:  LSTM=0.99 + adj_conf=0.40 -> lstm > 0.65 -> HOLD
             elif adj_conf <= 0.40 and lstm_signal <= BULLISH_LSTM_PROTECT:
                 decision   = "SELL"
                 alloc_pct  = 0.0
                 num_shares = 0
                 cash_value = 0.0
 
-            # ── FIX B v2.4: Bear lean-SELL with LSTM guard (tightened 0.60→0.50)
+            # -- FIX B v2.4: Bear lean-SELL with LSTM guard (tightened 0.60->0.50)
             # Prevents: SLV(lstm=0.537,adj=0.541) and AMD(lstm=0.529,adj=0.529)
             # from being SELL'd when LSTM was mildly bullish and market rose.
             elif (regime_label == "Bear"
@@ -710,7 +710,7 @@ class FinFolioGraphOrchestrator:
                 cash_value = 0.0
 
             else:
-                # lstm > BULLISH_LSTM_PROTECT but conf too low for BUY → HOLD
+                # lstm > BULLISH_LSTM_PROTECT but conf too low for BUY -> HOLD
                 # This catches NVDA/TSLA cases where pipeline killed confidence
                 decision   = "HOLD"
                 alloc_pct  = 0.0

@@ -23,11 +23,11 @@ class RegimeAgent:
                     self.regime_map = saved_data.get('regime_map', {})
                 else:
                     self.model = saved_data # Fallback for old models
-                print(f"✅ Regime Agent Loaded from {model_path}")
+                print(f"[OK] Regime Agent Loaded from {model_path}")
             except Exception as e:
-                print(f"❌ Error loading model: {e}")
+                print(f"[BAD] Error loading model: {e}")
         else:
-            print("⚠️ Regime Agent initialized (Untrained).")
+            print("[WARN] Regime Agent initialized (Untrained).")
 
     def train(self, data):
         """
@@ -39,7 +39,7 @@ class RegimeAgent:
         # --- AUTO-LABELING LOGIC ---
         # We need to find out: Which state is 'Bull'? Which is 'Bear'?
         self._label_regimes(data)
-        print("✅ HMM Training Complete & Regimes Labeled.")
+        print("[OK] HMM Training Complete & Regimes Labeled.")
 
     def _label_regimes(self, data):
         """

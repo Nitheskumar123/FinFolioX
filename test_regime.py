@@ -1,13 +1,13 @@
 """
-validate_hybrid_regime.py  — Project Root
+validate_hybrid_regime.py  HOLD Project Root
 ==========================================
-FinFolioX — Hybrid Regime Agent v2.3.1 Validation Suite
+FinFolioX HOLD Hybrid Regime Agent v2.3.1 Validation Suite
 T1–T13 + internal checks  (74 total tests)
 
 Run from project root:
     python validate_hybrid_regime.py
 
-Pass = ✅   Fail = ❌   Warn = ⚠️
+Pass = [OK]   Fail = [BAD]   Warn = [WARN]
 
 Expected output:
     🏆 VERDICT: HybridRegimeAgent v2.3.1 FIT for FinFolioX Phase 3.
@@ -26,7 +26,7 @@ import pandas as pd
 
 warnings.filterwarnings("ignore")
 
-# ── path setup ───────────────────────────────────────────────
+# -- path setup -----------------------------------------------
 PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, PROJECT_ROOT)
 
@@ -41,14 +41,14 @@ from ml_engine.hybrid_regime_agent import (
 
 MODEL_PATH = os.path.join(PROJECT_ROOT, "saved_models", "hmm_regime_hybrid.pkl")
 
-PASS = "✅ PASS"
-FAIL = "❌ FAIL"
-WARN = "⚠️  WARN"
+PASS = "[OK] PASS"
+FAIL = "[BAD] FAIL"
+WARN = "[WARN]  WARN"
 
 
-# ══════════════════════════════════════════════════════════════
+# ==============================================================
 #  VALIDATION SUITE
-# ══════════════════════════════════════════════════════════════
+# ==============================================================
 class ValidationSuite:
 
     VALID_REGIMES   = {"Bull", "Bear", "Sideways"}
@@ -69,7 +69,7 @@ class ValidationSuite:
         status = WARN if warn else (PASS if passed else FAIL)
         self.results.append({"Test": name, "Status": status, "Detail": detail})
 
-    # ── data helper ───────────────────────────────────────────
+    # -- data helper -------------------------------------------
     def _get(self, ticker, start, end):
         try:
             import yfinance as yf
@@ -94,9 +94,9 @@ class ValidationSuite:
             pass
         return _synthetic_ohlcv(start, end)
 
-    # ── T1: Output Contract ───────────────────────────────────
+    # -- T1: Output Contract -----------------------------------
     def t1(self):
-        print("\n── T1: Output Contract ─────────────────────────────")
+        print("\n-- T1: Output Contract -----------------------------")
         try:
             df  = self._get("^GSPC", "2024-01-01", "2024-12-31")
             res = self.agent.analyze_regime(df)
@@ -105,25 +105,25 @@ class ValidationSuite:
             label, vol = res
             self._r("Value 1 is str",   isinstance(label, str),  f"type={type(label)}")
             self._r("Value 2 is float", isinstance(vol,   float), f"type={type(vol)}")
-            print(f"         → ('{label}', {vol:.6f})")
+            print(f"         -> ('{label}', {vol:.6f})")
         except Exception as e:
             self._r("T1 contract", False, str(e))
 
-    # ── T2: Label Validity ────────────────────────────────────
+    # -- T2: Label Validity ------------------------------------
     def t2(self):
-        print("\n── T2: Label Validity ──────────────────────────────")
+        print("\n-- T2: Label Validity ------------------------------")
         try:
             df       = self._get("^GSPC", "2024-01-01", "2024-12-31")
             label, _ = self.agent.analyze_regime(df)
             self._r("Label in {Bull,Bear,Sideways}",
                     label in self.VALID_REGIMES, f"'{label}'")
-            print(f"         → Detected: '{label}'")
+            print(f"         -> Detected: '{label}'")
         except Exception as e:
             self._r("T2 label", False, str(e))
 
-    # ── T3: Volatility Sanity ─────────────────────────────────
+    # -- T3: Volatility Sanity ---------------------------------
     def t3(self):
-        print("\n── T3: Volatility Sanity ───────────────────────────")
+        print("\n-- T3: Volatility Sanity ---------------------------")
         try:
             df     = self._get("^GSPC", "2024-01-01", "2024-12-31")
             _, vol = self.agent.analyze_regime(df)
@@ -131,13 +131,13 @@ class ValidationSuite:
             self._r("vol is finite",        np.isfinite(vol),    f"vol={vol:.6f}")
             self._r("vol in [0.001, 0.20]", 0.001 < vol < 0.20, f"vol={vol:.6f}",
                     warn=not 0.001 < vol < 0.20)
-            print(f"         → daily vol = {vol:.5f}  (~{vol*100:.2f}%/day)")
+            print(f"         -> daily vol = {vol:.5f}  (~{vol*100:.2f}%/day)")
         except Exception as e:
             self._r("T3 vol", False, str(e))
 
-    # ── T4: Multi-Ticker ─────────────────────────────────────
+    # -- T4: Multi-Ticker -------------------------------------
     def t4(self):
-        print("\n── T4: Multi-Ticker Coverage ───────────────────────")
+        print("\n-- T4: Multi-Ticker Coverage -----------------------")
         tickers = {"^GSPC": "S&P500", "AAPL": "Apple",
                    "MSFT": "Microsoft", "GLD": "Gold ETF", "QQQ": "Nasdaq ETF"}
         for sym, nm in tickers.items():
@@ -151,9 +151,9 @@ class ValidationSuite:
             except Exception as e:
                 self._r(f"{nm} ({sym})", False, str(e))
 
-    # ── T5: Known Regime Dates ────────────────────────────────
+    # -- T5: Known Regime Dates --------------------------------
     def t5(self):
-        print("\n── T5: Known Regime Dates (Ground Truth) ───────────")
+        print("\n-- T5: Known Regime Dates (Ground Truth) -----------")
         train = _synthetic_ohlcv("2003-01-01", "2024-12-31", seed=42)
         n     = len(train)
         third = n // 3
@@ -171,9 +171,9 @@ class ValidationSuite:
             except Exception as e:
                 self._r(desc, False, str(e))
 
-    # ── T6: Regime Persistence ────────────────────────────────
+    # -- T6: Regime Persistence --------------------------------
     def t6(self):
-        print("\n── T6: Regime Persistence (Markov Stability) ───────")
+        print("\n-- T6: Regime Persistence (Markov Stability) -------")
         try:
             df = _synthetic_ohlcv("2003-01-01", "2024-12-31", seed=42)
             _, labels = self.agent.predict_all_states(df)
@@ -185,7 +185,7 @@ class ValidationSuite:
                     f"{pers:.4f}", warn=pers <= 0.90)
             dist  = Counter(labels)
             total = len(labels)
-            print(f"         → {total} days  |  ", end="")
+            print(f"         -> {total} days  |  ", end="")
             for lbl in ["Bull", "Sideways", "Bear"]:
                 print(f"{lbl}: {dist.get(lbl, 0)/total*100:.0f}%  ", end="")
             print()
@@ -193,9 +193,9 @@ class ValidationSuite:
             self._r("T6 persistence", False, str(e))
             traceback.print_exc()
 
-    # ── T7: Downstream Mapping ────────────────────────────────
+    # -- T7: Downstream Mapping --------------------------------
     def t7(self):
-        print("\n── T7: Downstream Mapping ──────────────────────────")
+        print("\n-- T7: Downstream Mapping --------------------------")
         for lbl in ["Bull", "Bear", "Sideways"]:
             fv = self.FUSION_MAP.get(lbl)
             kb = self.KELLY_MAP.get(lbl)
@@ -209,9 +209,9 @@ class ValidationSuite:
         except Exception as e:
             self._r("Arbitrator veto", False, str(e))
 
-    # ── T8: Save / Load Integrity ─────────────────────────────
+    # -- T8: Save / Load Integrity -----------------------------
     def t8(self):
-        print("\n── T8: Save / Load Integrity ───────────────────────")
+        print("\n-- T8: Save / Load Integrity -----------------------")
         try:
             with tempfile.TemporaryDirectory() as tmp:
                 path = os.path.join(tmp, "models", "test_hybrid.pkl")
@@ -233,9 +233,9 @@ class ValidationSuite:
             self._r("T8 save/load", False, str(e))
             traceback.print_exc()
 
-    # ── T9: Edge Cases ────────────────────────────────────────
+    # -- T9: Edge Cases ----------------------------------------
     def t9(self):
-        print("\n── T9: Edge Cases ──────────────────────────────────")
+        print("\n-- T9: Edge Cases ----------------------------------")
         try:
             df         = _synthetic_ohlcv("2024-09-01", "2024-12-31", seed=3)
             label, vol = self.agent.analyze_regime(df)
@@ -255,9 +255,9 @@ class ValidationSuite:
         except Exception as e:
             self._r("Untrained RuntimeError", False, str(e))
 
-    # ── T10: Latency ─────────────────────────────────────────
+    # -- T10: Latency -----------------------------------------
     def t10(self):
-        print("\n── T10: Inference Latency (< 100ms) ────────────────")
+        print("\n-- T10: Inference Latency (< 100ms) ----------------")
         try:
             df    = _synthetic_ohlcv("2023-01-01", "2024-12-31", seed=8)
             times = []
@@ -268,14 +268,14 @@ class ValidationSuite:
             avg_ms, max_ms = np.mean(times), np.max(times)
             self._r("Avg inference < 100ms", avg_ms < 100, f"avg={avg_ms:.2f}ms")
             self._r("Max inference < 200ms", max_ms < 200, f"max={max_ms:.2f}ms")
-            print(f"         → avg={avg_ms:.1f}ms | max={max_ms:.1f}ms | min={np.min(times):.1f}ms")
+            print(f"         -> avg={avg_ms:.1f}ms | max={max_ms:.1f}ms | min={np.min(times):.1f}ms")
         except Exception as e:
             self._r("T10 latency", False, str(e))
 
-    # ── T11: Forward Accuracy ─────────────────────────────────
+    # -- T11: Forward Accuracy ---------------------------------
     def t11(self):
         """Does today's regime predict next 5 days direction? This makes money."""
-        print("\n── T11: Forward Accuracy (regime → future returns) ─")
+        print("\n-- T11: Forward Accuracy (regime -> future returns) -")
         try:
             df             = _synthetic_ohlcv("2003-01-01", "2024-12-31", seed=42)
             states, labels, feat = self.agent.predict_all_with_feat(df)
@@ -289,7 +289,7 @@ class ValidationSuite:
             stats = {}
             print(f"\n  {'Regime':<12} {'Days':>6} {'Avg Fwd5':>10} "
                   f"{'Hit Rate':>10} {'Verdict'}")
-            print("  " + "─" * 48)
+            print("  " + "-" * 48)
 
             for lbl in ["Bull", "Bear", "Sideways"]:
                 mask = (labels_arr == lbl) & ~np.isnan(fwd5)
@@ -303,16 +303,16 @@ class ValidationSuite:
                 else:                correct = (np.abs(ret) < 0.015).sum()
                 hit = correct / len(ret)
                 stats[lbl] = (avg, hit, len(ret))
-                v = ("✅" if ((lbl == "Bull"    and avg > 0) or
+                v = ("[OK]" if ((lbl == "Bull"    and avg > 0) or
                               (lbl == "Bear"    and avg < 0) or
                               (lbl == "Sideways" and abs(avg) < 0.01))
-                     else "❌")
+                     else "[BAD]")
                 print(f"  {lbl:<12} {len(ret):>6} {avg:>+10.5f} {hit:>9.1%}  {v}")
 
             bull_avg, bull_hit, bull_n = stats.get("Bull",  (np.nan, np.nan, 0))
             bear_avg, bear_hit, bear_n = stats.get("Bear",  (np.nan, np.nan, 0))
 
-            # Bull+Bear directional accuracy (Sideways excluded — inherently low-directional)
+            # Bull+Bear directional accuracy (Sideways excluded HOLD inherently low-directional)
             bull_c  = int(bull_hit * bull_n) if not np.isnan(bull_hit) else 0
             bear_c  = int(bear_hit * bear_n) if not np.isnan(bear_hit) else 0
             dir_hit = (bull_c + bear_c) / (bull_n + bear_n) \
@@ -340,10 +340,10 @@ class ValidationSuite:
             self._r("T11 forward accuracy", False, str(e))
             traceback.print_exc()
 
-    # ── T12: Transition Matrix ────────────────────────────────
+    # -- T12: Transition Matrix --------------------------------
     def t12(self):
         """High diagonal = stable regimes, not random flipping."""
-        print("\n── T12: Transition Matrix (regime stickiness) ──────")
+        print("\n-- T12: Transition Matrix (regime stickiness) ------")
         try:
             T     = self.agent.model.transmat_
             K     = T.shape[0]
@@ -385,10 +385,10 @@ class ValidationSuite:
             self._r("T12 transition matrix", False, str(e))
             traceback.print_exc()
 
-    # ── T13: Performance Separation ───────────────────────────
+    # -- T13: Performance Separation ---------------------------
     def t13(self):
-        """Bull=high ret+low vol, Bear=low ret+high vol — model is meaningful."""
-        print("\n── T13: Regime Performance Separation ──────────────")
+        """Bull=high ret+low vol, Bear=low ret+high vol HOLD model is meaningful."""
+        print("\n-- T13: Regime Performance Separation --------------")
         try:
             df             = _synthetic_ohlcv("2003-01-01", "2024-12-31", seed=42)
             states, labels, feat = self.agent.predict_all_with_feat(df)
@@ -399,7 +399,7 @@ class ValidationSuite:
             stats = {}
             print(f"\n  {'Regime':<12} {'Days':>6} {'Avg Daily Ret':>15} "
                   f"{'Avg Daily Vol':>15} {'Ann Ret':>10} {'Ann Vol':>10}")
-            print("  " + "─" * 72)
+            print("  " + "-" * 72)
             for lbl in ["Bull", "Bear", "Sideways"]:
                 mask = labels_arr == lbl
                 if mask.sum() < 5:
@@ -439,7 +439,7 @@ class ValidationSuite:
             self._r("T13 performance separation", False, str(e))
             traceback.print_exc()
 
-    # ── T14: Ticker + Date Spot Check ────────────────────────
+    # -- T14: Ticker + Date Spot Check ------------------------
     def t14(self):
         """
         Spot-check regime + signals for specific tickers and date windows.
@@ -447,28 +447,28 @@ class ValidationSuite:
         and validates label, vol range, and optional expected regime.
 
         ADD your own cases to SPOT_CHECKS below.
-        expected=None means "any valid label" — useful when you just want
+        expected=None means "any valid label" HOLD useful when you just want
         to confirm the pipeline runs without asserting direction.
         """
-        print("\n── T14: Ticker + Date Spot Checks ──────────────────")
+        print("\n-- T14: Ticker + Date Spot Checks ------------------")
 
-        # ─────────────────────────────────────────────────────
+        # -----------------------------------------------------
         #  SPOT_CHECKS format:
         #  (description, ticker, start, end, expected_regime_or_None)
         #
         #  expected_regime options:
-        #    "Bull"     → assert label == "Bull"
-        #    "Bear"     → assert label == "Bear"
-        #    "Sideways" → assert label == "Sideways"
-        #    None       → any valid label (pipeline smoke test only)
-        # ─────────────────────────────────────────────────────
+        #    "Bull"     -> assert label == "Bull"
+        #    "Bear"     -> assert label == "Bear"
+        #    "Sideways" -> assert label == "Sideways"
+        #    None       -> any valid label (pipeline smoke test only)
+        # -----------------------------------------------------
         SPOT_CHECKS = [
-            # ── Known historical periods ──────────────────────
+            # -- Known historical periods ----------------------
             ("S&P500 2008 crisis",       "^GSPC", "2008-01-01", "2009-03-01", "Bear"),
             ("S&P500 2020 COVID crash",  "^GSPC", "2020-02-01", "2020-05-01", "Bear"),
             ("S&P500 2021 bull run",     "^GSPC", "2020-11-01", "2021-11-01", "Bull"),
             ("S&P500 2022 bear market",  "^GSPC", "2022-01-01", "2022-12-01", "Bear"),
-            # ── Individual tickers (smoke tests) ─────────────
+            # -- Individual tickers (smoke tests) -------------
             ("AAPL recent",              "AAPL",  "2024-01-01", "2025-03-01", None),
             ("NVDA recent",              "NVDA",  "2024-01-01", "2025-03-01", None),
             ("GLD recent",               "GLD",   "2024-01-01", "2025-03-01", None),
@@ -476,7 +476,7 @@ class ValidationSuite:
 
         print(f"\n  {'Description':<35} {'Ticker':<8} {'Got':>10} "
               f"{'Vol':>8} {'Expected':>10}  {'Result'}")
-        print("  " + "─" * 82)
+        print("  " + "-" * 82)
 
         for desc, ticker, start, end, expected in SPOT_CHECKS:
             try:
@@ -486,22 +486,22 @@ class ValidationSuite:
                     self._r(f"T14 {desc}", False,
                             f"too few rows: {len(df)}")
                     print(f"  {'  '+desc:<35} {ticker:<8} {'n/a':>10} "
-                          f"{'n/a':>8} {str(expected):>10}  ❌ too few rows")
+                          f"{'n/a':>8} {str(expected):>10}  [BAD] too few rows")
                     continue
 
                 label, vol = self.agent.analyze_regime(df)
 
-                # ── Checks ────────────────────────────────────
+                # -- Checks ------------------------------------
                 label_ok  = label in self.VALID_REGIMES
                 vol_ok    = 0.001 < vol < 0.20
                 regime_ok = (label == expected) if expected else True
 
                 all_ok = label_ok and vol_ok and regime_ok
-                icon   = "✅" if all_ok else ("⚠️ " if (label_ok and vol_ok) else "❌")
+                icon   = "[OK]" if all_ok else ("[WARN] " if (label_ok and vol_ok) else "[BAD]")
                 note   = (f"expected '{expected}' got '{label}'"
                           if expected and not regime_ok else "")
 
-                self._r(f"T14 — {desc} ({ticker} {start[:7]}→{end[:7]})",
+                self._r(f"T14 HOLD {desc} ({ticker} {start[:7]}->{end[:7]})",
                         all_ok,
                         f"label='{label}', vol={vol:.5f}{' | '+note if note else ''}",
                         warn=(label_ok and vol_ok and not regime_ok))
@@ -510,83 +510,83 @@ class ValidationSuite:
                       f"{vol:>8.5f} {str(expected or 'any'):>10}  {icon} {note}")
 
             except Exception as e:
-                self._r(f"T14 — {desc}", False, str(e))
+                self._r(f"T14 HOLD {desc}", False, str(e))
                 print(f"  {'  '+desc:<35} {ticker:<8} {'ERROR':>10} "
-                      f"{'':>8} {str(expected or 'any'):>10}  ❌ {e}")
+                      f"{'':>8} {str(expected or 'any'):>10}  [BAD] {e}")
 
-    # ── T15: Point-in-Time Date Backtest ─────────────────────
+    # -- T15: Point-in-Time Date Backtest ---------------------
     def t15(self):
         """
         🔥 "On a specific date, what regime did the model predict
-            for each ticker — and was it correct?"
+            for each ticker HOLD and was it correct?"
 
         For each (date, ticker) pair:
           1. Downloads data UP TO (and including) that date
-          2. Runs the model → records regime label + confidence
-          3. Downloads the NEXT 5 trading days → computes forward return
+          2. Runs the model -> records regime label + confidence
+          3. Downloads the NEXT 5 trading days -> computes forward return
           4. Checks directional correctness:
-               Bull     → forward_return > 0    ✅
-               Bear     → forward_return < 0    ✅
-               Sideways → not a directional call 🔍 (excluded from accuracy)
+               Bull     -> forward_return > 0    [OK]
+               Bear     -> forward_return < 0    [OK]
+               Sideways -> not a directional call [CHECK] (excluded from accuracy)
           5. Outputs a clean per-row table + overall accuracy
 
         ADD your own dates and tickers to DATE_BACKTEST below.
-        Set verify=True  → test directional correctness (needs future data)
-        Set verify=False → smoke test only (just checks pipeline runs)
+        Set verify=True  -> test directional correctness (needs future data)
+        Set verify=False -> smoke test only (just checks pipeline runs)
         """
-        print("\n── T15: Point-in-Time Date Backtest ────────────────")
+        print("\n-- T15: Point-in-Time Date Backtest ----------------")
 
-        # ─────────────────────────────────────────────────────
+        # -----------------------------------------------------
         #  DATE_BACKTEST format:
         #  (date_str "YYYY-MM-DD", ticker, verify_direction)
         #
-        #  verify=True  → downloads 5 days AFTER date, checks direction
-        #  verify=False → smoke test only (confirms pipeline runs)
+        #  verify=True  -> downloads 5 days AFTER date, checks direction
+        #  verify=False -> smoke test only (confirms pipeline runs)
         #
         #  noise_band: moves WITHIN this % are inconclusive (not a miss)
-        #    1.0  → good for indices  (^GSPC, QQQ, ^IXIC)  — low vol
-        #    2.0  → good for stocks   (AAPL, MSFT, NVDA)   — mid vol
-        #    3.0  → good for volatile (TSLA, NVDA on big news days)
-        # ─────────────────────────────────────────────────────
+        #    1.0  -> good for indices  (^GSPC, QQQ, ^IXIC)  HOLD low vol
+        #    2.0  -> good for stocks   (AAPL, MSFT, NVDA)   HOLD mid vol
+        #    3.0  -> good for volatile (TSLA, NVDA on big news days)
+        # -----------------------------------------------------
         DATE_BACKTEST = [
-            # ── date          ticker   verify  noise_band ──────────────
-            # ── 02 Mar 2026 ──────────────────────────────────────────
+            # -- date          ticker   verify  noise_band --------------
+            # -- 02 Mar 2026 ------------------------------------------
             ("2026-03-02", "^GSPC",  True,  1.0),
             ("2026-03-02", "AAPL",   True,  2.0),
-            ("2026-03-02", "NVDA",   True,  2.0),  # high vol stock → 2% band
+            ("2026-03-02", "NVDA",   True,  2.0),  # high vol stock -> 2% band
             ("2026-03-02", "MSFT",   True,  2.0),
-            # ── 06 Mar 2026 ──────────────────────────────────────────
+            # -- 06 Mar 2026 ------------------------------------------
             ("2026-03-06", "^GSPC",  True,  1.0),
             ("2026-03-06", "AAPL",   True,  2.0),
             ("2026-03-06", "NVDA",   True,  2.0),
             ("2026-03-06", "GLD",    True,  1.5),
-            # ── 07 Mar 2026 ──────────────────────────────────────────
+            # -- 07 Mar 2026 ------------------------------------------
             ("2026-03-07", "^GSPC",  True,  1.0),
             ("2026-03-07", "AAPL",   True,  2.0),
             ("2026-03-07", "QQQ",    True,  1.0),
-            # ── 12 Mar 2026 ──────────────────────────────────────────
+            # -- 12 Mar 2026 ------------------------------------------
             ("2026-03-12", "^GSPC",  True,  1.0),
             ("2026-03-12", "AAPL",   True,  2.0),
             ("2026-03-12", "MSFT",   True,  2.0),
             ("2026-03-12", "GLD",    True,  1.5),
-            # ── 14 Mar 2026 ──────────────────────────────────────────
+            # -- 14 Mar 2026 ------------------------------------------
             ("2026-03-14", "^GSPC",  True,  1.0),
             ("2026-03-14", "AAPL",   True,  2.0),
             ("2026-03-14", "GLD",    True,  1.5),
             ("2026-03-14", "QQQ",    True,  1.0),
-            # ── 16 Mar 2026 (Sun → last trading day = Fri 14) ────────
+            # -- 16 Mar 2026 (Sun -> last trading day = Fri 14) --------
             ("2026-03-16", "^GSPC",  True,  1.0),
             ("2026-03-16", "AAPL",   True,  2.0),
             ("2026-03-16", "NVDA",   True,  2.0),
             ("2026-03-16", "GLD",    True,  1.5),
-            # ── 19 Mar 2026 ──────────────────────────────────────────
+            # -- 19 Mar 2026 ------------------------------------------
             ("2026-03-19", "^GSPC",  True,  1.0),
             ("2026-03-19", "AAPL",   True,  2.0),
             ("2026-03-19", "MSFT",   True,  2.0),
             ("2026-03-19", "NVDA",   True,  2.0),
             ("2026-03-19", "GLD",    True,  1.5),
             ("2026-03-19", "QQQ",    True,  1.0),
-            # ── Add your own dates here ───────────────────────────────
+            # -- Add your own dates here -------------------------------
             # ("2026-02-01", "TSLA",   True, 3.0),
         ]
 
@@ -632,10 +632,10 @@ class ValidationSuite:
             df.dropna(inplace=True)
             return df.head(n_days)   # keep only first n trading days
 
-        # ── Run all checks ────────────────────────────────────
+        # -- Run all checks ------------------------------------
         print(f"\n  {'Date':<12} {'Ticker':<8} {'Regime':>9} "
               f"{'Conf':>6} {'Fwd':>12} {'Band':>5} {'Result'}")
-        print("  " + "─" * 70)
+        print("  " + "-" * 70)
 
         correct_total = 0
         verifiable    = 0
@@ -648,7 +648,7 @@ class ValidationSuite:
                     self._r(f"T15 {ticker} @{date_str}",
                             False, f"only {len(hist)} rows before {date_str}")
                     print(f"  {date_str:<12} {ticker:<8} {'n/a':>9} "
-                          f"{'':>6} {'n/a':>12} {noise_band:>4.1f}%  ❌ too few rows")
+                          f"{'':>6} {'n/a':>12} {noise_band:>4.1f}%  [BAD] too few rows")
                     continue
 
                 # 2. Predict regime on that date
@@ -665,20 +665,20 @@ class ValidationSuite:
                     if len(fwd) >= 1:
                         # Use whatever days are available (≥1).
                         # For recent dates (e.g. Mar 19 when today is Mar 22)
-                        # only 2 trading days may exist — that's fine.
+                        # only 2 trading days may exist HOLD that's fine.
                         fwd_return = (fwd["Close"].iloc[-1] /
                                       fwd["Close"].iloc[0] - 1) * 100
                         n_avail    = len(fwd)
                         direction  = f"{fwd_return:+.2f}% ({n_avail}d)"
 
                         # Per-row noise band (set in DATE_BACKTEST):
-                        #   indices (^GSPC, QQQ): 1% — tight, low vol
-                        #   stocks  (AAPL, MSFT): 2% — wider, mid vol
-                        #   volatile (NVDA, TSLA): 2-3% — macro signal not stock alpha
+                        #   indices (^GSPC, QQQ): 1% HOLD tight, low vol
+                        #   stocks  (AAPL, MSFT): 2% HOLD wider, mid vol
+                        #   volatile (NVDA, TSLA): 2-3% HOLD macro signal not stock alpha
                         if label == "Sideways":
                             correct = None  # Sideways is never a directional call
                         elif abs(fwd_return) <= noise_band:
-                            correct = None  # within noise — inconclusive
+                            correct = None  # within noise HOLD inconclusive
                         elif label == "Bull":
                             correct = fwd_return > 0
                             verifiable += 1
@@ -693,9 +693,9 @@ class ValidationSuite:
                         direction = "no data"  # future data not yet available
 
                 # 4. Result icon
-                if correct is True:   icon = "✅"
-                elif correct is False: icon = "❌"
-                else:                  icon = "🔍"   # not verified
+                if correct is True:   icon = "[OK]"
+                elif correct is False: icon = "[BAD]"
+                else:                  icon = "[CHECK]"   # not verified
 
                 # 5. Register test result
                 test_name = f"T15 {ticker} @{date_str}"
@@ -713,7 +713,7 @@ class ValidationSuite:
             except Exception as e:
                 self._r(f"T15 {ticker} @{date_str}", False, str(e))
                 print(f"  {date_str:<12} {ticker:<8} {'ERROR':>9} "
-                      f"{'':>6} {'':>12} {noise_band:>4.1f}%  ❌  {e}")
+                      f"{'':>6} {'':>12} {noise_band:>4.1f}%  [BAD]  {e}")
 
         # 6. Summary
         if verifiable > 0:
@@ -725,11 +725,11 @@ class ValidationSuite:
                     acc_ok,
                     f"{correct_total}/{verifiable} = {accuracy:.0f}%")
         else:
-            print("\n  (No verified checks — set verify=True to check direction)")
+            print("\n  (No verified checks HOLD set verify=True to check direction)")
 
-    # ── Internal: detect() interface ─────────────────────────
+    # -- Internal: detect() interface -------------------------
     def internal_detect(self):
-        print("\n── Internal: detect() 3-tuple interface ────────────")
+        print("\n-- Internal: detect() 3-tuple interface ------------")
         try:
             df     = _synthetic_ohlcv("2024-01-01", "2024-12-31", seed=7)
             result = self.agent.detect(df, "TEST")
@@ -740,13 +740,13 @@ class ValidationSuite:
             self._r("detect() label valid",   lbl  in self.VALID_REGIMES, f"'{lbl}'")
             self._r("detect() vol > 0",        vol  > 0,                   f"{vol:.5f}")
             self._r("detect() conf in [0,1]",  0.0 <= conf <= 1.0,        f"{conf:.3f}")
-            print(f"         → ('{lbl}', vol={vol:.5f}, conf={conf:.3f})")
+            print(f"         -> ('{lbl}', vol={vol:.5f}, conf={conf:.3f})")
         except Exception as e:
             self._r("Internal detect() interface", False, str(e))
 
-    # ── Internal: data quality ────────────────────────────────
+    # -- Internal: data quality --------------------------------
     def internal_data(self, data: dict):
-        print("\n── Internal: Data Quality ──────────────────────────")
+        print("\n-- Internal: Data Quality --------------------------")
         idx  = data["index"]
         vix  = data["vix"]
         secs = data["sectors"]
@@ -760,9 +760,9 @@ class ValidationSuite:
         self._r("Sectors ≥ 5 cols",         secs.shape[1] >= 5, f"{secs.shape[1]} cols")
         self._r("Source identified",        src in ("live", "synthetic"), f"{src}")
 
-    # ── Internal: feature quality ────────────────────────────
+    # -- Internal: feature quality ----------------------------
     def internal_features(self, feat: pd.DataFrame):
-        print("\n── Internal: Feature Quality ───────────────────────")
+        print("\n-- Internal: Feature Quality -----------------------")
         req = ["sp500","ma20","ma50","ma200","vix","realised_vol_20d",
                "realised_vol_ewm","breadth_pct","mom_score","ret_5d",
                "ret_20d","ret_60d","vol_ratio","broad_confirm"]
@@ -789,9 +789,9 @@ class ValidationSuite:
         self._r("No infinite values",
                 not np.isinf(feat.select_dtypes("number")).any().any(), "")
 
-    # ── Internal: output schema ───────────────────────────────
+    # -- Internal: output schema -------------------------------
     def internal_output(self, out):
-        print("\n── Internal: Output Schema + Cross-Consistency ─────")
+        print("\n-- Internal: Output Schema + Cross-Consistency -----")
         from ml_engine.hybrid_regime_agent import RegimeOutput
         self._r("regime valid",       out.regime in self.VALID_REGIMES,      f"'{out.regime}'")
         self._r("confidence [0,1]",   0.0 <= out.confidence <= 1.0,          f"{out.confidence}")
@@ -810,27 +810,27 @@ class ValidationSuite:
         # Test must count only penalty-applying flags, not informational ones.
         penalty_flags = [f for f in out.conflict_flags if "soft blend" not in f.lower()]
         if len(penalty_flags) >= 2:
-            self._r("≥2 penalty flags → conf < 0.75",
+            self._r("≥2 penalty flags -> conf < 0.75",
                     out.confidence < 0.75,
                     f"penalty_flags={len(penalty_flags)}, conf={out.confidence}")
         self._r("Bull breadth gate enforced",
                 not (out.regime == "Bull" and out.breadth_pct < 35.0),
                 f"regime={out.regime}, breadth={out.breadth_pct}%")
         if out.regime == "Bull":
-            self._r("Bull → Risk-On or Neutral",
+            self._r("Bull -> Risk-On or Neutral",
                     out.risk_state in ("Risk-On", "Neutral"),
                     f"risk_state={out.risk_state}")
         if out.regime == "Bear":
-            self._r("Bear → Risk-Off or Neutral",
+            self._r("Bear -> Risk-Off or Neutral",
                     out.risk_state in ("Risk-Off", "Neutral"),
                     f"risk_state={out.risk_state}")
         if out.vix_level > 25:
-            self._r("VIX>25 → vol not 'Low'", out.volatility != "Low",
+            self._r("VIX>25 -> vol not 'Low'", out.volatility != "Low",
                     f"vix={out.vix_level}, vol={out.volatility}")
 
-    # ── Internal: stability ───────────────────────────────────
+    # -- Internal: stability -----------------------------------
     def internal_stability(self, data: dict):
-        print("\n── Internal: Regime Stability (5-day window) ───────")
+        print("\n-- Internal: Regime Stability (5-day window) -------")
         try:
             sp_df  = pd.DataFrame({"Close": data["index"]["sp500"]})
             hmm_f  = FeatureEngine().build_hmm_features(sp_df)
@@ -849,12 +849,12 @@ class ValidationSuite:
         except Exception as e:
             self._r("Internal stability", False, str(e))
 
-    # ── Run all ───────────────────────────────────────────────
+    # -- Run all -----------------------------------------------
     def run_all(self):
-        print("\n" + "═" * 66)
-        print("  VALIDATION SUITE — Hybrid Regime Agent v2.3.1")
+        print("\n" + "=" * 66)
+        print("  VALIDATION SUITE HOLD Hybrid Regime Agent v2.3.1")
         print("  T1–T15 + Internal")
-        print("═" * 66)
+        print("=" * 66)
 
         # T1–T15
         self.t1();  self.t2();  self.t3();  self.t4()
@@ -883,19 +883,19 @@ class ValidationSuite:
 
         self._print_report()
 
-    # ── Report ────────────────────────────────────────────────
+    # -- Report ------------------------------------------------
     def _print_report(self):
         try:
             from tabulate import tabulate
-            print("\n" + "═" * 70)
+            print("\n" + "=" * 70)
             print("  FINAL VALIDATION REPORT")
-            print("═" * 70)
+            print("=" * 70)
             print(tabulate(pd.DataFrame(self.results),
                            headers="keys", tablefmt="rounded_outline", showindex=False))
         except ImportError:
-            print("\n" + "═" * 70)
+            print("\n" + "=" * 70)
             print("  FINAL VALIDATION REPORT")
-            print("═" * 70)
+            print("=" * 70)
             for r in self.results:
                 print(f"  {r['Status']}  {r['Test']:<55}  {r['Detail']}")
 
@@ -903,25 +903,25 @@ class ValidationSuite:
         fails  = sum(1 for r in self.results if r["Status"] == FAIL)
         warns  = sum(1 for r in self.results if r["Status"] == WARN)
         total  = len(self.results)
-        print(f"\n  Total: {total}  |  ✅ {passes}  |  ❌ {fails}  |  ⚠️  {warns}")
-        print("─" * 70)
+        print(f"\n  Total: {total}  |  [OK] {passes}  |  [BAD] {fails}  |  [WARN]  {warns}")
+        print("-" * 70)
         if fails == 0:
             print("\n  🏆 VERDICT: HybridRegimeAgent v2.3.1 FIT for FinFolioX Phase 3.")
         elif fails <= 5:
-            print("\n  ⚠️  VERDICT: Minor issues. Review ❌ before integrating.")
+            print("\n  [WARN]  VERDICT: Minor issues. Review [BAD] before integrating.")
         else:
             print("\n  🚨 VERDICT: FAILS validation. Do NOT integrate.")
-        print("═" * 70 + "\n")
+        print("=" * 70 + "\n")
 
 
-# ══════════════════════════════════════════════════════════════
+# ==============================================================
 #  ENTRY POINT
-# ══════════════════════════════════════════════════════════════
+# ==============================================================
 if __name__ == "__main__":
-    print("╔══════════════════════════════════════════════════╗")
-    print("║  FinFolioX — Hybrid Regime Agent v2.3.1         ║")
+    print("╔==================================================╗")
+    print("║  FinFolioX HOLD Hybrid Regime Agent v2.3.1         ║")
     print("║  Validation Suite  T1–T13 + Internal            ║")
-    print("╚══════════════════════════════════════════════════╝\n")
+    print("╚==================================================╝\n")
 
     print(f"📂 Model path: {MODEL_PATH}")
     agent = HybridRegimeAgent(hmm_model_path=MODEL_PATH, verbose=True)

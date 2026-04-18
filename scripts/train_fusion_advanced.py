@@ -93,7 +93,7 @@ def train_advanced():
     os.makedirs(os.path.dirname(SAVE_PATH), exist_ok=True)
     torch.save(model.state_dict(), SAVE_PATH)
     print("-" * 40)
-    print(f"✅ Advanced Fusion Model Saved to: {SAVE_PATH}")
+    print(f"[OK] Advanced Fusion Model Saved to: {SAVE_PATH}")
 
     # --- FINAL EXAM ---
     print("\n🧐 FINAL EXAM: Testing Logic & Interpretability")
@@ -112,9 +112,9 @@ def train_advanced():
     
     # In a high volatility market with negative sentiment, the confidence should be LOW (Sell)
     if conf.item() < 0.4:
-        print("   ✅ PASSED: The AI correctly ignored the Technicals!")
+        print("   [OK] PASSED: The AI correctly ignored the Technicals!")
     else:
-        print("   ❌ FAILED: The AI is still confused.")
+        print("   [BAD] FAILED: The AI is still confused.")
 
 if __name__ == "__main__":
     train_advanced()

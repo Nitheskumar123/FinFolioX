@@ -1,5 +1,5 @@
 """
-ml_engine/counterfactual_engine.py  —  Counterfactual Decision Engine v2.0
+ml_engine/counterfactual_engine.py  HOLD  Counterfactual Decision Engine v2.0
 ===========================================================================
 PHASE 15: COUNTERFACTUAL DECISION ENGINE (The "What-If" Simulator)
 
@@ -90,7 +90,7 @@ class CounterfactualEngine:
     """
     The Multiverse Simulator.
 
-    analyze() is the core method — it simulates three parallel universes
+    analyze() is the core method HOLD it simulates three parallel universes
     (BUY / SELL / HOLD) and computes regret against the optimal outcome.
 
     Parameters for analyze():
@@ -117,7 +117,7 @@ class CounterfactualEngine:
         self.tracker = RegretTracker(window_size=30)
         self.llm     = None
         self._init_llm()
-        print("   ✅ Phase 15: Counterfactual Engine v2.0 Initialized.")
+        print("   [OK] Phase 15: Counterfactual Engine v2.0 Initialized.")
 
     def _init_llm(self):
         try:
@@ -135,9 +135,9 @@ class CounterfactualEngine:
         except Exception as e:
             print(f"      - LLM Retrospective: OFFLINE ({e})")
 
-    # ──────────────────────────────────────────────────────────────────────────
-    # A. REGRET MATRIX — core method
-    # ──────────────────────────────────────────────────────────────────────────
+    # --------------------------------------------------------------------------
+    # A. REGRET MATRIX HOLD core method
+    # --------------------------------------------------------------------------
     def analyze(self,
                 actual_decision:  str,
                 decision_price:   float,
@@ -148,7 +148,7 @@ class CounterfactualEngine:
                 tlt_price_end:    float = None) -> dict:
         """
         Simulate BUY / SELL / HOLD universes and compute regret.
-        Does NOT mutate state — call record_to_tracker() to update rolling stats.
+        Does NOT mutate state HOLD call record_to_tracker() to update rolling stats.
         """
         if decision_price <= 0:
             raise ValueError(f"decision_price must be > 0, got {decision_price}")
@@ -159,8 +159,8 @@ class CounterfactualEngine:
         is_ambiguous = abs(move_pct) < nb
 
         # Universe P&Ls
-        # BUY:  long → profit from price rise, lose on fall
-        # SELL: short → profit from price fall, lose on rise
+        # BUY:  long -> profit from price rise, lose on fall
+        # SELL: short -> profit from price fall, lose on rise
         # HOLD: risk-free proxy (cash / TLT-scaled)
         buy_pnl  = float(move_pct  - TRADE_COMMISSION)
         sell_pnl = float(-move_pct - TRADE_COMMISSION)
@@ -178,14 +178,14 @@ class CounterfactualEngine:
         regret_score     = float(max(0.0, optimal_pnl - actual_pnl))
         regret_level     = self._classify_regret(regret_score)
 
-        # Confidence calibration — did direction match outcome?
+        # Confidence calibration HOLD did direction match outcome?
         outcome_up  = move_pct > 0
         if confidence >= 0.52:
-            conf_calibrated = outcome_up        # bullish conf → expect up
+            conf_calibrated = outcome_up        # bullish conf -> expect up
         elif confidence < 0.40:
-            conf_calibrated = not outcome_up    # bearish conf → expect down
+            conf_calibrated = not outcome_up    # bearish conf -> expect down
         else:
-            conf_calibrated = None              # neutral zone — unscoreable
+            conf_calibrated = None              # neutral zone HOLD unscoreable
 
         return {
             "hypothetical_buy_pnl":  universes["BUY"],
@@ -206,9 +206,9 @@ class CounterfactualEngine:
         """Push result into rolling RegretTracker."""
         self.tracker.record(cf_result["regret_score"], cf_result["regret_level"])
 
-    # ──────────────────────────────────────────────────────────────────────────
+    # --------------------------------------------------------------------------
     # B. BATCH / LEDGER HELPERS
-    # ──────────────────────────────────────────────────────────────────────────
+    # --------------------------------------------------------------------------
     def get_regret_summary(self, results: list) -> dict:
         """
         Aggregate counterfactual stats across a list of analyze() results.
@@ -266,9 +266,9 @@ class CounterfactualEngine:
         penalty = penalty_map.get(cf_result.get("regret_level", "NONE"), 0.0)
         return float(np.clip(fusion_confidence - penalty, 0.0, 1.0))
 
-    # ──────────────────────────────────────────────────────────────────────────
+    # --------------------------------------------------------------------------
     # C. LLM RETROSPECTIVE
-    # ──────────────────────────────────────────────────────────────────────────
+    # --------------------------------------------------------------------------
     def generate_retrospective(self,
                                ticker:        str,
                                decision_date: str,
@@ -316,54 +316,54 @@ class CounterfactualEngine:
         op = cf_result["optimal_pnl"]  * 100
         if a == o:
             return (f"[{decision_date}] {ticker}: AI correctly chose {a} "
-                    f"(P&L: {ap:+.2f}%). Optimal — no regret.")
+                    f"(P&L: {ap:+.2f}%). Optimal HOLD no regret.")
         return (f"[{decision_date}] {ticker}: AI chose {a} ({ap:+.2f}%) "
                 f"but optimal was {o} ({op:+.2f}%). "
                 f"Regret: {rg:.2f}%. Recalibrate agent weights for similar setups.")
 
-    # ──────────────────────────────────────────────────────────────────────────
+    # --------------------------------------------------------------------------
     # DISPLAY
-    # ──────────────────────────────────────────────────────────────────────────
+    # --------------------------------------------------------------------------
     @staticmethod
     def print_regret_audit(cf_result: dict, retrospective: str = ""):
-        ambig_note = "  ⚠️  AMBIGUOUS (inside noise band)" if cf_result["is_ambiguous"] else ""
-        print(f"\n      ── Counterfactual Regret Audit ──────────────────────────")
+        ambig_note = "  [WARN]  AMBIGUOUS (inside noise band)" if cf_result["is_ambiguous"] else ""
+        print(f"\n      -- Counterfactual Regret Audit --------------------------")
         print(f"      Move: {cf_result['move_pct']*100:+.2f}%{ambig_note}")
-        print("      ┌──────────┬────────────┬─────────────────────┐")
+        print("      ┌----------┬------------┬---------------------┐")
         print("      │  Action  │    P&L     │  Note               │")
-        print("      ├──────────┼────────────┼─────────────────────┤")
+        print("      ├----------┼------------┼---------------------┤")
 
         for action in ["BUY", "SELL", "HOLD"]:
             pnl  = cf_result[f"hypothetical_{action.lower()}_pnl"]
             note = ""
             if (action == cf_result["actual_decision"]
                     and action == cf_result["optimal_decision"]):
-                note = "← ACTUAL + OPTIMAL ✅"
+                note = "← ACTUAL + OPTIMAL [OK]"
             elif action == cf_result["actual_decision"]:
                 note = "← ACTUAL"
             elif action == cf_result["optimal_decision"]:
                 note = "← OPTIMAL"
             print(f"      │  {action:6s}  │ {pnl*100:+8.2f}%  │ {note:<19} │")
 
-        print("      └──────────┴────────────┴─────────────────────┘")
+        print("      └----------┴------------┴---------------------┘")
 
-        icons = {"NONE":"✅","LOW":"🔵","MODERATE":"🟡","HIGH":"🟠","EXTREME":"🔴"}
+        icons = {"NONE":"[OK]","LOW":"🔵","MODERATE":"🟡","HIGH":"🟠","EXTREME":"🔴"}
         icon  = icons.get(cf_result["regret_level"], "❓")
         print(f"      Regret: {cf_result['regret_score']*100:.2f}%  "
               f"{icon} {cf_result['regret_level']}")
 
         cal = cf_result.get("confidence_calibrated")
         if cal is not None:
-            tag = "✅ calibrated" if cal else "⚠️  miscalibrated"
+            tag = "[OK] calibrated" if cal else "[WARN]  miscalibrated"
             print(f"      Confidence direction: {tag}")
 
         if retrospective:
             print(f"\n      Diary: {retrospective}")
-        print("      " + "─" * 58)
+        print("      " + "-" * 58)
 
-    # ──────────────────────────────────────────────────────────────────────────
+    # --------------------------------------------------------------------------
     # PRIVATE HELPERS
-    # ──────────────────────────────────────────────────────────────────────────
+    # --------------------------------------------------------------------------
     @classmethod
     def _noise_band(cls, ticker: str) -> float:
         t = ticker.upper()
@@ -393,21 +393,21 @@ class CounterfactualEngine:
         if rs <= 0.070: return "HIGH"
         return "EXTREME"
 
-    # ──────────────────────────────────────────────────────────────────────────
-    # MISS-TYPE CLASSIFIER  (v2.1 — addresses Issue 1 + Issue 2)
-    # ──────────────────────────────────────────────────────────────────────────
+    # --------------------------------------------------------------------------
+    # MISS-TYPE CLASSIFIER  (v2.1 HOLD addresses Issue 1 + Issue 2)
+    # --------------------------------------------------------------------------
     @staticmethod
     def classify_miss_type(cf_result: dict) -> str:
         """
         Classifies WHY the AI missed the optimal decision.
 
         Returns one of:
-          "CORRECT"      — actual == optimal, no miss
-          "HOLD_BIAS"    — actual=HOLD but optimal=BUY/SELL (Issue 2)
-                           → System too conservative; should have traded
-          "WRONG_DIR"    — actual was BUY but market fell, or SELL but rose
-                           → LSTM predicted the wrong direction (Issue 1)
-          "SUBOPTIMAL"   — traded but chose wrong instrument
+          "CORRECT"      HOLD actual == optimal, no miss
+          "HOLD_BIAS"    HOLD actual=HOLD but optimal=BUY/SELL (Issue 2)
+                           -> System too conservative; should have traded
+          "WRONG_DIR"    HOLD actual was BUY but market fell, or SELL but rose
+                           -> LSTM predicted the wrong direction (Issue 1)
+          "SUBOPTIMAL"   HOLD traded but chose wrong instrument
                            (e.g. BUY when SELL was better)
         """
         actual  = cf_result["actual_decision"]
@@ -460,9 +460,9 @@ class CounterfactualEngine:
             ),
         }
 
-    # ──────────────────────────────────────────────────────────────────────────
+    # --------------------------------------------------------------------------
     # LEGACY COMPAT
-    # ──────────────────────────────────────────────────────────────────────────
+    # --------------------------------------------------------------------------
     def get_regret_penalty(self, regret_score: float) -> float:
         """Legacy MetaAgent trust penalty multiplier."""
         if regret_score <= 0.01:  return 0.0

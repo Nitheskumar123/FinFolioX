@@ -1,11 +1,11 @@
 """
-test_risk_engine.py  —  Risk Engine Backtest v2.1
+test_risk_engine.py  HOLD  Risk Engine Backtest v2.1
 ==================================================
-FinFolioX — Phase 9 Backtest  |  7 Windows × 30 Tickers
+FinFolioX HOLD Phase 9 Backtest  |  7 Windows x 30 Tickers
 
-Tests RiskEngine v2.1 specifically — isolates its contribution by showing
+Tests RiskEngine v2.1 specifically HOLD isolates its contribution by showing
 the full position-sizing pipeline at each step:
-  confidence → kelly → half-kelly → vol_scale → gdi_penalty → final_alloc
+  confidence -> kelly -> half-kelly -> vol_scale -> gdi_penalty -> final_alloc
 
 Key metrics per window:
   - Active rate        : % of tickers where engine allocated > 0
@@ -13,7 +13,7 @@ Key metrics per window:
   - Vol scaling hits   : how many tickers got the graduated vol cut
   - Regime comparison  : avg allocation Bull vs Bear vs Sideways
   - Hard cap hits      : how many hit the 20% ceiling
-  - Correlation check  : higher confidence → higher allocation (should hold)
+  - Correlation check  : higher confidence -> higher allocation (should hold)
 
 v2.1 regression checks:
   1. Graduated vol scaling: no sudden 50% cliff at 0.02
@@ -49,7 +49,7 @@ try:
 except ImportError:
     _CR_OK = False
 
-# ── Paths ─────────────────────────────────────────────────────────────────────
+# -- Paths ---------------------------------------------------------------------
 MODEL_PATH  = r"D:\FinFolioX\saved_models\lstm_model.keras"
 SCALER_PATH = r"D:\FinFolioX\saved_models\lstm_scaler.pkl"
 REGIME_PATH = r"D:\FinFolioX\saved_models\hmm_regime_hybrid.pkl"
@@ -63,15 +63,15 @@ COMMODITY_TICKERS = {"GLD","SLV","USO","UNG","GDX"}
 BUY_GDI_MAX       = 55.0
 MAX_RISK          = 0.20
 
-# ── Test windows ──────────────────────────────────────────────────────────────
+# -- Test windows --------------------------------------------------------------
 TEST_WINDOWS = [
-    ("2026-03-03", "2026-03-08", "Mar03→08  Bear start"),
-    ("2026-03-04", "2026-03-09", "Mar04→09  Bear early"),
-    ("2026-03-15", "2026-03-20", "Mar15→20  Deep Bear"),
-    ("2026-03-05", "2026-03-10", "Mar05→10  Bounce"),
-    ("2025-08-01", "2025-08-08", "Aug01→08  Bull Phase"),
-    ("2025-10-01", "2025-10-08", "Oct01→08  Sideways"),
-    ("2026-03-17", "2026-03-23", "Mar17→23  Iran+Fed"),
+    ("2026-03-03", "2026-03-08", "Mar03->08  Bear start"),
+    ("2026-03-04", "2026-03-09", "Mar04->09  Bear early"),
+    ("2026-03-15", "2026-03-20", "Mar15->20  Deep Bear"),
+    ("2026-03-05", "2026-03-10", "Mar05->10  Bounce"),
+    ("2025-08-01", "2025-08-08", "Aug01->08  Bull Phase"),
+    ("2025-10-01", "2025-10-08", "Oct01->08  Sideways"),
+    ("2026-03-17", "2026-03-23", "Mar17->23  Iran+Fed"),
 ]
 
 TICKERS = [
@@ -153,7 +153,7 @@ def snap_to_trading_day(date_str):
     dt = pd.to_datetime(date_str)
     snapped = pd.bdate_range(start=dt, periods=1)[0]
     if snapped != dt:
-        print(f"   ⚠️  {date_str} → snapped to {snapped.date()}")
+        print(f"   [WARN]  {date_str} -> snapped to {snapped.date()}")
     return snapped.strftime("%Y-%m-%d")
 
 def fetch_history(ticker, test_date):
@@ -219,18 +219,18 @@ def run_window(test_date, outcome_date, label,
         diffs = [(abs((pd.to_datetime(sent_date)-pd.to_datetime(k)).days), k)
                  for k in MANUAL_SENTIMENT]
         sent_date = min(diffs)[1]
-        print(f"   ℹ️  Sentiment mapped: {test_date} → {sent_date}")
+        print(f"   ℹ️  Sentiment mapped: {test_date} -> {sent_date}")
 
     sentiment_scores = MANUAL_SENTIMENT[sent_date]
 
     print(f"\n{'*'*128}")
-    print(f"  {label}  |  {test_date} → {outcome_date}")
+    print(f"  {label}  |  {test_date} -> {outcome_date}")
     print(f"{'*'*128}")
     print(f"\n  {'Ticker':<6} {'Regime':<9} {'Vol':>6} {'VScale':>7} {'Conf':>7} "
           f"{'Kelly':>7} {'GDI':>5} "
           f"{'Alloc%':>7} {'$':>7} {'Shr':>4}  "
           f"{'Step-by-step':<40}  {'Act%':>8}")
-    print(f"  {'─'*140}")
+    print(f"  {'-'*140}")
 
     rows           = []
     breakdowns     = []
@@ -292,7 +292,7 @@ def run_window(test_date, outcome_date, label,
                 except Exception:
                     arb_conf = gated_conf
 
-            # ── RISK ENGINE ────────────────────────────────────────────────
+            # -- RISK ENGINE ------------------------------------------------
             last_price = float(hist["Close"].iloc[-1])
 
             bdown = risk_engine.position_size_breakdown(
@@ -323,9 +323,9 @@ def run_window(test_date, outcome_date, label,
             half_k  = round(kelly * 0.5,      4) if kelly > 0 else 0.0
             after_v = round(half_k * vol_sc,  4)
             after_g = round(after_v * gdi_penalty, 4)
-            trace   = (f"kelly={kelly:+.4f} → ×0.5→{half_k:.4f} "
-                       f"→ ×{vol_sc:.3f}→{after_v:.4f} "
-                       f"→ ×{gdi_penalty:.2f}→{after_g:.4f}")
+            trace   = (f"kelly={kelly:+.4f} -> x0.5->{half_k:.4f} "
+                       f"-> x{vol_sc:.3f}->{after_v:.4f} "
+                       f"-> x{gdi_penalty:.2f}->{after_g:.4f}")
 
             actual_ret = fetch_actual_return(ticker, test_date, outcome_date)
             act_str    = f"{actual_ret:>+7.2f}%" if not np.isnan(actual_ret) else "    nan%"
@@ -357,16 +357,16 @@ def run_window(test_date, outcome_date, label,
         except Exception as e:
             print(f"  {ticker:<6}  ERROR: {e}")
 
-    # ── Window summary ─────────────────────────────────────────────────────────
+    # -- Window summary ---------------------------------------------------------
     wstats = RiskEngine.get_stats(breakdowns)
-    print(f"\n  ── Window Summary ────────────────────────────────────────────────────────")
+    print(f"\n  -- Window Summary --------------------------------------------------------")
     print(f"     Active allocations : {wstats.get('n_active', 0)}/{wstats.get('n', 0)} "
           f"= {wstats.get('active_rate_pct', 0):.1f}%")
-    print(f"     Negative Kelly     : {neg_kelly_cnt}  (no trade — negative EV)")
-    print(f"     Vol-scaled tickers : {vol_scaled_cnt}  (vol > {VOL_LOW} → graduated cut)")
+    print(f"     Negative Kelly     : {neg_kelly_cnt}  (no trade HOLD negative EV)")
+    print(f"     Vol-scaled tickers : {vol_scaled_cnt}  (vol > {VOL_LOW} -> graduated cut)")
     print(f"     Hard-cap hits (20%): {cap_hits}")
     print(f"     Bear-cap hits (10%): {bear_cap_hits}  ← v2.2 new")
-    print(f"     Below-floor hits   : {floor_hits}  (< 0.5% → zero'd out)")
+    print(f"     Below-floor hits   : {floor_hits}  (< 0.5% -> zero'd out)")
     print(f"     Mean alloc (all)   : {wstats.get('mean_alloc_pct', 0):.2f}%")
     print(f"     Mean alloc (active): {wstats.get('mean_active_alloc_pct', 0):.2f}%")
     print(f"     Max alloc          : {wstats.get('max_alloc_pct', 0):.2f}%")
@@ -386,8 +386,8 @@ def run_window(test_date, outcome_date, label,
     if len(conf_alloc) >= 3:
         corr = float(np.corrcoef([x[0] for x in conf_alloc],
                                   [x[1] for x in conf_alloc])[0, 1])
-        print(f"     Conf→Alloc corr    : {corr:+.3f}  "
-              + ("✅ positive correlation" if corr > 0 else "⚠️  weak/negative"))
+        print(f"     Conf->Alloc corr    : {corr:+.3f}  "
+              + ("[OK] positive correlation" if corr > 0 else "[WARN]  weak/negative"))
 
     return {
         "label": label, "test_date": test_date, "outcome_date": outcome_date,
@@ -403,7 +403,7 @@ def run_window(test_date, outcome_date, label,
 
 def main():
     print("=" * 128)
-    print("  RISK ENGINE BACKTEST v2.2  |  7 Windows × 30 Tickers")
+    print("  RISK ENGINE BACKTEST v2.2  |  7 Windows x 30 Tickers")
     print("  Tests: Kelly sizing + Bear cap(10%) + graduated vol + floor + cap + regime b")
     print(f"  b_odds: Bull={REGIME_ODDS['bull']}  Sideways={REGIME_ODDS['sideways']}  "
           f"Bear={REGIME_ODDS['bear']}  |  "
@@ -413,39 +413,39 @@ def main():
 
     try:
         tech_agent = TechnicalAgent(lstm_model_path=MODEL_PATH, lstm_scaler_path=SCALER_PATH)
-        print(f"  ✅ TechnicalAgent  {tuple(tech_agent.lstm_model.input_shape)}")
+        print(f"  [OK] TechnicalAgent  {tuple(tech_agent.lstm_model.input_shape)}")
     except Exception as e:
-        print(f"  ❌ TechnicalAgent: {e}"); return
+        print(f"  [BAD] TechnicalAgent: {e}"); return
 
     uncertainty_agent = UncertaintyAgent(tech_agent)
 
     try:
         regime_agent = HybridRegimeAgent(hmm_model_path=REGIME_PATH, verbose=False)
-        print(f"  ✅ HybridRegimeAgent  is_fitted={regime_agent.is_fitted}")
+        print(f"  [OK] HybridRegimeAgent  is_fitted={regime_agent.is_fitted}")
     except Exception as e:
-        print(f"  ❌ HybridRegimeAgent: {e}"); return
+        print(f"  [BAD] HybridRegimeAgent: {e}"); return
 
     try:
         fusion_agent = FusionAgent(model_path=FUSION_PATH)
-        print(f"  ✅ FusionAgent  [{fusion_agent._arch}]")
+        print(f"  [OK] FusionAgent  [{fusion_agent._arch}]")
     except Exception as e:
-        print(f"  ❌ FusionAgent: {e}"); return
+        print(f"  [BAD] FusionAgent: {e}"); return
 
     heatmap_agent = HeatmapAgent()
-    print("  ✅ HeatmapAgent")
+    print("  [OK] HeatmapAgent")
 
     conflict_resolver = None
     if _CR_OK:
         try:
             conflict_resolver = ConflictResolver(verbose=False)
-            print("  ✅ ConflictResolver  (v2.5)")
+            print("  [OK] ConflictResolver  (v2.5)")
         except Exception as e:
-            print(f"  ⚠️  ConflictResolver: {e}")
+            print(f"  [WARN]  ConflictResolver: {e}")
 
     risk_engine = RiskEngine(default_account_size=DEFAULT_CAPITAL,
                              max_risk_per_trade=MAX_RISK,
                              bear_max_allocation=0.10)
-    print(f"  ✅ RiskEngine v2.2  "
+    print(f"  [OK] RiskEngine v2.2  "
           f"(capital=${DEFAULT_CAPITAL:,.0f}  global_cap={MAX_RISK*100:.0f}%  "
           f"bear_cap=10%  half_kelly=0.5)")
 
@@ -463,13 +463,13 @@ def main():
         all_rows.extend(s["rows"])
         all_bdowns.extend(s["breakdowns"])
 
-    # ── Consolidated ──────────────────────────────────────────────────────────
+    # -- Consolidated ----------------------------------------------------------
     print("\n" + "=" * 128)
     print("  CONSOLIDATED RISK ENGINE RESULTS")
     print("=" * 128)
     print(f"\n  {'Window':<32} {'Active%':>8} {'NegK':>5} {'VolSc':>6} "
           f"{'Caps':>5} {'BrCp':>5} {'Flrs':>5} {'MeanAlloc':>10} {'MaxAlloc':>9}")
-    print(f"  {'─'*110}")
+    print(f"  {'-'*110}")
 
     for s in all_stats:
         st = s["stats"]
@@ -485,7 +485,7 @@ def main():
 
     # Overall
     overall = RiskEngine.get_stats(all_bdowns)
-    print(f"  {'─'*110}")
+    print(f"  {'-'*110}")
     print(f"  {'OVERALL':<32} "
           f"{overall.get('active_rate_pct', 0):>7.1f}%"
           f"  {sum(s['neg_kelly']      for s in all_stats):>4}"
@@ -496,8 +496,8 @@ def main():
           f"  {overall.get('mean_alloc_pct', 0):>8.2f}%"
           f"  {overall.get('max_alloc_pct', 0):>8.2f}%")
 
-    # ── Regime comparison ─────────────────────────────────────────────────────
-    print(f"\n  ── Regime Allocation Comparison ─────────────────────────────────────────")
+    # -- Regime comparison -----------------------------------------------------
+    print(f"\n  -- Regime Allocation Comparison -----------------------------------------")
     combined_regime = defaultdict(list)
     for s in all_stats:
         for r, allocs in s["regime_allocs"].items():
@@ -518,38 +518,38 @@ def main():
     bear_mean = np.mean(combined_regime.get("Bear",     [0])) * 100
     print(f"\n  Regime ordering check (Bull > Sideways > Bear):")
     print(f"  Bull={bull_mean:.2f}%  Sideways={side_mean:.2f}%  Bear={bear_mean:.2f}%  "
-          + ("✅ CORRECT" if bull_mean >= side_mean >= bear_mean
-             else "⚠️  out of order — check b_odds or regime detection"))
+          + ("[OK] CORRECT" if bull_mean >= side_mean >= bear_mean
+             else "[WARN]  out of order HOLD check b_odds or regime detection"))
 
-    # ── vol scaling regression ─────────────────────────────────────────────────
-    print(f"\n  ── v2.2 Regression Checks ───────────────────────────────────────────────")
+    # -- vol scaling regression -------------------------------------------------
+    print(f"\n  -- v2.2 Regression Checks -----------------------------------------------")
 
     # Check 1: graduated scaling
     vol_scales = [b["vol_scale"] for b in all_bdowns]
     cliff_count = sum(1 for v in vol_scales if v == 0.5
                       and all_bdowns[vol_scales.index(v)]["volatility"] < VOL_HIGH * 0.95)
     print(f"  Graduated vol scaling  : range [{min(vol_scales):.3f}, {max(vol_scales):.3f}]  "
-          + ("✅ no cliff artefacts" if cliff_count == 0
-             else f"⚠️  {cliff_count} potential cliff hits"))
+          + ("[OK] no cliff artefacts" if cliff_count == 0
+             else f"[WARN]  {cliff_count} potential cliff hits"))
 
     # Check 2: floor
-    print(f"  Min allocation floor   : {sum(s['floor_hits'] for s in all_stats)} decisions zero'd  ✅")
+    print(f"  Min allocation floor   : {sum(s['floor_hits'] for s in all_stats)} decisions zero'd  [OK]")
 
     # Check 3: hard cap never exceeded
     cap_exceeded = sum(1 for b in all_bdowns if b["final_allocation"] > MAX_RISK + 1e-6)
     print(f"  Hard cap (20%) check   : {cap_exceeded} violations  "
-          + ("✅ never exceeded" if cap_exceeded == 0 else "❌ VIOLATIONS FOUND"))
+          + ("[OK] never exceeded" if cap_exceeded == 0 else "[BAD] VIOLATIONS FOUND"))
 
-    # Check 4: Bear cap — no Bear ticker should exceed 10%
+    # Check 4: Bear cap HOLD no Bear ticker should exceed 10%
     bear_cap_exceeded = sum(
         1 for b in all_bdowns
         if b["regime"].lower() == "bear" and b["final_allocation"] > 0.101
     )
     total_bear_cap_hits = sum(s["bear_cap_hits"] for s in all_stats)
     print(f"  Bear cap (10%) check   : {bear_cap_exceeded} violations  "
-          + ("✅ never exceeded" if bear_cap_exceeded == 0 else "❌ VIOLATIONS"))
+          + ("[OK] never exceeded" if bear_cap_exceeded == 0 else "[BAD] VIOLATIONS"))
     print(f"  Bear cap activations   : {total_bear_cap_hits} tickers capped at 10% in Bear regime  "
-          + ("✅ protecting capital" if total_bear_cap_hits > 0 else "ℹ️  none needed this run"))
+          + ("[OK] protecting capital" if total_bear_cap_hits > 0 else "ℹ️  none needed this run"))
 
     # Check 5: cash rounding
     cash_decimals_ok = all(
@@ -557,29 +557,29 @@ def main():
         for b in all_bdowns if b["cash_value"] > 0
     )
     print(f"  Cash value rounding    : "
-          + ("✅ all values rounded to 2 d.p." if cash_decimals_ok
-             else "⚠️  some values have > 2 decimal places"))
+          + ("[OK] all values rounded to 2 d.p." if cash_decimals_ok
+             else "[WARN]  some values have > 2 decimal places"))
 
     # Check 6: input validation
     conf_ok = all(0.0 <= b["confidence"] <= 1.0 for b in all_bdowns)
     print(f"  Confidence clipping    : "
-          + ("✅ all values in [0.0, 1.0]" if conf_ok
-             else "⚠️  out-of-range confidences found"))
+          + ("[OK] all values in [0.0, 1.0]" if conf_ok
+             else "[WARN]  out-of-range confidences found"))
 
-    # ── Verdict ───────────────────────────────────────────────────────────────
-    print(f"\n  {'═'*65}")
+    # -- Verdict ---------------------------------------------------------------
+    print(f"\n  {'='*65}")
     print(f"  RISK ENGINE v2.2 VERDICT")
-    print(f"  {'═'*65}")
+    print(f"  {'='*65}")
     print(f"  Overall active rate    : {overall['active_rate_pct']:.1f}%  "
-          + ("✅" if overall["active_rate_pct"] > 0 else "⚠️ "))
+          + ("[OK]" if overall["active_rate_pct"] > 0 else "[WARN] "))
     print(f"  Mean active allocation : {overall['mean_active_alloc_pct']:.2f}%  "
-          + ("✅ reasonable" if 5 < overall["mean_active_alloc_pct"] < 20 else "⚠️  check"))
+          + ("[OK] reasonable" if 5 < overall["mean_active_alloc_pct"] < 20 else "[WARN]  check"))
     print(f"  Max allocation         : {overall['max_alloc_pct']:.2f}%  "
-          + ("✅ within 20% cap" if overall["max_alloc_pct"] <= 20.0 else "❌ EXCEEDS CAP"))
+          + ("[OK] within 20% cap" if overall["max_alloc_pct"] <= 20.0 else "[BAD] EXCEEDS CAP"))
     print(f"  Bear cap (10%)         : {bear_cap_exceeded} violations  "
-          + ("✅ protecting bear capital" if bear_cap_exceeded == 0 else "❌"))
+          + ("[OK] protecting bear capital" if bear_cap_exceeded == 0 else "[BAD]"))
     print(f"  Regime ordering        : Bull≥Sideways≥Bear  "
-          + ("✅" if bull_mean >= side_mean >= bear_mean else "⚠️ "))
+          + ("[OK]" if bull_mean >= side_mean >= bear_mean else "[WARN] "))
     print(f"  v2.2 improvements      : Bear cap(10%) + min viable dollar check")
 
     print(f"\n  Per-window active rate:")
@@ -594,7 +594,7 @@ def main():
 
     if all_rows:
         pd.DataFrame(all_rows).to_csv("risk_engine_backtest.csv", index=False)
-        print(f"\n  Saved → risk_engine_backtest.csv  ({len(all_rows)} rows)")
+        print(f"\n  Saved -> risk_engine_backtest.csv  ({len(all_rows)} rows)")
 
     print("\nDone.\n")
 

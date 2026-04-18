@@ -1,7 +1,7 @@
 """
-ml_engine/asc_memory.py  —  Agent Sycophancy Coefficient (ASC) Engine
+ml_engine/asc_memory.py  HOLD  Agent Sycophancy Coefficient (ASC) Engine
 ======================================================================
-Phase 26 — v2.3
+Phase 26 HOLD v2.3
 
 CHANGELOG v2.3 (4 bugs fixed on top of v2.2):
 
@@ -12,8 +12,8 @@ CHANGELOG v2.3 (4 bugs fixed on top of v2.2):
     the extra guard scales with the configured window.
 
   BUG-2 FIXED: Dissent Sensitivity (DS) was unused in the 0.70-0.85
-    penalty zone — both DS branches returned the same PENALTY_MODERATE.
-    Fix: low DS → PENALTY_MODERATE_LOW (−10%), high DS → PENALTY_MODERATE_HIGH (−20%).
+    penalty zone HOLD both DS branches returned the same PENALTY_MODERATE.
+    Fix: low DS -> PENALTY_MODERATE_LOW (−10%), high DS -> PENALTY_MODERATE_HIGH (−20%).
     This makes DS meaningfully differentiate within the moderate zone.
 
   BUG-3 FIXED: print_asc_report box lines had inconsistent widths
@@ -22,13 +22,13 @@ CHANGELOG v2.3 (4 bugs fixed on top of v2.2):
 
   BUG-4 FIXED: SATURATION_STD_THRESHOLD constant was 0.02 but the
     FIX-1 docstring said 0.04. Raised to 0.04 to match the documented
-    intent — low-variance batches were slipping through and generating
+    intent HOLD low-variance batches were slipping through and generating
     spurious penalties.
 
 CHANGELOG v2.2 (4 fixes on v2.1):
   FIX-1 · KSG Saturation Guard
-  FIX-2 · Raised minimum reliable window: 15 → 20
-  FIX-3 · Raised penalty fire threshold: 0.70 → 0.85
+  FIX-2 · Raised minimum reliable window: 15 -> 20
+  FIX-3 · Raised penalty fire threshold: 0.70 -> 0.85
   FIX-4 · Softer graduated penalty table
 """
 
@@ -46,7 +46,7 @@ try:
     SKLEARN_AVAILABLE = True
 except ImportError:
     SKLEARN_AVAILABLE = False
-    logger.warning("scikit-learn not found — ASC will use fallback correlation estimator.")
+    logger.warning("scikit-learn not found HOLD ASC will use fallback correlation estimator.")
 
 
 # ==============================================================================
@@ -62,7 +62,7 @@ N_HISTOGRAM_BINS          = 10
 SATURATION_STD_THRESHOLD  = 0.04
 
 # ASC zone boundaries
-ASC_LOW_THRESHOLD         = 0.50    # Below → no penalty
+ASC_LOW_THRESHOLD         = 0.50    # Below -> no penalty
 ASC_MED_THRESHOLD         = 0.70    # Mild zone
 ASC_HIGH_THRESHOLD        = 0.85    # v2.2 FIX-3: penalty zone starts here (was 0.70)
 ASC_EXTREME_THRESHOLD     = 0.95    # Extreme zone
@@ -118,7 +118,7 @@ class AgentDecisionMemory:
                  f"WARMING ({len(self.buffer)}/{MIN_RELIABLE_SAMPLES})"
         print(f"      - Status      : {status}")
 
-    # ── Persistence ───────────────────────────────────────────────────────
+    # -- Persistence -------------------------------------------------------
 
     def _load_buffer(self) -> deque:
         try:
@@ -145,7 +145,7 @@ class AgentDecisionMemory:
         except Exception as e:
             logger.warning(f"Could not save ASC buffer: {e}")
 
-    # ── Step 1: Record session ────────────────────────────────────────────
+    # -- Step 1: Record session --------------------------------------------
 
     def record_session(self, lstm_score: float, sent_score: float, regime_prob: float):
         """
@@ -172,16 +172,16 @@ class AgentDecisionMemory:
         elif label == "bear": return 0.20
         else:                 return 0.50
 
-    # ── Step 2: Compute ASC ───────────────────────────────────────────────
+    # -- Step 2: Compute ASC -----------------------------------------------
 
     def compute_asc(self) -> Dict:
         """
         Compute the Agent Sycophancy Coefficient over the current buffer.
 
         ASC = 1 - (sum_MI / sum_H)
-          - sum_H ≈ 0  (all sessions identical)  → asc = 1.0 (edge case)
-          - sum_MI high, sum_H high               → asc near 0 (agents informative)
-          - sum_MI low,  sum_H high               → asc near 1 (agents sycophantic)
+          - sum_H ≈ 0  (all sessions identical)  -> asc = 1.0 (edge case)
+          - sum_MI high, sum_H high               -> asc near 0 (agents informative)
+          - sum_MI low,  sum_H high               -> asc near 1 (agents sycophantic)
 
         Returns a dict with asc, asc_reliable, asc_saturated, and diagnostics.
         """
@@ -210,9 +210,9 @@ class AgentDecisionMemory:
         if saturated:
             logger.info(
                 f"ASC saturation: LSTM std={lstm_std:.4f} < {SATURATION_STD_THRESHOLD}. "
-                "Buffer too homogeneous — KSG output unreliable, penalty suppressed."
+                "Buffer too homogeneous HOLD KSG output unreliable, penalty suppressed."
             )
-            print(f"      ⚠️  [ASC] Saturation detected "
+            print(f"      [WARN]  [ASC] Saturation detected "
                   f"(LSTM std={lstm_std:.4f}, n={n}). Penalty suppressed.")
 
         mi_lstm_sent = self._compute_mi(lstm_arr, sent_arr)
@@ -271,7 +271,7 @@ class AgentDecisionMemory:
             logger.debug(f"Entropy estimation failed: {e}")
             return 0.0
 
-    # ── Step 3: Forced Dissent Protocol (FDP) ────────────────────────────
+    # -- Step 3: Forced Dissent Protocol (FDP) ----------------------------
 
     def run_forced_dissent(
         self,
@@ -283,7 +283,7 @@ class AgentDecisionMemory:
     ) -> Dict:
         """
         Invert LSTM signal, re-run Fusion, measure Dissent Sensitivity.
-        Read-only synthetic test — does NOT update any system state.
+        Read-only synthetic test HOLD does NOT update any system state.
         """
         vol_input = (
             0.9 if regime_label.strip().lower() == "bear"
@@ -345,11 +345,11 @@ class AgentDecisionMemory:
         return {
             "confidence_original": 0.5, "confidence_inverted": 0.5,
             "dissent_sensitivity": 0.0, "lstm_inverted": 0.5,
-            "interpretation": "FDP could not run — fusion agent error. Neutral result.",
+            "interpretation": "FDP could not run HOLD fusion agent error. Neutral result.",
             "fdp_ran": False,
         }
 
-    # ── Step 4: Penalty multiplier ────────────────────────────────────────
+    # -- Step 4: Penalty multiplier ----------------------------------------
 
     def get_penalty_multiplier(
         self,
@@ -361,37 +361,37 @@ class AgentDecisionMemory:
         Map (ASC, DS) to a confidence penalty multiplier and quadrant label.
 
         v2.3 BUG-2 FIX: DS is now meaningful in the moderate zone (0.70–0.85):
-          low DS  → −10% (correlated but not LSTM-dominated)
-          high DS → −20% (LSTM is driving the sycophancy)
+          low DS  -> −10% (correlated but not LSTM-dominated)
+          high DS -> −20% (LSTM is driving the sycophancy)
         """
-        # Saturation guard — never penalise unreliable KSG output
+        # Saturation guard HOLD never penalise unreliable KSG output
         if asc_saturated:
-            return PENALTY_NONE, "KSG SATURATED — homogeneous batch, no penalty"
+            return PENALTY_NONE, "KSG SATURATED HOLD homogeneous batch, no penalty"
 
         if asc < ASC_LOW_THRESHOLD:
-            return PENALTY_NONE, "INDEPENDENT — healthy ensemble, no penalty"
+            return PENALTY_NONE, "INDEPENDENT HOLD healthy ensemble, no penalty"
 
         if asc < ASC_MED_THRESHOLD:
-            return PENALTY_MILD, "MILD SYCOPHANCY — correlated but acceptable (−5%)"
+            return PENALTY_MILD, "MILD SYCOPHANCY HOLD correlated but acceptable (−5%)"
 
         if asc < ASC_HIGH_THRESHOLD:
             # v2.3 BUG-2 FIX: DS now differentiates within moderate zone
             if dissent_sensitivity < DS_LOW_THRESHOLD:
                 return (PENALTY_MODERATE_LOW,
-                        "MODERATE SYCOPHANCY — low LSTM dominance (−10%)")
+                        "MODERATE SYCOPHANCY HOLD low LSTM dominance (−10%)")
             else:
                 return (PENALTY_MODERATE_HIGH,
-                        "MODERATE SYCOPHANCY — high LSTM dominance (−20%)")
+                        "MODERATE SYCOPHANCY HOLD high LSTM dominance (−20%)")
 
         if asc < ASC_EXTREME_THRESHOLD:
             if dissent_sensitivity < DS_HIGH_THRESHOLD:
-                return PENALTY_HIGH, "STRONG SYCOPHANCY — low dominance (−25%)"
+                return PENALTY_HIGH, "STRONG SYCOPHANCY HOLD low dominance (−25%)"
             else:
-                return PENALTY_HIGH, "STRONG SYCOPHANCY — LSTM dominant (−25%)"
+                return PENALTY_HIGH, "STRONG SYCOPHANCY HOLD LSTM dominant (−25%)"
 
-        return PENALTY_EXTREME, "EXTREME SYCOPHANCY — ensemble collapsed (−35%)"
+        return PENALTY_EXTREME, "EXTREME SYCOPHANCY HOLD ensemble collapsed (−35%)"
 
-    # ── Summary ───────────────────────────────────────────────────────────
+    # -- Summary -----------------------------------------------------------
 
     def get_asc_summary(
         self,
@@ -419,7 +419,7 @@ class AgentDecisionMemory:
             "fdp_interpretation":     fdp_result.get("interpretation", "") if fdp_result else "",
         }
 
-    # ── Console report (v2.3 BUG-3 FIX: consistent box widths) ──────────
+    # -- Console report (v2.3 BUG-3 FIX: consistent box widths) ----------
 
     @staticmethod
     def print_asc_report(summary: Dict):
@@ -440,13 +440,13 @@ class AgentDecisionMemory:
             """Pad/truncate text to exactly W chars."""
             return f"   ║ {text:<{W}} ║"
 
-        print("   ╔" + "═" * (W + 2) + "╗")
-        print(row("PHASE 26 — ASC Memory Engine v2.3"))
-        print("   ╠" + "═" * (W + 2) + "╣")
+        print("   ╔" + "=" * (W + 2) + "╗")
+        print(row("PHASE 26 HOLD ASC Memory Engine v2.3"))
+        print("   ╠" + "=" * (W + 2) + "╣")
         print(row(f"ASC Score   : {asc:.4f}  [{bar}]"))
         sat_str = str(sat)
         print(row(f"Samples     : {n}/{WINDOW_SIZE}  LSTM std={lstm_std:.4f}  Sat={sat_str}"))
         print(row(f"Quadrant    : {quad[:W-14]}"))
         print(row(f"FDP Ran     : {'YES' if fdp else 'NO '}   Dissent Sensitivity: {ds:.4f}"))
         print(row(f"Penalty     : {pen:.2f}x applied to fusion confidence"))
-        print("   ╚" + "═" * (W + 2) + "╝")
+        print("   ╚" + "=" * (W + 2) + "╝")

@@ -27,9 +27,9 @@ def main():
             app.analyze_stock(ticker)
             
     except KeyboardInterrupt:
-        print("\n   ⚠️ System halted by user.")
+        print("\n   [WARN] System halted by user.")
     except Exception as e:
-        print(f"   ❌ Critical Error: {e}")
+        print(f"   [BAD] Critical Error: {e}")
         print("   Tip: Check if your models are trained and saved in 'saved_models/'")
 
 if __name__ == "__main__":

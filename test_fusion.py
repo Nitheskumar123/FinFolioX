@@ -1,13 +1,13 @@
 """
-test_fusion.py  —  FusionAgent + Full Chain Backtest
+test_fusion.py  HOLD  FusionAgent + Full Chain Backtest
 =====================================================
-FIX v2.3 — predict_from_prob() — no silent fallback
-FIX v2.4 — util = decisions_made/total (all BUY/SELL incl. noise-band)
-FIX v2.5 — Noise-band 🔍 calls now show directional correctness:
-           🔍(correct) = BUY on day that went up, or SELL on day that went down
-           🔍(wrong)   = BUY on day that went down, or SELL on day that went up
+FIX v2.3 HOLD predict_from_prob() HOLD no silent fallback
+FIX v2.4 HOLD util = decisions_made/total (all BUY/SELL incl. noise-band)
+FIX v2.5 HOLD Noise-band [CHECK] calls now show directional correctness:
+           [CHECK](correct) = BUY on day that went up, or SELL on day that went down
+           [CHECK](wrong)   = BUY on day that went down, or SELL on day that went up
            Also tracked in summary: noise_correct / noise_wrong
-           Goal: noise-band calls should be mostly 🔍(correct)
+           Goal: noise-band calls should be mostly [CHECK](correct)
 """
 
 import os, sys, warnings
@@ -52,11 +52,11 @@ UNCERTAINTY_HIGH     = 0.15
 UNCERTAINTY_MODERATE = 0.05
 
 TEST_WINDOWS = [
-    ("2026-03-03", "2026-03-08", "Mar03→08  Bear start"),
-    ("2026-03-04", "2026-03-09", "Mar04→09  Bear early"),
-    ("2026-03-17", "2026-03-22", "Mar17→22  Deep Bear"),
-    ("2025-08-01", "2025-08-08", "Aug01→08  Bull Phase"),
-    ("2025-10-01", "2025-10-08", "Oct01→08  Sideways"),
+    ("2026-03-03", "2026-03-08", "Mar03->08  Bear start"),
+    ("2026-03-04", "2026-03-09", "Mar04->09  Bear early"),
+    ("2026-03-17", "2026-03-22", "Mar17->22  Deep Bear"),
+    ("2025-08-01", "2025-08-08", "Aug01->08  Bull Phase"),
+    ("2025-10-01", "2025-10-08", "Oct01->08  Sideways"),
 ]
 
 TICKERS = [
@@ -106,7 +106,7 @@ MANUAL_SENTIMENT = {
     "META": +0.12,   # $27B Nebius cloud deal, AI momentum, up 2.3% Mar 17
     "GOOGL": +0.14,  # overtook AAPL in market cap, strong AI narrative, Waymo leadership
     "AMZN": -0.08,   # down >1% Fed day, no offsetting catalyst
-    "AMD":  -0.06,   # Iranian attacks threatening helium supply → chip risk
+    "AMD":  -0.06,   # Iranian attacks threatening helium supply -> chip risk
     "INTC": -0.12,   # TSMC/helium supply threat from Iran strikes, chip supply risk
     "ORCL": +0.02,   # neutral; no major news
     "SPY":  -0.10,   # broad market sell-off, near correction by Friday
@@ -165,7 +165,7 @@ def snap_to_trading_day(date_str):
     dt = pd.to_datetime(date_str)
     snapped = pd.bdate_range(start=dt, periods=1)[0]
     if snapped != dt:
-        print(f"   ⚠️  {date_str} → snapped to {snapped.date()}")
+        print(f"   [WARN]  {date_str} -> snapped to {snapped.date()}")
     return snapped.strftime("%Y-%m-%d")
 
 def fetch_history(ticker, test_date):
@@ -235,17 +235,17 @@ def run_window(test_date, outcome_date, label,
         diffs     = [(abs((pd.to_datetime(sent_date)-pd.to_datetime(k)).days), k)
                      for k in MANUAL_SENTIMENT]
         sent_date = min(diffs)[1]
-        print(f"   ℹ️  Sentiment date mapped: {test_date} → {sent_date}")
+        print(f"   ℹ️  Sentiment date mapped: {test_date} -> {sent_date}")
 
     sentiment_scores = MANUAL_SENTIMENT[sent_date]
 
     print(f"\n{'*'*112}")
-    print(f"  {label}  |  {test_date} → {outcome_date}")
+    print(f"  {label}  |  {test_date} -> {outcome_date}")
     print(f"{'*'*112}")
     print(f"\n  {'Ticker':<6} {'LSTM_s':>7} {'mc_std':>7} {'Unc':>8} {'Regime':<10} "
           f"{'RC':>5} {'FConf':>7} {'ArbConf':>8} {'Alloc':>6} "
           f"{'Decision':<8} {'Shares':>7} {'Act%':>8} {'Result'}")
-    print(f"  {'─'*120}")
+    print(f"  {'-'*120}")
 
     results        = []
     correct        = wrong = neutral = 0
@@ -349,7 +349,7 @@ def run_window(test_date, outcome_date, label,
                 decisions_made += 1
 
                 if abs(actual_ret) <= noise_band(ticker):
-                    # ── v2.5: score direction even inside noise band ───────────
+                    # -- v2.5: score direction even inside noise band -----------
                     # The move was too small to be decisive, but we can still
                     # check if the call was pointing the right way.
                     direction_correct = (
@@ -357,20 +357,20 @@ def run_window(test_date, outcome_date, label,
                         (decision == "SELL" and actual_ret <= 0)
                     )
                     if direction_correct:
-                        result_str   = "🔍(correct)"
+                        result_str   = "[CHECK](correct)"
                         noise_correct += 1
                     else:
-                        result_str   = "🔍(wrong)"
+                        result_str   = "[CHECK](wrong)"
                         noise_wrong  += 1
                     neutral    += 1
                     hold_reason = "noise"
 
                 elif decision == "BUY"  and actual_ret > 0:
-                    result_str = "✅"; correct += 1
+                    result_str = "[OK]"; correct += 1
                 elif decision == "SELL" and actual_ret < 0:
-                    result_str = "✅"; correct += 1
+                    result_str = "[OK]"; correct += 1
                 else:
-                    result_str = "❌"; wrong += 1
+                    result_str = "[BAD]"; wrong += 1
 
             if hold_reason == "model":             hold_model    += 1
             elif hold_reason == "regime_conflict": hold_conflict += 1
@@ -408,11 +408,11 @@ def run_window(test_date, outcome_date, label,
     total_noise = noise_correct + noise_wrong
     noise_acc   = (noise_correct / total_noise * 100) if total_noise > 0 else 0.0
 
-    print(f"\n  ── Window Summary ─────────────────────────────────────────────────")
-    print(f"     Accuracy         : {correct}✅ / {wrong}❌ / {neutral}🔍/-  → {acc:.1f}%")
+    print(f"\n  -- Window Summary -------------------------------------------------")
+    print(f"     Accuracy         : {correct}[OK] / {wrong}[BAD] / {neutral}[CHECK]/-  -> {acc:.1f}%")
     print(f"     Utilisation      : {decisions_made}/{len(results)} = {util:.1f}%")
-    print(f"     Noise-band calls : {noise_correct}🔍(correct) / {noise_wrong}🔍(wrong)"
-          f"  → {noise_acc:.1f}% directionally correct")
+    print(f"     Noise-band calls : {noise_correct}[CHECK](correct) / {noise_wrong}[CHECK](wrong)"
+          f"  -> {noise_acc:.1f}% directionally correct")
     print(f"     HOLD breakdown   : regime_conflict={hold_conflict}  "
           f"model={hold_model}  noise_band={hold_noise}")
     print(f"     Uncertainty dist : LOW={unc_low}  MODERATE={unc_mod}  HIGH={unc_high}")
@@ -438,50 +438,50 @@ def run_window(test_date, outcome_date, label,
 
 def main():
     print("=" * 112)
-    print("  FUSION AGENT BACKTEST  |  6 Windows × 30 Tickers")
+    print("  FUSION AGENT BACKTEST  |  6 Windows x 30 Tickers")
     print("  FIX v2.3: predict_from_prob() | v2.4: util=decisions_made/total")
-    print("  FIX v2.5: 🔍 noise-band calls show 🔍(correct) / 🔍(wrong)")
+    print("  FIX v2.5: [CHECK] noise-band calls show [CHECK](correct) / [CHECK](wrong)")
     print("=" * 112)
     print("\nLoading agents...")
 
     try:
         tech_agent = TechnicalAgent(lstm_model_path=MODEL_PATH, lstm_scaler_path=SCALER_PATH)
-        print(f"  ✅ TechnicalAgent  {tuple(tech_agent.lstm_model.input_shape)}")
+        print(f"  [OK] TechnicalAgent  {tuple(tech_agent.lstm_model.input_shape)}")
     except Exception as e:
-        print(f"  ❌ TechnicalAgent failed: {e}"); return
+        print(f"  [BAD] TechnicalAgent failed: {e}"); return
 
     uncertainty_agent = UncertaintyAgent(tech_agent)
 
     try:
         regime_agent = HybridRegimeAgent(hmm_model_path=REGIME_PATH, verbose=False)
-        print(f"  ✅ HybridRegimeAgent  is_fitted={regime_agent.is_fitted}")
+        print(f"  [OK] HybridRegimeAgent  is_fitted={regime_agent.is_fitted}")
     except Exception as e:
-        print(f"  ❌ HybridRegimeAgent failed: {e}"); return
+        print(f"  [BAD] HybridRegimeAgent failed: {e}"); return
 
     try:
         fusion_agent = FusionAgent(model_path=FUSION_PATH)
-        print(f"  ✅ FusionAgent  [{fusion_agent._arch}]")
+        print(f"  [OK] FusionAgent  [{fusion_agent._arch}]")
     except Exception as e:
-        print(f"  ❌ FusionAgent failed: {e}"); return
+        print(f"  [BAD] FusionAgent failed: {e}"); return
 
     heatmap_agent = HeatmapAgent()
-    print("  ✅ HeatmapAgent")
+    print("  [OK] HeatmapAgent")
 
     conflict_resolver = None
     if _CONFLICT_OK:
         try:
             conflict_resolver = ConflictResolver()
-            print("  ✅ ConflictResolver")
+            print("  [OK] ConflictResolver")
         except Exception as e:
-            print(f"  ⚠️  ConflictResolver init failed: {e}")
+            print(f"  [WARN]  ConflictResolver init failed: {e}")
 
     risk_engine = None
     if _RISK_OK:
         try:
             risk_engine = RiskEngine(default_account_size=DEFAULT_CAPITAL)
-            print(f"  ✅ RiskEngine  (capital=${DEFAULT_CAPITAL:,.0f})")
+            print(f"  [OK] RiskEngine  (capital=${DEFAULT_CAPITAL:,.0f})")
         except Exception as e:
-            print(f"  ⚠️  RiskEngine init failed: {e}")
+            print(f"  [WARN]  RiskEngine init failed: {e}")
 
     all_stats = []
     for test_date, outcome_date, label in TEST_WINDOWS:
@@ -490,19 +490,19 @@ def main():
                        fusion_agent, heatmap_agent, conflict_resolver, risk_engine)
         all_stats.append(s)
 
-    # ── Consolidated ──────────────────────────────────────────────────────────
+    # -- Consolidated ----------------------------------------------------------
     print("\n" + "=" * 112)
     print("  CONSOLIDATED RESULTS")
     print("=" * 112)
     print(f"\n  {'Window':<32} {'Acc':>7} {'Util':>6} {'Calls':>8}  "
-          f"{'C/W':>6}  {'🔍corr':>7} {'🔍wrng':>7} {'NoisAcc':>8}  "
+          f"{'C/W':>6}  {'[CHECK]corr':>7} {'[CHECK]wrng':>7} {'NoisAcc':>8}  "
           f"{'Unc_L':>6} {'Unc_M':>6} {'Unc_H':>6}")
-    print(f"  {'─'*112}")
+    print(f"  {'-'*112}")
 
     for s in all_stats:
-        af = "✅" if s["accuracy"]    >= 75 else "⚠️ "
-        uf = "✅" if s["utilisation"] >= 60 else "⚠️ "
-        nf = "✅" if s["noise_acc"]   >= 60 else "⚠️ "
+        af = "[OK]" if s["accuracy"]    >= 75 else "[WARN] "
+        uf = "[OK]" if s["utilisation"] >= 60 else "[WARN] "
+        nf = "[OK]" if s["noise_acc"]   >= 60 else "[WARN] "
         print(f"  {s['label']:<32} {s['accuracy']:>5.1f}%{af}"
               f"  {s['utilisation']:>4.0f}%{uf}"
               f"  {s['decisions_made']:>3}/{s['total']:<3}"
@@ -525,7 +525,7 @@ def main():
     total_t    = sum(s["total"]          for s in all_stats)
     overall_nacc = (total_nc / (total_nc + total_nw) * 100) if (total_nc + total_nw) > 0 else 0
 
-    print(f"  {'─'*112}")
+    print(f"  {'-'*112}")
     print(f"  {'AVERAGE':<32} {avg_acc:>5.1f}%   {avg_util:>4.0f}%"
           f"  {total_d:>3}/{total_t:<3}"
           f"  {total_c:>2}/{total_w:<2}"
@@ -533,40 +533,40 @@ def main():
           f"  {total_nw:>7}"
           f"  {overall_nacc:>6.1f}%")
 
-    # ── Noise-band explanation ────────────────────────────────────────────────
-    print(f"\n  ── Noise-Band Directional Analysis (v2.5) ───────────────────────────")
-    print(f"  🔍(correct) = BUY on a day that rose, or SELL on a day that fell")
-    print(f"  🔍(wrong)   = BUY on a day that fell, or SELL on a day that rose")
-    print(f"  The move was inside the noise band — too small to be decisive.")
+    # -- Noise-band explanation ------------------------------------------------
+    print(f"\n  -- Noise-Band Directional Analysis (v2.5) ---------------------------")
+    print(f"  [CHECK](correct) = BUY on a day that rose, or SELL on a day that fell")
+    print(f"  [CHECK](wrong)   = BUY on a day that fell, or SELL on a day that rose")
+    print(f"  The move was inside the noise band HOLD too small to be decisive.")
     print(f"  But direction still tells us if the model was right-minded.")
     print(f"  Target: noise-band calls should be ≥60% directionally correct.")
     print(f"  Overall noise-band accuracy: {total_nc}/{total_nc+total_nw} = {overall_nacc:.1f}%  "
-          + ("✅" if overall_nacc >= 60 else "⚠️  needs improvement"))
+          + ("[OK]" if overall_nacc >= 60 else "[WARN]  needs improvement"))
 
-    # ── Verdict ───────────────────────────────────────────────────────────────
+    # -- Verdict ---------------------------------------------------------------
     acc_ok   = avg_acc  >= 75
     util_ok  = avg_util >= 60
     noise_ok = overall_nacc >= 60
-    print(f"\n  {'═'*65}")
+    print(f"\n  {'='*65}")
     print(f"  THREE-AGENT CHAIN VERDICT")
-    print(f"  {'═'*65}")
+    print(f"  {'='*65}")
     print(f"  Decision accuracy  : {avg_acc:.1f}%  "
-          + ("✅ PASS (≥75%)" if acc_ok   else "⚠️  BELOW TARGET"))
+          + ("[OK] PASS (≥75%)" if acc_ok   else "[WARN]  BELOW TARGET"))
     print(f"  Utilisation rate   : {avg_util:.1f}%  "
-          + ("✅ PASS (≥60%)" if util_ok  else "⚠️  LOW"))
+          + ("[OK] PASS (≥60%)" if util_ok  else "[WARN]  LOW"))
     print(f"  Noise-band dir acc : {overall_nacc:.1f}%  "
-          + ("✅ PASS (≥60%)" if noise_ok else "⚠️  LOW — model direction unreliable in tight moves"))
-    print(f"  UncertaintyAgent   : ✅ operational  (predict_from_prob)")
-    print(f"  RiskEngine         : {'✅ operational' if risk_engine else '⚠️  not loaded'}")
-    print(f"  ConflictResolver   : {'✅ operational' if conflict_resolver else '⚠️  not loaded'}")
+          + ("[OK] PASS (≥60%)" if noise_ok else "[WARN]  LOW HOLD model direction unreliable in tight moves"))
+    print(f"  UncertaintyAgent   : [OK] operational  (predict_from_prob)")
+    print(f"  RiskEngine         : {'[OK] operational' if risk_engine else '[WARN]  not loaded'}")
+    print(f"  ConflictResolver   : {'[OK] operational' if conflict_resolver else '[WARN]  not loaded'}")
 
     print(f"\n  Per-window:")
     for s in all_stats:
         bar_a = "█"*int(s["accuracy"]/5)    + "░"*(20-int(s["accuracy"]/5))
         bar_u = "█"*int(s["utilisation"]/5) + "░"*(20-int(s["utilisation"]/5))
-        af = "✅" if s["accuracy"]    >= 75 else "⚠️ "
-        uf = "✅" if s["utilisation"] >= 60 else "⚠️ "
-        nf = "✅" if s["noise_acc"]   >= 60 else "⚠️ "
+        af = "[OK]" if s["accuracy"]    >= 75 else "[WARN] "
+        uf = "[OK]" if s["utilisation"] >= 60 else "[WARN] "
+        nf = "[OK]" if s["noise_acc"]   >= 60 else "[WARN] "
         print(f"  {s['label']:<32}  "
               f"acc [{bar_a}] {s['accuracy']:.0f}%{af}  "
               f"util [{bar_u}] {s['utilisation']:.0f}%{uf}  "
@@ -579,7 +579,7 @@ def main():
             all_rows.append(r)
     if all_rows:
         pd.DataFrame(all_rows).to_csv("fusion_backtest.csv", index=False)
-        print(f"\n  Saved → fusion_backtest.csv  ({len(all_rows)} rows)")
+        print(f"\n  Saved -> fusion_backtest.csv  ({len(all_rows)} rows)")
 
     print("\nDone.\n")
 

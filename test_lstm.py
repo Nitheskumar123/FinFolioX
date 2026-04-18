@@ -1,14 +1,14 @@
 """
-test_lstm.py  —  LSTM + Explainability Backtest v5  |  5-Day Horizon
+test_lstm.py  HOLD  LSTM + Explainability Backtest v5  |  5-Day Horizon
 ======================================================================
 Uses production TechnicalAgent and ExplainabilityAgent directly.
-Zero logic duplication — all IG, reliability, and feature engineering
+Zero logic duplication HOLD all IG, reliability, and feature engineering
 come from ml_engine/technical_agent.py and ml_engine/explainability_agent.py.
 
 HOW THE TWO-PHASE RELIABILITY WORKS (matches original test_lstm logic):
   Phase 1 : explain_prediction() for every ticker in the window.
             Raw attributions + prob auto-stored in expl_agent._session_data.
-  Phase 2 : set_batch_reliability(_session_data) — computes reliability
+  Phase 2 : set_batch_reliability(_session_data) HOLD computes reliability
             from all 30 tickers simultaneously (cross-sectional, not incremental).
             Overwrites the default 0.5 values with real window reliability.
   Phase 3 : Re-select top driver per ticker using _select_top_driver(raw_attrs)
@@ -19,10 +19,10 @@ This matches exactly what the original standalone test did with:
   top_driver, eff_ig, _ = select_top_driver(attrs, reliability)
 
 FIXES STILL ACTIVE (now enforced by production classes):
-  FIX 1 — Weekend snap via snap_to_trading_day()
-  FIX 2 — Real F(baseline) via ExplainabilityAgent._last_baseline_prob
-  FIX 3 — macd_norm gate via ExplainabilityAgent._select_top_driver()
-  FIX 4 — Raw (unstretched) prob via TechnicalAgent / IG forward pass
+  FIX 1 HOLD Weekend snap via snap_to_trading_day()
+  FIX 2 HOLD Real F(baseline) via ExplainabilityAgent._last_baseline_prob
+  FIX 3 HOLD macd_norm gate via ExplainabilityAgent._select_top_driver()
+  FIX 4 HOLD Raw (unstretched) prob via TechnicalAgent / IG forward pass
 """
 
 import os
@@ -35,7 +35,7 @@ import yfinance as yf
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 warnings.filterwarnings("ignore")
 
-# ── Import production modules ─────────────────────────────────────────────────
+# -- Import production modules -------------------------------------------------
 # Assumes test_lstm.py lives at the project root (same level as ml_engine/)
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
@@ -47,16 +47,18 @@ from ml_engine.technical_agent import (
 )
 from ml_engine.explainability_agent import ExplainabilityAgent, MACD_REL_GATE
 
-# ── Paths ─────────────────────────────────────────────────────────────────────
+# -- Paths ---------------------------------------------------------------------
 MODEL_PATH  = r"D:\FinFolioX\saved_models\lstm_model.keras"
 SCALER_PATH = r"D:\FinFolioX\saved_models\lstm_scaler.pkl"
 
-# ── Test windows ──────────────────────────────────────────────────────────────
+# -- Test windows --------------------------------------------------------------
 TEST_WINDOWS = [
+    
     ("2026-03-23", "2026-03-28", "Mar23->28  Bear start"),
     ("2026-03-04", "2026-03-09", "Mar04->09  Bear early"),
-    ("2026-03-15", "2026-03-20", "Mar15->20  Deep Bear"),   # Sunday -- auto-snapped
+    ("2026-03-15", "2026-03-20", "Mar15->20  Deep Bear"),
     ("2026-03-05", "2026-03-10", "Mar05->10  Bounce"),
+    ("2026-04-02", "2026-04-07", "Apr02->07  Iran Bear Lull"),  # ← ADD THIS
 ]
 
 TICKERS = [
@@ -71,8 +73,8 @@ BUY_THRESHOLD  = 0.52
 SELL_THRESHOLD = 0.48
 
 # Historical baselines for comparison columns
-V1_EXPL = [37.9, 43.3, 46.7, 70.0]
-V3_EXPL = [55.2, 66.7, 66.7, 70.0]
+V1_EXPL = [37.9, 43.3, 46.7, 70.0, 0.0]
+V3_EXPL = [55.2, 66.7, 66.7, 70.0, 0.0]
 
 
 # ==============================================================================

@@ -1,5 +1,5 @@
 """
-test_heatmap.py  —  HeatmapAgent GDI Backtest  |  March 2026
+test_heatmap.py  HOLD  HeatmapAgent GDI Backtest  |  March 2026
 =============================================================
 Tests accuracy of the Disagreement Heatmap across 4 date windows.
 
@@ -9,23 +9,23 @@ What this tests:
   3. LOW GDI (signals agree) correctly predicts high-accuracy outcomes
   4. Final decision accuracy (BUY/SELL vs actual 5-day return)
 
-Imports production classes — zero logic duplicated here:
-  - TechnicalAgent   → predict_raw() for LSTM signal
-  - HybridRegimeAgent → detect() for regime + vol
-  - HeatmapAgent     → analyze() for GDI + penalty
+Imports production classes HOLD zero logic duplicated here:
+  - TechnicalAgent   -> predict_raw() for LSTM signal
+  - HybridRegimeAgent -> detect() for regime + vol
+  - HeatmapAgent     -> analyze() for GDI + penalty
 
 Sentiment scores are MANUAL (pre-computed from v2.3 context analysis).
-Reason: SentimentAgent makes 40+ live API calls per run — not suitable for
+Reason: SentimentAgent makes 40+ live API calls per run HOLD not suitable for
 fast backtest. The manual scores reflect realistic MCP+LLM output for each
 date based on the known March 2026 market context (tariff selloff, VIX ~26-27).
 
 Manual score derivation logic:
   - Mar 02-09: tariff fears mounting, S&P -3 to -5% range, VIX 25-28
-    → All tickers: negative/neutral (range -0.15 to +0.05)
+    -> All tickers: negative/neutral (range -0.15 to +0.05)
   - Mar 05-10: brief bounce attempt off lows
-    → Mixed: SPY/QQQ slightly positive, individual stocks neutral
+    -> Mixed: SPY/QQQ slightly positive, individual stocks neutral
   - Mar 15-20: deep bear, GLD -10%, tech -4-6%
-    → Strong negative across board (-0.08 to -0.20)
+    -> Strong negative across board (-0.08 to -0.20)
 
 Run from project root:
     python test_heatmap.py
@@ -47,30 +47,30 @@ from ml_engine.technical_agent    import TechnicalAgent, build_lstm_features, SE
 from ml_engine.hybrid_regime_agent import HybridRegimeAgent
 from ml_engine.heatmap_agent       import HeatmapAgent
 
-# ── Paths ─────────────────────────────────────────────────────────────────────
+# -- Paths ---------------------------------------------------------------------
 MODEL_PATH   = r"D:\FinFolioX\saved_models\lstm_model.keras"
 SCALER_PATH  = r"D:\FinFolioX\saved_models\lstm_scaler.pkl"
 REGIME_PATH  = r"D:\FinFolioX\saved_models\hmm_regime_hybrid.pkl"
 
-# ── Test config ───────────────────────────────────────────────────────────────
+# -- Test config ---------------------------------------------------------------
 TICKERS = [
-    # ── Mega-cap Tech ───────────────────────────────────────────
+    # -- Mega-cap Tech -------------------------------------------
     "AAPL", "MSFT", "NVDA", "TSLA", "META", "GOOGL", "AMZN",
-    # ── Semiconductors / AI ─────────────────────────────────────
+    # -- Semiconductors / AI -------------------------------------
     "AMD",  "INTC", "ORCL",
-    # ── Index ETFs ───────────────────────────────────────────────
+    # -- Index ETFs -----------------------------------------------
     "SPY",  "QQQ",  "DIA",  "IWM",
-    # ── Financials ───────────────────────────────────────────────
+    # -- Financials -----------------------------------------------
     "JPM",  "BAC",  "GS",   "V",
-    # ── Bond / Safe-Haven ETFs ───────────────────────────────────
+    # -- Bond / Safe-Haven ETFs -----------------------------------
     "GLD",  "TLT",  "SLV",
-    # ── Energy ───────────────────────────────────────────────────
+    # -- Energy ---------------------------------------------------
     "XOM",  "CVX",
-    # ── Consumer Defensive ───────────────────────────────────────
+    # -- Consumer Defensive ---------------------------------------
     "WMT",  "PG",   "JNJ",
-    # ── Consumer Discretionary / Media ───────────────────────────
+    # -- Consumer Discretionary / Media ---------------------------
     "NFLX", "DIS",
-    # ── Enterprise / Cloud ───────────────────────────────────────
+    # -- Enterprise / Cloud ---------------------------------------
     "CRM",  "PLTR",
 ]
 
@@ -78,18 +78,18 @@ BUY_THRESHOLD  = 0.52   # raw (unstretched) LSTM prob
 SELL_THRESHOLD = 0.48
 
 TEST_WINDOWS = [
-    # ── March 2026: known Bear regime ─────────────────────────────────────────
-    ("2026-03-03", "2026-03-08", "Mar03→08  Bear start"),
-    ("2026-03-04", "2026-03-09", "Mar04→09  Bear early"),
-    ("2026-03-15", "2026-03-20", "Mar15→20  Deep Bear"),   # snapped from Sun
-    ("2026-03-05", "2026-03-10", "Mar05→10  Bounce"),
-    # ── Regime cross-check: did it detect Bull / Sideways correctly? ──────────
-    ("2025-08-01", "2025-08-08", "Aug01→08  Bull Phase"),
-    ("2025-10-01", "2025-10-08", "Oct01→08  Sideways"),
+    # -- March 2026: known Bear regime -----------------------------------------
+    ("2026-03-03", "2026-03-08", "Mar03->08  Bear start"),
+    ("2026-03-04", "2026-03-09", "Mar04->09  Bear early"),
+    ("2026-03-15", "2026-03-20", "Mar15->20  Deep Bear"),   # snapped from Sun
+    ("2026-03-05", "2026-03-10", "Mar05->10  Bounce"),
+    # -- Regime cross-check: did it detect Bull / Sideways correctly? ----------
+    ("2025-08-01", "2025-08-08", "Aug01->08  Bull Phase"),
+    ("2025-10-01", "2025-10-08", "Oct01->08  Sideways"),
 ]
 
 # ==============================================================================
-# MANUAL SENTIMENT SCORES — March 2026 + Aug 2025 + Oct 2025
+# MANUAL SENTIMENT SCORES HOLD March 2026 + Aug 2025 + Oct 2025
 # ==============================================================================
 # Source: derived from v2.3 MCP+LLM pipeline runs and known market context.
 #
@@ -101,24 +101,24 @@ TEST_WINDOWS = [
 #   - Tech (NVDA/TSLA): leading decline on AI capex fears
 #   - JPM: defensive but still weak with credit concerns
 #
-# Score scale: [-0.75 bearish ← 0 neutral → +0.75 bullish]
+# Score scale: [-0.75 bearish ← 0 neutral -> +0.75 bullish]
 # Using 0.07 threshold (v2.3): >+0.07=bullish, <-0.07=bearish
 #
 # March 2026 macro context per sector:
-#   Tech (AAPL/MSFT/GOOGL/META):  tariff + AI-spend fear → bearish
-#   Semis (NVDA/AMD/INTC):        export controls + capex fears → bearish
-#   Indices (SPY/QQQ/DIA/IWM):    broad market drag → bearish
-#   Financials (JPM/BAC/GS/V):    rate uncertainty, credit spreads widen → mildly neg
+#   Tech (AAPL/MSFT/GOOGL/META):  tariff + AI-spend fear -> bearish
+#   Semis (NVDA/AMD/INTC):        export controls + capex fears -> bearish
+#   Indices (SPY/QQQ/DIA/IWM):    broad market drag -> bearish
+#   Financials (JPM/BAC/GS/V):    rate uncertainty, credit spreads widen -> mildly neg
 #   Safe-havens (GLD/TLT/SLV):    flight-to-quality early then reversal Mar 15-19
-#   Energy (XOM/CVX):             oil volatile on OPEC + tariff demand fears → mixed
-#   Consumer Defensive (WMT/PG/JNJ): resilient business, mild selloff → near neutral
-#   Cons. Disc/Media (NFLX/DIS):  discretionary spending fears → bearish
-#   Cloud/AI (ORCL/CRM/PLTR):    AI spend scrutiny but PLTR benefits → mixed
+#   Energy (XOM/CVX):             oil volatile on OPEC + tariff demand fears -> mixed
+#   Consumer Defensive (WMT/PG/JNJ): resilient business, mild selloff -> near neutral
+#   Cons. Disc/Media (NFLX/DIS):  discretionary spending fears -> bearish
+#   Cloud/AI (ORCL/CRM/PLTR):    AI spend scrutiny but PLTR benefits -> mixed
 # ==============================================================================
 
 MANUAL_SENTIMENT = {
-    # ── Mar 03-08: Bear start ─────────────────────────────────────────────────
-    # Tariff fears dominant, market breaking down, VIX 24→27
+    # -- Mar 03-08: Bear start -------------------------------------------------
+    # Tariff fears dominant, market breaking down, VIX 24->27
     "2026-03-03": {
         # Mega-cap Tech
         "AAPL": -0.08,   # China revenue + App Store scrutiny
@@ -161,7 +161,7 @@ MANUAL_SENTIMENT = {
         "PLTR":  0.05,   # Defense/govt contracts insulated, AI buzz
     },
 
-    # ── Mar 04-09: Bear early ─────────────────────────────────────────────────
+    # -- Mar 04-09: Bear early -------------------------------------------------
     # Sentiment deteriorating, VIX 26-28, capitulation signals emerging
     "2026-03-04": {
         # Mega-cap Tech
@@ -205,14 +205,14 @@ MANUAL_SENTIMENT = {
         "PLTR":  0.06,
     },
 
-    # ── Mar 05-10: Bounce ────────────────────────────────────────────────────
-    # Oversold technical bounce — mixed signals, VIX easing from peak
+    # -- Mar 05-10: Bounce ----------------------------------------------------
+    # Oversold technical bounce HOLD mixed signals, VIX easing from peak
     "2026-03-05": {
         # Mega-cap Tech
-        "AAPL":  0.03,   # China smartphone win → slight relief
+        "AAPL":  0.03,   # China smartphone win -> slight relief
         "MSFT":  0.02,
-        "NVDA":  0.04,   # GTC 2026 upcoming → catalyst
-        "TSLA": -0.12,   # Still negative — fundamentals unchanged
+        "NVDA":  0.04,   # GTC 2026 upcoming -> catalyst
+        "TSLA": -0.12,   # Still negative HOLD fundamentals unchanged
         "META":  0.05,   # New AI glasses announcement
         "GOOGL": 0.02,
         "AMZN":  0.02,
@@ -249,9 +249,9 @@ MANUAL_SENTIMENT = {
         "PLTR":  0.08,   # GTC adjacent AI momentum
     },
 
-    # ── Mar 15-20: Deep Bear ─────────────────────────────────────────────────
+    # -- Mar 15-20: Deep Bear -------------------------------------------------
     # Worst phase: GLD crashed, tech rout, VIX 27-30, new 2026 lows
-    # Note: Mar 15 Sunday → snapped to Mon Mar 16
+    # Note: Mar 15 Sunday -> snapped to Mon Mar 16
     "2026-03-15": {
         # Mega-cap Tech
         "AAPL": -0.11,
@@ -276,7 +276,7 @@ MANUAL_SENTIMENT = {
         "GS":   -0.05,
         "V":    -0.07,
         # Safe-havens
-        "GLD":  -0.16,   # Trump tariff pause talk → GLD crashes
+        "GLD":  -0.16,   # Trump tariff pause talk -> GLD crashes
         "TLT":   0.04,   # Still some bond demand but less
         "SLV":  -0.10,   # Silver follows gold down
         # Energy
@@ -294,12 +294,12 @@ MANUAL_SENTIMENT = {
         "PLTR": -0.03,   # Even defence names selling off
     },
 
-    # ── Aug 01-08: Bull Phase ─────────────────────────────────────────────────
+    # -- Aug 01-08: Bull Phase -------------------------------------------------
     # August 2025 context:
     #   S&P ~5800, Fed already cut 25bp in June, AI optimism peak, VIX ~13-15
     #   Tech leading: NVDA near ATH on Blackwell GPU demand
     #   Bond market calm, GLD flat-positive, small-caps lagging
-    #   No major macro catalyst — "soft landing" narrative dominant
+    #   No major macro catalyst HOLD "soft landing" narrative dominant
     "2025-08-01": {
         # Mega-cap Tech
         "AAPL":  0.12,   # iPhone 17 rumours, services growth strong
@@ -342,7 +342,7 @@ MANUAL_SENTIMENT = {
         "PLTR":  0.22,   # AIP bootcamps driving commercial growth
     },
 
-    # ── Oct 01-08: Sideways ───────────────────────────────────────────────────
+    # -- Oct 01-08: Sideways ---------------------------------------------------
     # October 2025 context:
     #   S&P ~5600-5700, choppy after Sep volatility, VIX ~18-21
     #   "Magnificent 7" losing momentum after Q3 guidance misses
@@ -363,7 +363,7 @@ MANUAL_SENTIMENT = {
         "INTC": -0.05,   # Guidance cut warning
         "ORCL":  0.06,   # Cloud still growing faster than market
         # Index ETFs
-        "SPY":  -0.02,   # Near flat — indecisive market
+        "SPY":  -0.02,   # Near flat HOLD indecisive market
         "QQQ":  -0.04,   # Tech lagging slightly
         "DIA":   0.01,
         "IWM":  -0.06,   # Small caps hurt by "higher for longer"
@@ -373,7 +373,7 @@ MANUAL_SENTIMENT = {
         "GS":    0.03,
         "V":     0.02,
         # Safe-havens
-        "GLD":   0.12,   # Geopolitical risk bid — oil + Middle East
+        "GLD":   0.12,   # Geopolitical risk bid HOLD oil + Middle East
         "TLT":  -0.08,   # Yields rising, bonds weak
         "SLV":   0.05,   # Following gold up
         # Energy
@@ -401,7 +401,7 @@ def snap_to_trading_day(date_str: str) -> str:
     dt      = pd.to_datetime(date_str)
     snapped = pd.bdate_range(start=dt, periods=1)[0]
     if snapped != dt:
-        print(f"   ⚠️  {date_str} is not a trading day → snapped to {snapped.date()}")
+        print(f"   [WARN]  {date_str} is not a trading day -> snapped to {snapped.date()}")
     return snapped.strftime("%Y-%m-%d")
 
 
@@ -460,17 +460,17 @@ def run_window(test_date: str, outcome_date: str, label: str,
         diffs = [(abs((pd.to_datetime(sent_date) - pd.to_datetime(k)).days), k)
                  for k in available]
         sent_date = min(diffs)[1]
-        print(f"   ℹ️  Sentiment date mapped: {test_date} → using {sent_date} scores")
+        print(f"   ℹ️  Sentiment date mapped: {test_date} -> using {sent_date} scores")
 
     sentiment_scores = MANUAL_SENTIMENT[sent_date]
 
     print(f"\n{'*'*90}")
-    print(f"  {label}  |  {test_date} → {outcome_date}")
+    print(f"  {label}  |  {test_date} -> {outcome_date}")
     print(f"{'*'*90}")
     print(f"\n  {'Ticker':<7} {'LSTM':>7} {'Regime':<10} {'Vol':>7} "
           f"{'Sent':>7} {'GDI':>6} {'Tension':<10} {'Vote':>5} "
           f"{'Decision':<7} {'Act%':>8} {'Result'}")
-    print(f"  {'─'*97}")
+    print(f"  {'-'*97}")
 
     results      = []
     correct      = 0
@@ -485,23 +485,23 @@ def run_window(test_date: str, outcome_date: str, label: str,
         try:
             hist = fetch_history(ticker, test_date)
             if hist.empty or len(hist) < 150:
-                print(f"  {ticker:<7} — skipped (only {len(hist)} rows)")
+                print(f"  {ticker:<7} HOLD skipped (only {len(hist)} rows)")
                 continue
 
-            # ── LSTM raw signal ──────────────────────────────────────────────
+            # -- LSTM raw signal ----------------------------------------------
             feat_df = build_lstm_features(hist)
             if len(feat_df) < SEQ_LEN:
-                print(f"  {ticker:<7} — skipped (feat rows={len(feat_df)} < {SEQ_LEN})")
+                print(f"  {ticker:<7} HOLD skipped (feat rows={len(feat_df)} < {SEQ_LEN})")
                 continue
             lstm_raw = tech_agent.predict_raw(hist)   # unstretched
 
-            # ── Regime ──────────────────────────────────────────────────────
+            # -- Regime ------------------------------------------------------
             regime_label, regime_vol, _ = regime_agent.detect(hist, ticker)
 
-            # ── Manual sentiment ─────────────────────────────────────────────
+            # -- Manual sentiment ---------------------------------------------
             sent_score = sentiment_scores.get(ticker, 0.0)
 
-            # ── Heatmap GDI ──────────────────────────────────────────────────
+            # -- Heatmap GDI --------------------------------------------------
             gdi_result = heatmap_agent.analyze(
                 lstm_score=lstm_raw,
                 sent_score=sent_score,
@@ -512,33 +512,33 @@ def run_window(test_date: str, outcome_date: str, label: str,
             tension = gdi_result["tension"]
             penalty = gdi_result["penalty"]
 
-            # ── Decision v2: 3-signal majority voting + GDI conflict gate ────
+            # -- Decision v2: 3-signal majority voting + GDI conflict gate ----
             #
-            # Old logic (broken): `regime == "Bear" → SELL` — too blunt.
+            # Old logic (broken): `regime == "Bear" -> SELL` HOLD too blunt.
             # NVDA LSTM=0.995 in Bear regime got SELL but bounced +1.44%.
             # That's a regime gate overriding a strong technical signal wrongly.
             #
-            # New logic — two steps:
+            # New logic HOLD two steps:
             #
-            # STEP 1 — GDI conflict gate (HIGH/CRITICAL → HOLD immediately).
+            # STEP 1 HOLD GDI conflict gate (HIGH/CRITICAL -> HOLD immediately).
             # When agents strongly disagree (GDI > 0.55), no signal is reliable.
             # Better to stay out than pick the wrong side with 50/50 odds.
             #
-            # STEP 2 — Majority vote across 3 independent signals:
-            #   Signal A: LSTM   → +1 bull if prob > BUY_THRESHOLD,
+            # STEP 2 HOLD Majority vote across 3 independent signals:
+            #   Signal A: LSTM   -> +1 bull if prob > BUY_THRESHOLD,
             #                       -1 bear if prob < SELL_THRESHOLD, 0 neutral
-            #   Signal B: Sentiment → +1 bull if sent > 0.07,
+            #   Signal B: Sentiment -> +1 bull if sent > 0.07,
             #                          -1 bear if sent < -0.07, 0 neutral
-            #   Signal C: Regime → +1 Bull, -1 Bear, 0 Sideways
+            #   Signal C: Regime -> +1 Bull, -1 Bear, 0 Sideways
             # BUY  needs: total_vote ≥ +2 AND regime ≠ Bear
             # SELL needs: total_vote ≤ -2
             # HOLD: everything else (conflicted or insufficient evidence)
 
-            GDI_HOLD_THRESHOLD = 0.55   # HIGH/CRITICAL disagreement → HOLD
+            GDI_HOLD_THRESHOLD = 0.55   # HIGH/CRITICAL disagreement -> HOLD
 
             # Step 1: conflict gate
             if gdi >= GDI_HOLD_THRESHOLD:
-                decision = "HOLD"   # agents too divided — stay out
+                decision = "HOLD"   # agents too divided HOLD stay out
             else:
                 # Step 2: majority vote
                 vote_lstm   = (+1 if lstm_raw > BUY_THRESHOLD
@@ -558,9 +558,9 @@ def run_window(test_date: str, outcome_date: str, label: str,
                 elif total_vote <= -2:
                     decision = "SELL"
                 else:
-                    decision = "HOLD"   # mixed signals — insufficient conviction
+                    decision = "HOLD"   # mixed signals HOLD insufficient conviction
 
-            # ── Actual return ────────────────────────────────────────────────
+            # -- Actual return ------------------------------------------------
             actual_ret = fetch_actual_return(ticker, test_date, outcome_date)
 
             if np.isnan(actual_ret):
@@ -572,15 +572,15 @@ def run_window(test_date: str, outcome_date: str, label: str,
                 neutral_cnt += 1
                 correct_flag = None
             elif decision == "BUY"  and actual_ret > 0:
-                result_str = "✅"
+                result_str = "[OK]"
                 correct += 1
                 correct_flag = True
             elif decision == "SELL" and actual_ret < 0:
-                result_str = "✅"
+                result_str = "[OK]"
                 correct += 1
                 correct_flag = True
             else:
-                result_str = "❌"
+                result_str = "[BAD]"
                 wrong += 1
                 correct_flag = False
 
@@ -632,15 +632,15 @@ def run_window(test_date: str, outcome_date: str, label: str,
     low_acc  = (low_gdi_correct  / low_gdi_total  * 100) if low_gdi_total  > 0 else float("nan")
     high_acc = (high_gdi_correct / high_gdi_total * 100) if high_gdi_total > 0 else float("nan")
 
-    print(f"\n  ── Window Summary ───────────────────────────────────────────────────────")
-    print(f"     Decision accuracy   : {correct}✅ / {wrong}❌ / {neutral_cnt}-  → {acc:.1f}%")
-    print(f"     Low  GDI (agree)    : {low_gdi_correct}/{low_gdi_total}  → {low_acc:.0f}%  (should be HIGHER)")
-    print(f"     High GDI (disagree) : {high_gdi_correct}/{high_gdi_total}  → {high_acc:.0f}%  (should be LOWER)")
+    print(f"\n  -- Window Summary -------------------------------------------------------")
+    print(f"     Decision accuracy   : {correct}[OK] / {wrong}[BAD] / {neutral_cnt}-  -> {acc:.1f}%")
+    print(f"     Low  GDI (agree)    : {low_gdi_correct}/{low_gdi_total}  -> {low_acc:.0f}%  (should be HIGHER)")
+    print(f"     High GDI (disagree) : {high_gdi_correct}/{high_gdi_total}  -> {high_acc:.0f}%  (should be LOWER)")
     gdi_hypothesis_ok = (
         (np.isnan(low_acc) or np.isnan(high_acc)) or
         low_acc >= high_acc
     )
-    print(f"     GDI hypothesis      : {'✅ CONFIRMED' if gdi_hypothesis_ok else '⚠️ NOT CONFIRMED'} "
+    print(f"     GDI hypothesis      : {'[OK] CONFIRMED' if gdi_hypothesis_ok else '[WARN] NOT CONFIRMED'} "
           f"(low-GDI trades ≥ high-GDI trades in accuracy)")
 
     return {
@@ -668,42 +668,42 @@ def run_window(test_date: str, outcome_date: str, label: str,
 
 def main():
     print("=" * 90)
-    print("  HEATMAP AGENT GDI BACKTEST  |  6 Windows × 30 Tickers")
-    print("  Windows: 4× Bear/Bounce (Mar 2026) + Bull (Aug 2025) + Sideways (Oct 2025)")
+    print("  HEATMAP AGENT GDI BACKTEST  |  6 Windows x 30 Tickers")
+    print("  Windows: 4x Bear/Bounce (Mar 2026) + Bull (Aug 2025) + Sideways (Oct 2025)")
     print("  Sentiment: Manual pre-computed scores (v2.3 MCP+LLM context)")
     print("  Decision:  3-signal majority vote + GDI conflict gate")
     print("=" * 90)
 
-    # ── Load agents ───────────────────────────────────────────────────────────
+    # -- Load agents -----------------------------------------------------------
     print("\nLoading TechnicalAgent...")
     try:
         tech_agent = TechnicalAgent(
             lstm_model_path=MODEL_PATH,
             lstm_scaler_path=SCALER_PATH,
         )
-        print(f"   ✅ LSTM loaded  {tuple(tech_agent.lstm_model.input_shape)}")
+        print(f"   [OK] LSTM loaded  {tuple(tech_agent.lstm_model.input_shape)}")
     except Exception as e:
-        print(f"   ❌ Failed: {e}"); return
+        print(f"   [BAD] Failed: {e}"); return
 
     print("\nLoading HybridRegimeAgent...")
     try:
         regime_agent = HybridRegimeAgent(
             hmm_model_path=REGIME_PATH, verbose=False)
-        print(f"   ✅ Regime loaded  is_fitted={regime_agent.is_fitted}")
+        print(f"   [OK] Regime loaded  is_fitted={regime_agent.is_fitted}")
     except Exception as e:
-        print(f"   ❌ Failed: {e}"); return
+        print(f"   [BAD] Failed: {e}"); return
 
     print("\nLoading HeatmapAgent...")
     heatmap_agent = HeatmapAgent()
-    print("   ✅ HeatmapAgent ready")
+    print("   [OK] HeatmapAgent ready")
 
-    # ── Print manual sentiment summary ───────────────────────────────────────
+    # -- Print manual sentiment summary ---------------------------------------
     print(f"\n  Manual sentiment scores used ({len(TICKERS)} tickers):")
     print(f"  {'Ticker':<8}", end="")
     for d in sorted(MANUAL_SENTIMENT.keys()):
         print(f"  {d[5:]:>10}", end="")   # MM-DD
     print()
-    print("  " + "─" * 55)
+    print("  " + "-" * 55)
     for t in TICKERS:
         print(f"  {t:<8}", end="")
         for d in sorted(MANUAL_SENTIMENT.keys()):
@@ -712,25 +712,25 @@ def main():
             print(f"  {sc:>+7.3f}{icon}", end="")
         print()
 
-    # ── Run windows ──────────────────────────────────────────────────────────
+    # -- Run windows ----------------------------------------------------------
     all_stats = []
     for test_date, outcome_date, label in TEST_WINDOWS:
         s = run_window(test_date, outcome_date, label,
                        tech_agent, regime_agent, heatmap_agent)
         all_stats.append(s)
 
-    # ── Consolidated summary ──────────────────────────────────────────────────
+    # -- Consolidated summary --------------------------------------------------
     print("\n" + "=" * 90)
     print("  CONSOLIDATED RESULTS")
     print("=" * 90)
     print(f"\n  {'Window':<30} {'Acc':>7} {'C/W/N':>12} {'LowGDI':>8} {'HighGDI':>9} {'Hypothesis'}")
-    print(f"  {'─'*78}")
+    print(f"  {'-'*78}")
 
     for s in all_stats:
         c_w_n = f"{s['correct']}/{s['wrong']}/{s['neutral']}"
         low_s  = f"{s['low_gdi_acc']:.0f}%({s['low_gdi_total']})" if not np.isnan(s['low_gdi_acc']) else "n/a"
         high_s = f"{s['high_gdi_acc']:.0f}%({s['high_gdi_total']})" if not np.isnan(s['high_gdi_acc']) else "n/a"
-        hyp    = "✅" if s["gdi_hypothesis_ok"] else "⚠️"
+        hyp    = "[OK]" if s["gdi_hypothesis_ok"] else "[WARN]"
         print(f"  {s['label']:<30} {s['accuracy']:>5.1f}%  {c_w_n:>12} "
               f"{low_s:>10} {high_s:>10}  {hyp}")
 
@@ -739,7 +739,7 @@ def main():
     all_high_acc = [s["high_gdi_acc"] for s in all_stats if not np.isnan(s["high_gdi_acc"])]
     hyp_confirmed = sum(1 for s in all_stats if s["gdi_hypothesis_ok"])
 
-    print(f"  {'─'*78}")
+    print(f"  {'-'*78}")
     print(f"  {'AVERAGE':<30} {avg_acc:>5.1f}%")
     if all_low_acc:
         print(f"  Avg accuracy LOW-GDI  (signals agree)    : {np.mean(all_low_acc):.1f}%")
@@ -747,27 +747,27 @@ def main():
         print(f"  Avg accuracy HIGH-GDI (signals disagree) : {np.mean(all_high_acc):.1f}%")
     print(f"  GDI hypothesis confirmed: {hyp_confirmed}/{len(all_stats)} windows")
 
-    # ── Verdict ───────────────────────────────────────────────────────────────
-    print(f"\n  {'═'*60}")
+    # -- Verdict ---------------------------------------------------------------
+    print(f"\n  {'='*60}")
     print(f"  HEATMAP AGENT VERDICT")
-    print(f"  {'═'*60}")
+    print(f"  {'='*60}")
     print(f"  Decision accuracy  : {avg_acc:.1f}%  "
-          + ("✅ above 55%" if avg_acc >= 55 else "⚠️  below 55%"))
+          + ("[OK] above 55%" if avg_acc >= 55 else "[WARN]  below 55%"))
     print(f"  GDI discrimination : {hyp_confirmed}/{len(all_stats)} windows show "
           "low-GDI trades outperform high-GDI trades")
     gdi_works = hyp_confirmed >= len(all_stats) // 2
-    print(f"  GDI useful?        : {'✅ YES — penalty correctly reduces confidence on disagreement' if gdi_works else '⚠️ MIXED — check GDI weights'}")
+    print(f"  GDI useful?        : {'[OK] YES HOLD penalty correctly reduces confidence on disagreement' if gdi_works else '[WARN] MIXED HOLD check GDI weights'}")
 
-    # ── Regime cross-check ────────────────────────────────────────────────────
+    # -- Regime cross-check ----------------------------------------------------
     # Key test: does the HybridRegimeAgent detect the right regime per window?
     # Bull windows should show mostly "Bull" labels.
     # Sideways windows should show mostly "Sideways".
     # Bear windows should show mostly "Bear".
-    print(f"\n  {'═'*60}")
+    print(f"\n  {'='*60}")
     print(f"  REGIME DETECTION CROSS-CHECK")
-    print(f"  {'═'*60}")
+    print(f"  {'='*60}")
     print(f"  {'Window':<28} {'Expected':<10} {'Regimes detected (across 30 tickers)'}")
-    print(f"  {'─'*60}")
+    print(f"  {'-'*60}")
 
     expected_regime = {
         "Bear start":  "Bear",
@@ -797,7 +797,7 @@ def main():
         side_pct = dist.get("Sideways", 0) / total * 100
 
         dominant = max(dist, key=dist.get)
-        match = "✅" if dominant == exp else "⚠️ "
+        match = "[OK]" if dominant == exp else "[WARN] "
 
         dist_str = (f"Bear={dist.get('Bear',0):2d} "
                     f"Bull={dist.get('Bull',0):2d} "
@@ -807,9 +807,9 @@ def main():
 
     print(f"\n  ℹ️  Note: HybridRegimeAgent runs on per-ticker OHLCV, not market-wide data.")
     print(f"       Some tickers (e.g. GLD in Bull) may show Bear due to their own price action.")
-    print(f"       Cross-window dominant regime should match expected — that confirms the HMM is working.")
+    print(f"       Cross-window dominant regime should match expected HOLD that confirms the HMM is working.")
 
-    # ── Save CSV ─────────────────────────────────────────────────────────────
+    # -- Save CSV -------------------------------------------------------------
     all_rows = []
     for s in all_stats:
         for r in s["results"]:
@@ -817,7 +817,7 @@ def main():
             all_rows.append(r)
     if all_rows:
         pd.DataFrame(all_rows).to_csv("heatmap_backtest.csv", index=False)
-        print(f"\n  Saved → heatmap_backtest.csv  ({len(all_rows)} rows)")
+        print(f"\n  Saved -> heatmap_backtest.csv  ({len(all_rows)} rows)")
 
     print("\nDone.\n")
 

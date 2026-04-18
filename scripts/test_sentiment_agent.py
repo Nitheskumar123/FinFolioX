@@ -32,9 +32,9 @@ def test_sentiment_logic():
 
     # 4. Interpretation
     if score > 0:
-        print("✅ SUCCESS: The AI correctly identified a generally POSITIVE day.")
+        print("[OK] SUCCESS: The AI correctly identified a generally POSITIVE day.")
     else:
-        print("❌ CHECK: The score seems low. Verify the headlines.")
+        print("[BAD] CHECK: The score seems low. Verify the headlines.")
 
 if __name__ == "__main__":
     test_sentiment_logic()

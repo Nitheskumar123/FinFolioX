@@ -1,15 +1,15 @@
 """
 ================================================================================
-test_ablation_study.py — FinFolioX Ablation Study (Revised Agent Selection)
+test_ablation_study.py HOLD FinFolioX Ablation Study (Revised Agent Selection)
 ================================================================================
 FIXES APPLIED vs previous version:
-  FIX-A  Topology + Causal added to ablation — they were active in baseline
+  FIX-A  Topology + Causal added to ablation HOLD they were active in baseline
          but never independently tested. Now they replace ASC/Adversarial/
          HeatmapGDI which all showed negative drops (over-constraining agents).
 
-  FIX-B  AESL prewarm raised 15 → 50 sessions so BCS exits WARMING before
+  FIX-B  AESL prewarm raised 15 -> 50 sessions so BCS exits WARMING before
          any test window runs. In the previous version AESL was still WARMING
-         during every window → aesl_mult = 1.0 always → 0.0pp drop regardless.
+         during every window -> aesl_mult = 1.0 always -> 0.0pp drop regardless.
 
   FIX-C  LegacyRegimeAgent loaded and kept active as baseline cross-validator.
 
@@ -19,17 +19,17 @@ FIXES APPLIED vs previous version:
          novel "Agent Interference Phenomenon" finding.
 
 TARGET 5 POSITIVE CONTRIBUTORS:
-  1. HybridRegimeAgent   — proven +4.0pp
-  2. SentimentScores     — proven +2.1pp
-  3. TopologyAgent (TDA) — untested in prior run; active in baseline
-  4. CausalAgent         — untested in prior run; active in baseline
-  5. AESLAgent (fixed)   — previously 0pp due to WARMING; now properly warmed
+  1. HybridRegimeAgent   HOLD proven +4.0pp
+  2. SentimentScores     HOLD proven +2.1pp
+  3. TopologyAgent (TDA) HOLD untested in prior run; active in baseline
+  4. CausalAgent         HOLD untested in prior run; active in baseline
+  5. AESLAgent (fixed)   HOLD previously 0pp due to WARMING; now properly warmed
 
-OVER-REGULATION SECTION (IEEE finding — removing them improves accuracy):
-  - ASC Memory          — +3.4pp improvement when removed
-  - HeatmapGDI          — +1.6pp improvement when removed
-  - AdversarialTester   — +1.4pp improvement when removed
-  - ConflictResolver    — +0.7pp improvement when removed
+OVER-REGULATION SECTION (IEEE finding HOLD removing them improves accuracy):
+  - ASC Memory          HOLD +3.4pp improvement when removed
+  - HeatmapGDI          HOLD +1.6pp improvement when removed
+  - AdversarialTester   HOLD +1.4pp improvement when removed
+  - ConflictResolver    HOLD +0.7pp improvement when removed
 ================================================================================
 """
 
@@ -49,9 +49,9 @@ os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 warnings.filterwarnings("ignore")
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-# ════════════════════════════════════════════════════════════════════════════════
+# ================================================================================
 #  AGENT IMPORTS
-# ════════════════════════════════════════════════════════════════════════════════
+# ================================================================================
 from ml_engine.technical_agent     import TechnicalAgent, build_lstm_features, SEQ_LEN
 from ml_engine.uncertainty_agent   import UncertaintyAgent
 from ml_engine.hybrid_regime_agent import HybridRegimeAgent
@@ -119,17 +119,17 @@ try:
 except Exception:
     _META_OK = False
 
-# ════════════════════════════════════════════════════════════════════════════════
+# ================================================================================
 #  MODEL PATHS
-# ════════════════════════════════════════════════════════════════════════════════
+# ================================================================================
 MODEL_PATH  = r"D:/FinFolioX/saved_models/lstm_model.keras"
 SCALER_PATH = r"D:/FinFolioX/saved_models/lstm_scaler.pkl"
 REGIME_PATH = os.path.join("saved_models", "hmm_regime_hybrid.pkl")
 FUSION_PATH = os.path.join("saved_models", "attention_fusion.pth")
 
-# ════════════════════════════════════════════════════════════════════════════════
+# ================================================================================
 #  CONSTANTS
-# ════════════════════════════════════════════════════════════════════════════════
+# ================================================================================
 DEFAULT_CAPITAL   = 10_000.0
 BUY_THRESHOLD     = 0.52
 SELL_THRESHOLD    = 0.35
@@ -143,9 +143,9 @@ BEAR_BUY_BCS_MAX  = 0.70
 # FIX-B: Raise AESL prewarm to 50 so BCS exits WARMING (threshold=10) well before tests
 AESL_PREWARM_N = 50  # was 15
 
-# ════════════════════════════════════════════════════════════════════════════════
+# ================================================================================
 #  17 TEST WINDOWS
-# ════════════════════════════════════════════════════════════════════════════════
+# ================================================================================
 TEST_WINDOWS = [
     ("2024-11-06", "2024-11-11", "Win1:  Bull-PostElection"),
     ("2024-07-30", "2024-08-05", "Win2:  Bear-YenCrash"),
@@ -166,9 +166,9 @@ TEST_WINDOWS = [
     ("2025-04-22", "2025-04-29", "Win17: Bounce-TariffPause"),
 ]
 
-# ════════════════════════════════════════════════════════════════════════════════
+# ================================================================================
 #  30 TICKERS
-# ════════════════════════════════════════════════════════════════════════════════
+# ================================================================================
 TICKERS = [
     "AAPL", "MSFT", "NVDA", "TSLA", "META", "GOOGL", "AMZN",
     "AMD",  "INTC", "ORCL",
@@ -189,9 +189,9 @@ def noise_band(ticker):
     if ticker in VOLATILE_STKS: return 3.0
     return 2.0
 
-# ════════════════════════════════════════════════════════════════════════════════
+# ================================================================================
 #  MANUAL SENTIMENT SCORES
-# ════════════════════════════════════════════════════════════════════════════════
+# ================================================================================
 MANUAL_SENTIMENT = {
     "2024-11-06": {
         "AAPL": +0.08, "MSFT": +0.07, "NVDA": +0.12, "TSLA": +0.25,
@@ -365,9 +365,9 @@ MANUAL_SENTIMENT = {
     },
 }
 
-# ════════════════════════════════════════════════════════════════════════════════
-#  ABLATION CONFIGS — TWO GROUPS
-# ════════════════════════════════════════════════════════════════════════════════
+# ================================================================================
+#  ABLATION CONFIGS HOLD TWO GROUPS
+# ================================================================================
 
 # Group A: 5 positive contributors (removing them should hurt accuracy)
 ABLATION_POSITIVE = [
@@ -377,8 +377,8 @@ ABLATION_POSITIVE = [
         "flag":        "use_hybrid_regime",
         "phase":       "Phase 3b",
         "tier":        "Core",
-        "description": "HMM+14-rule regime detector — gates all fusion/arbitration/sizing decisions",
-        "hypothesis":  "Regime gating lost → aggressive BUY in sustained downtrends, no Bear cap",
+        "description": "HMM+14-rule regime detector HOLD gates all fusion/arbitration/sizing decisions",
+        "hypothesis":  "Regime gating lost -> aggressive BUY in sustained downtrends, no Bear cap",
         "group":       "POSITIVE",
     },
     {
@@ -387,8 +387,8 @@ ABLATION_POSITIVE = [
         "flag":        "use_sentiment",
         "phase":       "Phase 2",
         "tier":        "Core",
-        "description": "FinBERT+MCP news scoring — sets sent_score to 0 for all tickers when disabled",
-        "hypothesis":  "News events (tariffs, FOMC, NVDA GTC) invisible → decisions purely price-based",
+        "description": "FinBERT+MCP news scoring HOLD sets sent_score to 0 for all tickers when disabled",
+        "hypothesis":  "News events (tariffs, FOMC, NVDA GTC) invisible -> decisions purely price-based",
         "group":       "POSITIVE",
     },
     {
@@ -397,8 +397,8 @@ ABLATION_POSITIVE = [
         "flag":        "use_topology",
         "phase":       "Phase 24",
         "tier":        "Analytical",
-        "description": "Persistent homology TDA — Betti-0/1 chaos modifier on fusion confidence",
-        "hypothesis":  "No market geometry context → chaotic/choppy regimes sized same as trending",
+        "description": "Persistent homology TDA HOLD Betti-0/1 chaos modifier on fusion confidence",
+        "hypothesis":  "No market geometry context -> chaotic/choppy regimes sized same as trending",
         "group":       "POSITIVE",
     },
     {
@@ -407,8 +407,8 @@ ABLATION_POSITIVE = [
         "flag":        "use_causal",
         "phase":       "Phase 25",
         "tier":        "Analytical",
-        "description": "Do-calculus causal discovery — separates causal from spurious price drivers",
-        "hypothesis":  "Confounders not removed → spurious correlations drive allocation decisions",
+        "description": "Do-calculus causal discovery HOLD separates causal from spurious price drivers",
+        "hypothesis":  "Confounders not removed -> spurious correlations drive allocation decisions",
         "group":       "POSITIVE",
     },
     {
@@ -417,14 +417,14 @@ ABLATION_POSITIVE = [
         "flag":        "use_aesl",
         "phase":       "Phase 27",
         "tier":        "Epistemic",
-        "description": "Belief Contradiction Scoring (BCS) — 5-dim epistemic gate on agent signals",
-        "hypothesis":  "Agent contradictions undetected → capital deployed despite conflicted signals",
+        "description": "Belief Contradiction Scoring (BCS) HOLD 5-dim epistemic gate on agent signals",
+        "hypothesis":  "Agent contradictions undetected -> capital deployed despite conflicted signals",
         "group":       "POSITIVE",
         # NOTE: prewarm n=50 ensures AESL exits WARMING before first window (FIX-B)
     },
 ]
 
-# Group B: 4 over-regulators (removing them improves accuracy — IEEE finding)
+# Group B: 4 over-regulators (removing them improves accuracy HOLD IEEE finding)
 ABLATION_OVER_REGULATORS = [
     {
         "name":        "Without ASC Memory",
@@ -432,8 +432,8 @@ ABLATION_OVER_REGULATORS = [
         "flag":        "use_asc",
         "phase":       "Phase 26",
         "tier":        "Epistemic",
-        "description": "Agent Sycophancy Coefficient — MI-based ensemble collapse detector",
-        "hypothesis":  "Over-penalises correct BUY signals in trending regimes → excessive false HOLDs",
+        "description": "Agent Sycophancy Coefficient HOLD MI-based ensemble collapse detector",
+        "hypothesis":  "Over-penalises correct BUY signals in trending regimes -> excessive false HOLDs",
         "group":       "OVER_REGULATOR",
     },
     {
@@ -442,8 +442,8 @@ ABLATION_OVER_REGULATORS = [
         "flag":        "use_heatmap",
         "phase":       "Phase 16",
         "tier":        "Analytical",
-        "description": "Group Disagreement Index — multi-signal tension penalty on confidence",
-        "hypothesis":  "GDI penalty too broad → blocks valid BUY signals during legitimate disagreement",
+        "description": "Group Disagreement Index HOLD multi-signal tension penalty on confidence",
+        "hypothesis":  "GDI penalty too broad -> blocks valid BUY signals during legitimate disagreement",
         "group":       "OVER_REGULATOR",
     },
     {
@@ -452,8 +452,8 @@ ABLATION_OVER_REGULATORS = [
         "flag":        "use_adversarial",
         "phase":       "Phase 11",
         "tier":        "Robustness",
-        "description": "Red Team flash-crash tester — applies 0.72× penalty on fragile LSTM signals",
-        "hypothesis":  "Penalty 0.72 too aggressive in normal Bull/Bounce markets → reduces BUY rate",
+        "description": "Red Team flash-crash tester HOLD applies 0.72x penalty on fragile LSTM signals",
+        "hypothesis":  "Penalty 0.72 too aggressive in normal Bull/Bounce markets -> reduces BUY rate",
         "group":       "OVER_REGULATOR",
     },
     {
@@ -462,8 +462,8 @@ ABLATION_OVER_REGULATORS = [
         "flag":        "use_conflict",
         "phase":       "Phase 13",
         "tier":        "Decision",
-        "description": "Neuro-symbolic arbitrator — LSTM↔Sentiment conflict detection with SYSTEMIC_VETO",
-        "hypothesis":  "SYSTEMIC_VETO fires too often in low-risk windows → unnecessary confidence drop",
+        "description": "Neuro-symbolic arbitrator HOLD LSTM↔Sentiment conflict detection with SYSTEMIC_VETO",
+        "hypothesis":  "SYSTEMIC_VETO fires too often in low-risk windows -> unnecessary confidence drop",
         "group":       "OVER_REGULATOR",
     },
 ]
@@ -471,9 +471,9 @@ ABLATION_OVER_REGULATORS = [
 ALL_ABLATION_CONFIGS = ABLATION_POSITIVE + ABLATION_OVER_REGULATORS
 
 
-# ════════════════════════════════════════════════════════════════════════════════
+# ================================================================================
 #  HELPER FUNCTIONS
-# ════════════════════════════════════════════════════════════════════════════════
+# ================================================================================
 def snap_to_trading_day(date_str):
     dt = pd.to_datetime(date_str)
     snapped = None
@@ -644,55 +644,55 @@ def prewarm_aesl(aesl_agent, n=AESL_PREWARM_N, seed=42):
             pass
 
 
-def print_separator(char="═", width=100): print(char * width)
-def print_section(title, char="─", width=100):
+def print_separator(char="=", width=100): print(char * width)
+def print_section(title, char="-", width=100):
     print(f"\n{char * width}\n  {title}\n{char * width}")
 
 
-# ════════════════════════════════════════════════════════════════════════════════
-#  AGENT FACTORY — fresh instance per run for reproducibility
-# ════════════════════════════════════════════════════════════════════════════════
+# ================================================================================
+#  AGENT FACTORY HOLD fresh instance per run for reproducibility
+# ================================================================================
 def init_agents(seed=42, verbose=False):
     if verbose:
         print("\n  LOADING AGENTS...")
-        print("  " + "─" * 80)
+        print("  " + "-" * 80)
 
     agents = {}
     S = contextlib.redirect_stdout(io.StringIO())
 
     with S: agents["tech"] = TechnicalAgent(lstm_model_path=MODEL_PATH,
                                              lstm_scaler_path=SCALER_PATH)
-    if verbose: print("  ✅  TechnicalAgent (LSTM)")
+    if verbose: print("  [OK]  TechnicalAgent (LSTM)")
 
     agents["uncertainty"] = UncertaintyAgent(agents["tech"])
-    if verbose: print("  ✅  UncertaintyAgent")
+    if verbose: print("  [OK]  UncertaintyAgent")
 
     try:
         with S: agents["regime"] = HybridRegimeAgent(hmm_model_path=REGIME_PATH, verbose=False)
-        if verbose: print("  ✅  HybridRegimeAgent")
+        if verbose: print("  [OK]  HybridRegimeAgent")
     except Exception as e:
         agents["regime"] = None
-        if verbose: print(f"  ⚠️   HybridRegimeAgent: {str(e)[:50]}")
+        if verbose: print(f"  [WARN]   HybridRegimeAgent: {str(e)[:50]}")
 
     try:
         hmm_path = os.path.join("saved_models", "hmm_regime.pkl")
         if _REGIME_LEGACY_OK and os.path.exists(hmm_path):
             with S: agents["legacy_regime"] = RegimeAgent(model_path=hmm_path)
-            if verbose: print("  ✅  LegacyRegimeAgent")
+            if verbose: print("  [OK]  LegacyRegimeAgent")
         else:
             agents["legacy_regime"] = None
     except Exception:
         agents["legacy_regime"] = None
 
     with S: agents["fusion"] = FusionAgent(model_path=FUSION_PATH)
-    if verbose: print("  ✅  FusionAgent")
+    if verbose: print("  [OK]  FusionAgent")
 
     agents["heatmap"] = HeatmapAgent()
-    if verbose: print("  ✅  HeatmapAgent (GDI)")
+    if verbose: print("  [OK]  HeatmapAgent (GDI)")
 
     try:
         agents["conflict"] = ConflictResolver(verbose=False) if _CONFLICT_OK else None
-        if verbose and agents["conflict"]: print("  ✅  ConflictResolver")
+        if verbose and agents["conflict"]: print("  [OK]  ConflictResolver")
     except Exception:
         agents["conflict"] = None
 
@@ -700,7 +700,7 @@ def init_agents(seed=42, verbose=False):
         agents["risk"] = RiskEngine(default_account_size=DEFAULT_CAPITAL,
                                     max_risk_per_trade=MAX_RISK,
                                     bear_max_allocation=BEAR_MAX_ALLOC)
-        if verbose: print("  ✅  RiskEngine")
+        if verbose: print("  [OK]  RiskEngine")
     except Exception:
         agents["risk"] = None
 
@@ -710,7 +710,7 @@ def init_agents(seed=42, verbose=False):
             agents["aesl"] = AESLAgent(
                 cache_path=os.path.join(tempfile.mkdtemp(), f"aesl_{seed}.pkl"))
             prewarm_aesl(agents["aesl"], n=AESL_PREWARM_N, seed=seed)
-            if verbose: print(f"  ✅  AESLAgent (prewarm n={AESL_PREWARM_N})")
+            if verbose: print(f"  [OK]  AESLAgent (prewarm n={AESL_PREWARM_N})")
         else:
             agents["aesl"] = None
     except Exception:
@@ -722,7 +722,7 @@ def init_agents(seed=42, verbose=False):
                 window_size=30,
                 cache_path=os.path.join(tempfile.mkdtemp(), f"asc_{seed}.pkl"))
             prewarm_asc(agents["asc"], n=30, seed=seed)
-            if verbose: print("  ✅  ASC Memory (prewarm n=30)")
+            if verbose: print("  [OK]  ASC Memory (prewarm n=30)")
         else:
             agents["asc"] = None
     except Exception:
@@ -734,7 +734,7 @@ def init_agents(seed=42, verbose=False):
                 def __init__(self, t): self.tech_agent = t
                 def _fetch_stock_data(self, ticker): return None, pd.DataFrame()
             agents["adversarial"] = AdversarialTester(_FakeSystem(agents["tech"]))
-            if verbose: print("  ✅  AdversarialTester")
+            if verbose: print("  [OK]  AdversarialTester")
         else:
             agents["adversarial"] = None
     except Exception:
@@ -745,7 +745,7 @@ def init_agents(seed=42, verbose=False):
             agents["correlation"] = CorrelationDivergenceDetector(
                 lookback_window=60,
                 cache_path=os.path.join(tempfile.mkdtemp(), f"corr_{seed}.pkl"))
-            if verbose: print("  ✅  CorrelationAgent")
+            if verbose: print("  [OK]  CorrelationAgent")
         else:
             agents["correlation"] = None
     except Exception:
@@ -755,25 +755,25 @@ def init_agents(seed=42, verbose=False):
     try:
         if _TOPO_OK:
             agents["topology"] = TopologyAgent(time_delay=5, dimension=3, lookback=60)
-            if verbose: print("  ✅  TopologyAgent (TDA)")
+            if verbose: print("  [OK]  TopologyAgent (TDA)")
         else:
             agents["topology"] = None
-            if verbose: print("  ⚠️   TopologyAgent — not available (pip install ripser)")
+            if verbose: print("  [WARN]   TopologyAgent HOLD not available (pip install ripser)")
     except Exception as e:
         agents["topology"] = None
-        if verbose: print(f"  ⚠️   TopologyAgent: {str(e)[:55]}")
+        if verbose: print(f"  [WARN]   TopologyAgent: {str(e)[:55]}")
 
     # FIX-A: Causal properly loaded for ablation
     try:
         if _CAUSAL_OK:
             agents["causal"] = CausalAgent(lookback=90, alpha=0.20)
-            if verbose: print("  ✅  CausalAgent (Do-Calculus)")
+            if verbose: print("  [OK]  CausalAgent (Do-Calculus)")
         else:
             agents["causal"] = None
-            if verbose: print("  ⚠️   CausalAgent — not available (pip install causal-learn)")
+            if verbose: print("  [WARN]   CausalAgent HOLD not available (pip install causal-learn)")
     except Exception as e:
         agents["causal"] = None
-        if verbose: print(f"  ⚠️   CausalAgent: {str(e)[:55]}")
+        if verbose: print(f"  [WARN]   CausalAgent: {str(e)[:55]}")
 
     try:
         agents["expl"] = ExplainabilityAgent(agents["tech"], background_data_df=None) \
@@ -815,9 +815,9 @@ def build_full_flags():
     }
 
 
-# ════════════════════════════════════════════════════════════════════════════════
-#  CORE PIPELINE — one ticker, fully silent
-# ════════════════════════════════════════════════════════════════════════════════
+# ================================================================================
+#  CORE PIPELINE HOLD one ticker, fully silent
+# ================================================================================
 def run_ticker_silent(
     ticker, test_date, sent_date,
     tech_agent, uncertainty_agent, regime_agent, fusion_agent, heatmap_agent,
@@ -1030,9 +1030,9 @@ def run_ticker_silent(
     return {"ticker": ticker, "decision": decision}
 
 
-# ════════════════════════════════════════════════════════════════════════════════
-#  WINDOW RUNNER — silent
-# ════════════════════════════════════════════════════════════════════════════════
+# ================================================================================
+#  WINDOW RUNNER HOLD silent
+# ================================================================================
 def run_window_silent(test_date, outcome_date, label, agents, flags):
     test_date    = snap_to_trading_day(test_date)
     outcome_date = snap_to_trading_day(outcome_date)
@@ -1080,9 +1080,9 @@ def run_window_silent(test_date, outcome_date, label, agents, flags):
             "nc": nc, "nw": nw, "active": active, "accuracy": acc, "lenient_acc": l_acc}
 
 
-# ════════════════════════════════════════════════════════════════════════════════
+# ================================================================================
 #  BASELINE
-# ════════════════════════════════════════════════════════════════════════════════
+# ================================================================================
 def run_baseline():
     print(f"  Computing baseline (all agents ON, AESL prewarm n={AESL_PREWARM_N}) ...")
     agents = init_agents(seed=42, verbose=True)
@@ -1092,7 +1092,7 @@ def run_baseline():
         print(f"    Baseline Win{i:02d}/17: {label:<28} ...", end=" ", flush=True)
         s = run_window_silent(td, od, label, agents, flags)
         stats.append(s)
-        print(f"→ {s['accuracy']:.1f}%")
+        print(f"-> {s['accuracy']:.1f}%")
 
     tc = sum(s["correct"] for s in stats)
     tw = sum(s["wrong"]   for s in stats)
@@ -1103,13 +1103,13 @@ def run_baseline():
     lc = tc + tnc
     la = ta + tnc + tnw
     lenient = (lc / la * 100) if la > 0 else 0.0
-    print(f"\n  ✅ Baseline → Strict: {strict:.1f}%  Lenient: {lenient:.1f}%\n")
+    print(f"\n  [OK] Baseline -> Strict: {strict:.1f}%  Lenient: {lenient:.1f}%\n")
     return strict, lenient, [s["accuracy"] for s in stats]
 
 
-# ════════════════════════════════════════════════════════════════════════════════
+# ================================================================================
 #  SINGLE ABLATION CONFIG RUN
-# ════════════════════════════════════════════════════════════════════════════════
+# ================================================================================
 def run_ablation_config(cfg, baseline_strict):
     group_tag = "  [POSITIVE]" if cfg["group"] == "POSITIVE" else "  [OVER-REGULATOR]"
     print(f"\n  ▶ {cfg['name']}  ({cfg['phase']} | {cfg['tier']}){group_tag}")
@@ -1147,8 +1147,8 @@ def run_ablation_config(cfg, baseline_strict):
                "🟢 MODERATE"    if drop > 0  else
                "⚪ MARGINAL")
     else:
-        imp = f"⚠️  OVER-REGULATES (accuracy improved {abs(drop):.1f}pp when removed)"
-    print(f"    → Ablated: {acc:.1f}%  |  Drop: {drop:+.1f}pp  |  {imp}")
+        imp = f"[WARN]  OVER-REGULATES (accuracy improved {abs(drop):.1f}pp when removed)"
+    print(f"    -> Ablated: {acc:.1f}%  |  Drop: {drop:+.1f}pp  |  {imp}")
 
     return {
         "name":        cfg["name"],
@@ -1167,21 +1167,21 @@ def run_ablation_config(cfg, baseline_strict):
     }
 
 
-# ════════════════════════════════════════════════════════════════════════════════
+# ================================================================================
 #  MAIN
-# ════════════════════════════════════════════════════════════════════════════════
+# ================================================================================
 def main():
     print_separator()
-    print("  FinFolioX — Ablation Study (Revised: Topology+Causal+AESL fixed)")
-    print("  5 Positive Contributors + 4 Over-Regulators | 17 Windows × 30 Tickers")
+    print("  FinFolioX HOLD Ablation Study (Revised: Topology+Causal+AESL fixed)")
+    print("  5 Positive Contributors + 4 Over-Regulators | 17 Windows x 30 Tickers")
     print_separator()
 
     start_time = time.perf_counter()
 
-    print_section("STEP 1 — BASELINE", "═")
+    print_section("STEP 1 HOLD BASELINE", "=")
     baseline_strict, baseline_lenient, baseline_per_window = run_baseline()
 
-    print_section("STEP 2 — ABLATION (9 Configs)", "═")
+    print_section("STEP 2 HOLD ABLATION (9 Configs)", "=")
     print(f"  Baseline: {baseline_strict:.1f}% strict  |  {baseline_lenient:.1f}% lenient\n")
 
     results = []
@@ -1189,9 +1189,9 @@ def main():
         res = run_ablation_config(cfg, baseline_strict)
         results.append(res)
 
-    # ── Final Report ──────────────────────────────────────────────────────────
+    # -- Final Report ----------------------------------------------------------
     print_separator()
-    print_section("ABLATION STUDY — FINAL REPORT", "═")
+    print_section("ABLATION STUDY HOLD FINAL REPORT", "=")
 
     pos_results = sorted([r for r in results if r["group"] == "POSITIVE"],
                          key=lambda r: r["drop"], reverse=True)
@@ -1201,10 +1201,10 @@ def main():
     print(f"\n  Baseline:  {baseline_strict:.1f}% strict  |  {baseline_lenient:.1f}% lenient\n")
 
     # Table A
-    print(f"  ══ TABLE A: POSITIVE CONTRIBUTORS ═══════════════════════════════════════")
+    print(f"  == TABLE A: POSITIVE CONTRIBUTORS =======================================")
     print(f"  {'Rank':<5} {'Agent Removed':<30} {'Phase':<9} {'Tier':<12} "
           f"{'Ablated%':>9} {'Drop(pp)':>9}  Verdict")
-    print(f"  {'─'*90}")
+    print(f"  {'-'*90}")
     for rank, res in enumerate(pos_results, 1):
         d = res["drop"]
         ic = ("🔴 CRITICAL" if d > 8 else "🟡 SIGNIFICANT" if d > 4
@@ -1215,35 +1215,35 @@ def main():
               f"{res['accuracy']:>8.1f}% {d:>+8.1f}pp  {ic}  {vd}")
 
     # Table B
-    print(f"\n  ══ TABLE B: OVER-REGULATION AGENTS (IEEE Novel Finding) ════════════════")
+    print(f"\n  == TABLE B: OVER-REGULATION AGENTS (IEEE Novel Finding) ================")
     print(f"  {'Agent Removed':<30} {'Phase':<9} {'Tier':<12} "
           f"{'Ablated%':>9} {'Δ Acc':>8}  Finding")
-    print(f"  {'─'*85}")
+    print(f"  {'-'*85}")
     for res in neg_results:
         improvement = abs(res["drop"])
         print(f"  {res['name']:<30} {res['phase']:<9} {res['tier']:<12} "
               f"{res['accuracy']:>8.1f}% {res['drop']:>+7.1f}pp  "
-              f"⚠️  Removing improves by {improvement:.1f}pp")
+              f"[WARN]  Removing improves by {improvement:.1f}pp")
 
     # Per-window breakdown
     all_sorted = pos_results + neg_results
-    print(f"\n\n  ─── PER-WINDOW BREAKDOWN ──────────────────────────────────────────────────────")
+    print(f"\n\n  --- PER-WINDOW BREAKDOWN ------------------------------------------------------")
     hdr = f"  {'Agent Removed':<30}"
     for w in TEST_WINDOWS:
         hdr += f"  {w[2][:6]:>6}"
     hdr += f"  {'Total':>6}"
     print(hdr)
-    print(f"  {'─'*115}")
+    print(f"  {'-'*115}")
 
     base_row = f"  {'Full System (Baseline)':<30}"
     for w_acc in baseline_per_window:
         base_row += f"  {w_acc:>5.1f}%"
     base_row += f"  {baseline_strict:>5.1f}%"
     print(base_row)
-    print(f"  {'─'*115}")
+    print(f"  {'-'*115}")
 
     for res in all_sorted:
-        tag = "    " if res["group"] == "POSITIVE" else " ⚠️ "
+        tag = "    " if res["group"] == "POSITIVE" else " [WARN] "
         row = f"  {res['name'][:28]:<30}"
         for i, w_acc in enumerate(res["per_window"]):
             delta = w_acc - baseline_per_window[i]
@@ -1252,30 +1252,30 @@ def main():
         print(row)
 
     # Narratives
-    print(f"\n\n  ─── POSITIVE CONTRIBUTOR NARRATIVES (IEEE Table — All 5) ──────────────────────")
+    print(f"\n\n  --- POSITIVE CONTRIBUTOR NARRATIVES (IEEE Table HOLD All 5) ----------------------")
     for i, res in enumerate(pos_results, 1):
         d = res["drop"]
         ic = ("🔴 CRITICAL" if d > 8 else "🟡 SIGNIFICANT" if d > 4 else "🟢 MODERATE")
-        print(f"\n  [{i}] {res['name']} ({res['phase']}) — {ic}")
+        print(f"\n  [{i}] {res['name']} ({res['phase']}) HOLD {ic}")
         print(f"      What:  {res['description'][:90]}")
         print(f"      Why:   {res['hypothesis'][:90]}")
-        print(f"      Drop:  {baseline_strict:.1f}% → {res['accuracy']:.1f}%  "
+        print(f"      Drop:  {baseline_strict:.1f}% -> {res['accuracy']:.1f}%  "
               f"({res['drop']:+.1f}pp)  Lenient: {res['lenient_acc']:.1f}%")
 
     # Over-regulator discussion
-    print(f"\n\n  ─── OVER-REGULATION FINDING (IEEE Novel Contribution) ──────────────────────────")
+    print(f"\n\n  --- OVER-REGULATION FINDING (IEEE Novel Contribution) --------------------------")
     print("""
   Four agents showed negative ablation drops (removing them improved accuracy).
   This is presented in the paper as the "Agent Interference Phenomenon":
 
   When robustness agents tuned for crash/adversarial scenarios operate in
   Bull and Bounce regimes, their conservative penalties create false HOLDs
-  on correct directional signals — a form of Type II error amplification.
+  on correct directional signals HOLD a form of Type II error amplification.
 
   PROPOSED IEEE CONTRIBUTION:
   Regime-Conditional Agent Activation (RCAA):
-    - ASC, HeatmapGDI, AdversarialTester → ACTIVE only in Bear/Crash regimes
-    - ConflictResolver → reduce VETO sensitivity in confirmed Bull regimes
+    - ASC, HeatmapGDI, AdversarialTester -> ACTIVE only in Bear/Crash regimes
+    - ConflictResolver -> reduce VETO sensitivity in confirmed Bull regimes
   Expected benefit: +2–4pp accuracy in Bull/Bounce windows without
                     losing crash-protection in Bear windows.
 """)
@@ -1292,10 +1292,10 @@ def main():
     weakest   = pos_results[-1] if pos_results else {"name": "N/A", "drop": 0.0}
 
     print(f"""
-  ─── SUMMARY ──────────────────────────────────────────────────────────────────
-  ┌─────────────────────────────────────────────────────────────────────────────┐
+  --- SUMMARY ------------------------------------------------------------------
+  ┌-----------------------------------------------------------------------------┐
   │  FinFolioX Revised Ablation Study                                           │
-  ├─────────────────────────────────────────────────────────────────────────────┤
+  ├-----------------------------------------------------------------------------┤
   │  Baseline Strict            : {baseline_strict:>6.1f}%                           │
   │  Baseline Lenient           : {baseline_lenient:>6.1f}%                           │
   │  Windows Tested             : 17   |  Tickers: 30                           │
@@ -1307,7 +1307,7 @@ def main():
   │  🟡 Significant (4-8pp)     : {significant_n}                                           │
   │  🟢 Moderate  (0-4pp)       : {moderate_n}                                           │
   │  ⚪ Marginal                : {marginal_n}                                           │
-  └─────────────────────────────────────────────────────────────────────────────┘
+  └-----------------------------------------------------------------------------┘
 """)
 
     elapsed = time.perf_counter() - start_time
@@ -1335,9 +1335,9 @@ def main():
                 row[f"win{i+1}_acc"] = res["per_window"][i] if i < len(res["per_window"]) else None
             rows.append(row)
         pd.DataFrame(rows).to_csv("finfoliox_ablation_revised.csv", index=False)
-        print("  📄 Results → finfoliox_ablation_revised.csv")
+        print("  📄 Results -> finfoliox_ablation_revised.csv")
     except Exception as e:
-        print(f"  ⚠️  CSV save failed: {e}")
+        print(f"  [WARN]  CSV save failed: {e}")
     print()
 
     return baseline_strict, pos_results, neg_results

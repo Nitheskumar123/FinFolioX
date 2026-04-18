@@ -65,7 +65,7 @@ class SyntheticMarketGenerator:
             datetime.strptime(start_date, "%Y-%m-%d") - timedelta(days=buffer_days)
         ).strftime("%Y-%m-%d")
 
-        print(f"   [Twin] Downloading {ticker} data: {start_buffered} → {end_date}")
+        print(f"   [Twin] Downloading {ticker} data: {start_buffered} -> {end_date}")
         stock = yf.Ticker(ticker)
         hist = stock.history(start=start_buffered, end=end_date)
 
@@ -162,7 +162,7 @@ class ScenarioInjector:
 # SIMULATION PORTFOLIO
 # ==============================================================================
 class SimulationPortfolio:
-    """Virtual wallet — tracks fake cash and fake shares."""
+    """Virtual wallet HOLD tracks fake cash and fake shares."""
 
     def __init__(self, starting_capital=10_000.0):
         self.starting_capital = starting_capital
@@ -248,7 +248,7 @@ class SimulationPortfolio:
         if len(returns) > 1 and returns.std() > 0:
             sharpe = (returns.mean() / returns.std()) * np.sqrt(252)
 
-        # FIX v2: Correct win rate — compare entry vs exit price per round-trip
+        # FIX v2: Correct win rate HOLD compare entry vs exit price per round-trip
         buy_trades = [t for t in self.trades if t["action"] == "BUY"]
         sell_trades = [t for t in self.trades if t["action"] == "SELL"]
 
@@ -315,10 +315,10 @@ class DigitalTwinSimulator:
     ):
         """Main entry point. Runs the full simulation."""
         print("\n" + "=" * 70)
-        print("  DIGITAL TWIN SIMULATION ENGINE (v2 — Optimized)")
+        print("  DIGITAL TWIN SIMULATION ENGINE (v2 HOLD Optimized)")
         print("=" * 70)
         print(f"  Ticker: {ticker}")
-        print(f"  Period: {start_date} → {end_date}")
+        print(f"  Period: {start_date} -> {end_date}")
         print(f"  Capital: ${starting_capital:,.2f}")
         print(f"  Mode: {data_mode.upper()}")
         print("=" * 70)
@@ -438,7 +438,7 @@ class DigitalTwinSimulator:
         metrics = portfolio.get_metrics()
 
         print(f"\n   {'=' * 50}")
-        print("   SIMULATION COMPLETE (v2 — Optimized)")
+        print("   SIMULATION COMPLETE (v2 HOLD Optimized)")
         print(f"   {'=' * 50}")
         print(f"   Starting Capital : ${starting_capital:>12,.2f}")
         print(f"   Final Value      : ${metrics['final_value']:>12,.2f}")

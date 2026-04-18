@@ -1,10 +1,10 @@
 """
-ml_engine/aesl_agent.py  —  Agent Epistemic State Ledger (AESL) v2.2
+ml_engine/aesl_agent.py  HOLD  Agent Epistemic State Ledger (AESL) v2.2
 ======================================================================
 Phase 27: Belief-Aware Multi-Agent Contradiction Detection
 FinFolioX Patent-Pending System
 
-CHANGELOG v2.2 — 4 Patent-Readiness Fixes (FIX-10 … FIX-13)
+CHANGELOG v2.2 HOLD 4 Patent-Readiness Fixes (FIX-10 … FIX-13)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
   FIX-10 (H2 monotonicity):  BCS Zone Boundary Restructuring.
@@ -13,27 +13,27 @@ CHANGELOG v2.2 — 4 Patent-Readiness Fixes (FIX-10 … FIX-13)
     Widens HARMONY to absorb low-BCS Bear tickers (LSTM≈0, BCS<0.20) whose
     correct SELL decisions were inflating MILD accuracy above HARMONY, breaking
     the required monotonic accuracy-decrease pattern for H2.
-    Narrows MILD boundary 0.40→0.38 so mixed-signal tickers (BCS 0.38–0.40)
+    Narrows MILD boundary 0.40->0.38 so mixed-signal tickers (BCS 0.38–0.40)
     move into MODERATE where accuracy is correctly lower.
 
   FIX-11 (H4 precision + force-hold):  Threshold Raised + Directional H4.
-    FORCE_HOLD_BCS_THRESHOLD raised 0.70 → 0.75.
+    FORCE_HOLD_BCS_THRESHOLD raised 0.70 -> 0.75.
     Rationale: at 0.70 the gate fired on correct directional Bear SELLs
     (GOOGL, TSLA, TLT, SLV) converting them to HOLDs and shrinking the H4
     sample to 1–4 per window. At 0.75 only near-CRITICAL BCS triggers HOLD,
     keeping the HIGH-zone decision stream large enough for reliable H4 stats.
     H4 measurement change (test side): count all directional errors regardless
-    of noise_band magnitude — any SELL+rise or BUY+fall is a precision hit.
+    of noise_band magnitude HOLD any SELL+rise or BUY+fall is a precision hit.
 
   FIX-12 (BUY signal rate):  Controlled BUY Expansion.
-    BUY_THRESHOLD lowered 0.52→0.50 (fusion neutrality point).
-    apply_gates confidence cap raised 0.58→0.62 for sent<−0.05 + lstm>0.55.
+    BUY_THRESHOLD lowered 0.52->0.50 (fusion neutrality point).
+    apply_gates confidence cap raised 0.58->0.62 for sent<−0.05 + lstm>0.55.
     Bear BUY gate eased: arb_conf≥0.55 (was 0.58) AND bcs<0.62 (was 0.55).
     Commodity BUY threshold unchanged at 0.55.
     Expected: 12–20 BUY signals across 120 decisions vs. ~6 in v2.1.
 
   FIX-13 (accuracy lift):  Override Guard with Raised Threshold.
-    When force_hold converts raw_dec→HOLD, the override guard reverts
+    When force_hold converts raw_dec->HOLD, the override guard reverts
     adj_dec back to raw_dec if evidence_score < OVERRIDE_GUARD_MIN_EVIDENCE.
     OVERRIDE_GUARD_MIN_EVIDENCE = 3.0 (raised from 2.0).
     Rationale: at 2.0 the guard failed to protect correct SELLs on TLT
@@ -41,28 +41,28 @@ CHANGELOG v2.2 — 4 Patent-Readiness Fixes (FIX-10 … FIX-13)
     and MSFT (evidence_score=2.8, BCS=0.757) in Mar15 and Mar17 windows.
     All three were correct directional SELLs that fell −1.6% to −16%.
     At 3.0 the guard fires when evidence_score<3.0, reverting those HOLDs.
-    evidence_score = n_full + 0.4×n_partial; score<3.0 means fewer than
+    evidence_score = n_full + 0.4xn_partial; score<3.0 means fewer than
     3 full UP↔DOWN contradictions (allowing ≤2 full + any partials),
     which is insufficient to override a high-confidence directional signal.
 
-CHANGELOG v2.1 — 2 Patent-Readiness Fixes (FIX-8, FIX-9)
+CHANGELOG v2.1 HOLD 2 Patent-Readiness Fixes (FIX-8, FIX-9)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
   FIX-8 (H4 precision):  Evidence Gate for HIGH/CRITICAL zones.
-    CRITICAL→HIGH if n_full < 3.  HIGH→MODERATE if n_full < 2 or BCS < 0.65.
-    Partial-heavy penalty: n_partial > n_full×2 → downgrade one level.
-    New fields: evidence_gated (bool), evidence_score = n_full + 0.4×n_partial.
+    CRITICAL->HIGH if n_full < 3.  HIGH->MODERATE if n_full < 2 or BCS < 0.65.
+    Partial-heavy penalty: n_partial > n_fullx2 -> downgrade one level.
+    New fields: evidence_gated (bool), evidence_score = n_full + 0.4xn_partial.
 
   FIX-9 (multi-agent balance):  Pair Dominance Damping.
-    If one pair contributes >50% of BCS numerator, effective_weight ×= 0.65.
+    If one pair contributes >50% of BCS numerator, effective_weight x= 0.65.
     New fields: dominance_damped (bool), dominant_pair_share (float).
 
-CHANGELOG v2.0 — 7 Fixes
+CHANGELOG v2.0 HOLD 7 Fixes
 ━━━━━━━━━━━━━━━━━━━━━━━━━
   FIX-1: Zone-specific allocation floors.
   FIX-2: Confidence-based contradiction damping (LSTM FLAT zone widened).
   FIX-3: Sigmoid confidence scaling for sentiment.
-  FIX-4: Force-HOLD threshold corrected (0.85→0.65→0.70→0.75 in v2.2).
+  FIX-4: Force-HOLD threshold corrected (0.85->0.65->0.70->0.75 in v2.2).
   FIX-5: P&L-weighted AESL value measurement.
   FIX-6: Adaptive zone engine (z-score relative to rolling ledger).
   FIX-7: TemporalAnalyzer class (BCS trend + percentile penalty).
@@ -105,7 +105,7 @@ THRESH = {
     DIM_TOPOLOGY:  {"up": 0.35,  "down": 0.60},
 }
 
-# Pair weights — sum = 1.00
+# Pair weights HOLD sum = 1.00
 # FIX-2: Rebalanced to reduce LSTM↔Regime absolute dominance
 PAIR_WEIGHTS: Dict[Tuple[str, str], float] = {
     (DIM_TREND,     DIM_REGIME):    0.28,
@@ -139,9 +139,9 @@ ZONE_ALLOCATION_FLOORS = {
 }
 
 # FIX-10: Restructured BCS zone boundaries for H2 monotonicity.
-# HARMONY widened 0.20→0.25: absorbs low-BCS Bear tickers (LSTM≈0, BCS 0.09–0.20)
+# HARMONY widened 0.20->0.25: absorbs low-BCS Bear tickers (LSTM≈0, BCS 0.09–0.20)
 #   that were inflating MILD accuracy above HARMONY.
-# MILD narrowed 0.40→0.38: mixed-signal tickers (BCS 0.38–0.40) now MODERATE.
+# MILD narrowed 0.40->0.38: mixed-signal tickers (BCS 0.38–0.40) now MODERATE.
 # MODERATE/HIGH/CRITICAL thresholds unchanged.
 BCS_ZONES = [
     (0.25, "HARMONY",  1.00),
@@ -159,19 +159,19 @@ ZONE_MULTIPLIERS = {
     "CRITICAL": 0.30,
 }
 
-# FIX-4/11: Force-HOLD threshold raised 0.70→0.75.
+# FIX-4/11: Force-HOLD threshold raised 0.70->0.75.
 # At 0.70 the gate fired on correct Bear SELLs, shrinking H4 sample.
 # At 0.75 only near-CRITICAL epistemic collapse triggers HOLD.
 FORCE_HOLD_BCS_THRESHOLD = 0.75
 
 # FIX-13: Override guard threshold.
-# When force_hold fires and converts raw_dec→HOLD, if evidence_score is below
+# When force_hold fires and converts raw_dec->HOLD, if evidence_score is below
 # this threshold the override guard reverts adj_dec back to raw_dec.
-# Raised 2.0→3.0: protects correct directional SELLs on TLT (score=2.8),
+# Raised 2.0->3.0: protects correct directional SELLs on TLT (score=2.8),
 # SLV (score=2.8), MSFT (score=2.8) which all fell significantly but were
 # silenced by force_hold at 2.0 threshold.
-# evidence_score = n_full + 0.4×n_partial; score<3.0 means <3 full UP↔DOWN
-# contradictions — insufficient to veto a high-confidence directional signal.
+# evidence_score = n_full + 0.4xn_partial; score<3.0 means <3 full UP↔DOWN
+# contradictions HOLD insufficient to veto a high-confidence directional signal.
 OVERRIDE_GUARD_MIN_EVIDENCE = 3.0
 
 # FIX-3: Sigmoid confidence scaling parameters for sentiment
@@ -195,12 +195,12 @@ LOW_PCT_BOOST      = 1.04
 
 LEDGER_WINDOW = 50
 
-# ── FIX-8: Evidence Gate constants ────────────────────────────────────────────
+# -- FIX-8: Evidence Gate constants --------------------------------------------
 EVIDENCE_GATE_CRITICAL_MIN_FULL = 3
 EVIDENCE_GATE_HIGH_MIN_FULL     = 2
 EVIDENCE_GATE_HIGH_BCS          = 0.65
 
-# ── FIX-9: Pair Dominance Damping constants ────────────────────────────────────
+# -- FIX-9: Pair Dominance Damping constants ------------------------------------
 DOMINANCE_CAP  = 0.50
 DOMINANCE_DAMP = 0.65
 
@@ -276,7 +276,7 @@ class AESLResult:
 
 
 # ==============================================================================
-# COMPONENT 1 — BELIEF EXTRACTOR (FIX-2, FIX-3)
+# COMPONENT 1 HOLD BELIEF EXTRACTOR (FIX-2, FIX-3)
 # ==============================================================================
 
 class BeliefExtractor:
@@ -390,7 +390,7 @@ class BeliefExtractor:
 
 
 # ==============================================================================
-# COMPONENT 2 — ONTOLOGY MAPPER
+# COMPONENT 2 HOLD ONTOLOGY MAPPER
 # ==============================================================================
 
 class OntologyMapper:
@@ -421,7 +421,7 @@ class OntologyMapper:
 
 
 # ==============================================================================
-# COMPONENT 3 — CONTRADICTION ENGINE (FIX-2, FIX-9)
+# COMPONENT 3 HOLD CONTRADICTION ENGINE (FIX-2, FIX-9)
 # ==============================================================================
 
 class ContradictionEngine:
@@ -486,7 +486,7 @@ class ContradictionEngine:
 
 
 # ==============================================================================
-# COMPONENT 4 — BCS ENGINE (FIX-5, FIX-6, FIX-8, FIX-10)
+# COMPONENT 4 HOLD BCS ENGINE (FIX-5, FIX-6, FIX-8, FIX-10)
 # ==============================================================================
 
 class BCSEngine:
@@ -503,7 +503,7 @@ class BCSEngine:
         return bcs, numerator, denominator
 
     def get_zone(self, bcs: float) -> Tuple[str, float]:
-        """FIX-10: New boundaries — HARMONY<0.25, MILD<0.38, rest unchanged."""
+        """FIX-10: New boundaries HOLD HARMONY<0.25, MILD<0.38, rest unchanged."""
         for threshold, zone_name, multiplier in BCS_ZONES:
             if bcs < threshold:
                 return zone_name, multiplier
@@ -532,18 +532,18 @@ class BCSEngine:
         FIX-8: Downgrade HIGH/CRITICAL when hard directional evidence is weak.
 
         Gate logic (applied sequentially):
-          Step 1 — CRITICAL check:
-            CRITICAL → HIGH  if  n_full < EVIDENCE_GATE_CRITICAL_MIN_FULL (3)
-          Step 2 — HIGH check (on result of step 1):
-            HIGH → MODERATE  if  n_full < EVIDENCE_GATE_HIGH_MIN_FULL (2)
+          Step 1 HOLD CRITICAL check:
+            CRITICAL -> HIGH  if  n_full < EVIDENCE_GATE_CRITICAL_MIN_FULL (3)
+          Step 2 HOLD HIGH check (on result of step 1):
+            HIGH -> MODERATE  if  n_full < EVIDENCE_GATE_HIGH_MIN_FULL (2)
                               OR  bcs    < EVIDENCE_GATE_HIGH_BCS (0.65)
-          Step 3 — Partial-heavy penalty:
-            HIGH/CRITICAL → one level down  if  n_partial > n_full × 2
+          Step 3 HOLD Partial-heavy penalty:
+            HIGH/CRITICAL -> one level down  if  n_partial > n_full x 2
 
-        Note: A CRITICAL with n_full=2 → HIGH (step 1), then HIGH with n_full=2
-        and bcs≥0.65 → stays HIGH (step 2 passes). This is correct behavior.
-        A CRITICAL with n_full=1 → HIGH (step 1), then HIGH with n_full=1<2
-        → MODERATE (step 2). Correct: two-step downgrade to MODERATE.
+        Note: A CRITICAL with n_full=2 -> HIGH (step 1), then HIGH with n_full=2
+        and bcs≥0.65 -> stays HIGH (step 2 passes). This is correct behavior.
+        A CRITICAL with n_full=1 -> HIGH (step 1), then HIGH with n_full=1<2
+        -> MODERATE (step 2). Correct: two-step downgrade to MODERATE.
 
         Returns (final_zone, was_gated).
         """
@@ -579,7 +579,7 @@ class BCSEngine:
 
 
 # ==============================================================================
-# COMPONENT 5 — TEMPORAL ANALYZER (FIX-7)
+# COMPONENT 5 HOLD TEMPORAL ANALYZER (FIX-7)
 # ==============================================================================
 
 class TemporalAnalyzer:
@@ -621,7 +621,7 @@ class TemporalAnalyzer:
 
 
 # ==============================================================================
-# COMPONENT 6 — DECISION CONTROLLER (FIX-1, FIX-4/11, FIX-13)
+# COMPONENT 6 HOLD DECISION CONTROLLER (FIX-1, FIX-4/11, FIX-13)
 # ==============================================================================
 
 class DecisionController:
@@ -653,7 +653,7 @@ class DecisionController:
     def should_override_hold(self, bcs_result: "AESLResult",
                               raw_dec: str, adj_dec: str) -> bool:
         """
-        FIX-13: Override guard — revert force_hold-driven HOLD to raw_dec
+        FIX-13: Override guard HOLD revert force_hold-driven HOLD to raw_dec
         when evidence is insufficient to justify silencing a directional call.
 
         Fires when ALL of:
@@ -665,8 +665,8 @@ class DecisionController:
         SLV (score=2.8, −16%), MSFT (score=2.8, −4.1%) in the Mar15/Mar17
         windows where force_hold at BCS 0.75–0.78 was silencing valid signals.
 
-        Returns True  → revert adj_dec to raw_dec
-        Returns False → keep adj_dec as HOLD (evidence is strong enough)
+        Returns True  -> revert adj_dec to raw_dec
+        Returns False -> keep adj_dec as HOLD (evidence is strong enough)
         """
         if adj_dec != "HOLD":
             return False
@@ -707,7 +707,7 @@ class DecisionController:
 
 
 # ==============================================================================
-# COMPONENT 7 — EPISTEMIC LEDGER (FIX-6, FIX-7)
+# COMPONENT 7 HOLD EPISTEMIC LEDGER (FIX-6, FIX-7)
 # ==============================================================================
 
 class EpistemicLedger:
@@ -800,13 +800,13 @@ class EpistemicLedger:
 
 class AESLAgent:
     """
-    Agent Epistemic State Ledger v2.2 — all 13 fixes applied.
+    Agent Epistemic State Ledger v2.2 HOLD all 13 fixes applied.
 
     Fixes added in v2.2:
       FIX-10  BCS zone boundaries restructured (HARMONY<0.25, MILD<0.38).
-      FIX-11  FORCE_HOLD raised 0.70→0.75; H4 counts directional errors.
-      FIX-12  BUY threshold lowered 0.52→0.50; Bear gate eased.
-      FIX-13  Override guard raised 2.0→3.0 (protects correct directional SELLs).
+      FIX-11  FORCE_HOLD raised 0.70->0.75; H4 counts directional errors.
+      FIX-12  BUY threshold lowered 0.52->0.50; Bear gate eased.
+      FIX-13  Override guard raised 2.0->3.0 (protects correct directional SELLs).
 
     Usage:
         aesl   = AESLAgent()
@@ -952,9 +952,9 @@ class AESLAgent:
         def row(text: str) -> str:
             return f"   \u2551 {text:<{W}} \u2551"
 
-        print(f"\n   \u2554{'═'*(W+2)}\u2557")
-        print(row(f"PHASE 27 v2.2 — AESL{label}"))
-        print(f"   \u2560{'═'*(W+2)}\u2563")
+        print(f"\n   \u2554{'='*(W+2)}\u2557")
+        print(row(f"PHASE 27 v2.2 HOLD AESL{label}"))
+        print(f"   \u2560{'='*(W+2)}\u2563")
         print(row(f"BCS        : {result.bcs:.4f}  [{bar}]"))
         print(row(f"Zone       : {icon} {result.adaptive_zone:<10}"
                   f"(static={result.zone}){eg_sym}"))
@@ -970,13 +970,13 @@ class AESLAgent:
         print(row(f"Dominance  : share={result.dominant_pair_share:.2f}  "
                   f"damped={result.dominance_damped}{dd_sym}"))
         print(row(f"Dom.Conflict: {result.dominant_conflict[:44]}"))
-        print(f"   \u2560{'═'*(W+2)}\u2563")
+        print(f"   \u2560{'='*(W+2)}\u2563")
         print(row("Beliefs:"))
         for b in result.beliefs:
             d = {DIR_UP: "\u2191", DIR_DOWN: "\u2193", DIR_FLAT: "\u2192"}.get(b.direction, "?")
             print(row(f"  {b.agent_name:<12} {b.dimension:<11} "
                       f"{d} {b.direction:<5} conf={b.confidence:.3f}"))
-        print(f"   \u2560{'═'*(W+2)}\u2563")
+        print(f"   \u2560{'='*(W+2)}\u2563")
         if result.contradictions:
             worst = max(result.contradictions, key=lambda c: c.weighted_contrib)
             print(row(f"Top: {worst.agent_a}\u2194{worst.agent_b}  "
@@ -986,7 +986,7 @@ class AESLAgent:
         ls = self.ledger.get_stats()
         print(row(f"Ledger: n={ls['n']}  mean={ls['mean_bcs']:.3f}  std={ls['std_bcs']:.3f}"))
         print(row(f"Narrative: {self.controller.get_narrative(result)[:46]}"))
-        print(f"   \u255a{'═'*(W+2)}\u255d")
+        print(f"   \u255a{'='*(W+2)}\u255d")
 
     def reset_ledger(self):
         self.ledger.reset()

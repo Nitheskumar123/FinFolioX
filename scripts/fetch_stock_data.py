@@ -16,14 +16,14 @@ def fetch_data():
     
     # 3. Check if data is empty
     if df.empty:
-        print("❌ No data found. Check your internet or ticker symbol.")
+        print("[BAD] No data found. Check your internet or ticker symbol.")
         return
 
     # 4. Save to CSV
     # Ensure the directory exists
     os.makedirs(os.path.dirname(SAVE_PATH), exist_ok=True)
     df.to_csv(SAVE_PATH)
-    print(f"✅ Data saved successfully to: {SAVE_PATH}")
+    print(f"[OK] Data saved successfully to: {SAVE_PATH}")
     print(f"📊 Total Rows: {len(df)}")
     print(df.head())
 

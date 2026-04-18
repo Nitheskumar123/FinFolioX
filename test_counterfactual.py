@@ -1,12 +1,12 @@
 """
-test_counterfactual.py  —  Counterfactual Decision Engine Backtest v2.1
+test_counterfactual.py  HOLD  Counterfactual Decision Engine Backtest v2.1
 ===================================================================
-FinFolioX — Phase 15 Backtest  |  7 Windows × 30 Tickers
+FinFolioX HOLD Phase 15 Backtest  |  7 Windows x 30 Tickers
 
 Tests CounterfactualEngine v2.0 on top of the full agent pipeline:
-  Pipeline → actual decision → fetch T+5 price → analyze() → regret
+  Pipeline -> actual decision -> fetch T+5 price -> analyze() -> regret
 
-Includes the new Mar17→23 window with Iran war / Fed hawkish sentiment.
+Includes the new Mar17->23 window with Iran war / Fed hawkish sentiment.
 
 Metrics reported per window:
   - Optimal match rate  : % of decisions that were already optimal
@@ -47,36 +47,36 @@ try:
 except ImportError:
     _RISK_OK = False
 
-# ── Paths ─────────────────────────────────────────────────────────────────────
+# -- Paths ---------------------------------------------------------------------
 MODEL_PATH  = r"D:\FinFolioX\saved_models\lstm_model.keras"
 SCALER_PATH = r"D:\FinFolioX\saved_models\lstm_scaler.pkl"
 REGIME_PATH = r"D:\FinFolioX\saved_models\hmm_regime_hybrid.pkl"
 FUSION_PATH = r"D:\FinFolioX\saved_models\attention_fusion.pth"
 
-# ── Constants ─────────────────────────────────────────────────────────────────
+# -- Constants -----------------------------------------------------------------
 DEFAULT_CAPITAL    = 10_000.0
 BUY_THRESHOLD      = 0.52
 SELL_THRESHOLD     = 0.40
 STRONG_CONF        = 0.75   # v2.2: override Bear regime when LSTM overwhelmingly bullish
-BEAR_LEAN_SELL     = 0.60   # v2.2: Bear regime + conf <= this → SELL not HOLD
+BEAR_LEAN_SELL     = 0.60   # v2.2: Bear regime + conf <= this -> SELL not HOLD
 COMMODITY_BUY_T    = 0.55
 COMMODITY_TICKERS  = {"GLD","SLV","USO","UNG","GDX"}
 BUY_GDI_MAX        = 55.0
 UNCERTAINTY_HIGH   = 0.15
 UNCERTAINTY_MOD    = 0.05
 
-# ── Test windows — same 6 as test_fusion.py + new Mar17→23 ───────────────────
+# -- Test windows HOLD same 6 as test_fusion.py + new Mar17->23 -------------------
 TEST_WINDOWS = [
-    ("2026-03-03", "2026-03-08", "Mar03→08  Bear start"),
-    ("2026-03-04", "2026-03-09", "Mar04→09  Bear early"),
-    ("2026-03-15", "2026-03-20", "Mar15→20  Deep Bear"),
-    ("2026-03-05", "2026-03-10", "Mar05→10  Bounce"),
-    ("2025-08-01", "2025-08-08", "Aug01→08  Bull Phase"),
-    ("2025-10-01", "2025-10-08", "Oct01→08  Sideways"),
-    ("2026-03-17", "2026-03-23", "Mar17→23  Iran+Fed"),   # ← NEW
+    ("2026-03-03", "2026-03-08", "Mar03->08  Bear start"),
+    ("2026-03-04", "2026-03-09", "Mar04->09  Bear early"),
+    ("2026-03-15", "2026-03-20", "Mar15->20  Deep Bear"),
+    ("2026-03-05", "2026-03-10", "Mar05->10  Bounce"),
+    ("2025-08-01", "2025-08-08", "Aug01->08  Bull Phase"),
+    ("2025-10-01", "2025-10-08", "Oct01->08  Sideways"),
+    ("2026-03-17", "2026-03-23", "Mar17->23  Iran+Fed"),   # ← NEW
 ]
 
-# ── 30 tickers ────────────────────────────────────────────────────────────────
+# -- 30 tickers ----------------------------------------------------------------
 TICKERS = [
     "AAPL","MSFT","NVDA","TSLA","META","GOOGL","AMZN",
     "AMD", "INTC","ORCL",
@@ -89,7 +89,7 @@ TICKERS = [
     "CRM", "PLTR",
 ]
 
-# ── Sentiment scores — all 7 windows ──────────────────────────────────────────
+# -- Sentiment scores HOLD all 7 windows ------------------------------------------
 MANUAL_SENTIMENT = {
     "2026-03-03": {
         "AAPL":-0.08,"MSFT":-0.06,"NVDA":-0.12,"TSLA":-0.18,"META":-0.05,
@@ -167,7 +167,7 @@ def snap_to_trading_day(date_str):
     dt = pd.to_datetime(date_str)
     snapped = pd.bdate_range(start=dt, periods=1)[0]
     if snapped != dt:
-        print(f"   ⚠️  {date_str} → snapped to {snapped.date()}")
+        print(f"   [WARN]  {date_str} -> snapped to {snapped.date()}")
     return snapped.strftime("%Y-%m-%d")
 
 def fetch_history(ticker, test_date):
@@ -230,7 +230,7 @@ def run_window(test_date, outcome_date, label,
         diffs     = [(abs((pd.to_datetime(sent_date)-pd.to_datetime(k)).days), k)
                      for k in MANUAL_SENTIMENT]
         sent_date = min(diffs)[1]
-        print(f"   ℹ️  Sentiment mapped: {test_date} → {sent_date}")
+        print(f"   ℹ️  Sentiment mapped: {test_date} -> {sent_date}")
 
     sentiment_scores = MANUAL_SENTIMENT[sent_date]
 
@@ -239,12 +239,12 @@ def run_window(test_date, outcome_date, label,
     tlt_exit  = fetch_price_at("TLT", outcome_date)
 
     print(f"\n{'*'*116}")
-    print(f"  {label}  |  {test_date} → {outcome_date}")
+    print(f"  {label}  |  {test_date} -> {outcome_date}")
     print(f"{'*'*116}")
     print(f"\n  {'Ticker':<6} {'Decision':<8} {'ArbConf':>8} {'EntryP':>8} "
           f"{'ExitP':>8} {'Move%':>7} {'Optimal':<8} "
           f"{'Regret%':>8} {'Level':<10} {'CFcalib'}")
-    print(f"  {'─'*118}")
+    print(f"  {'-'*118}")
 
     window_cf_results = []
     window_rows       = []
@@ -319,16 +319,16 @@ def run_window(test_date, outcome_date, label,
             else:
                 decision = "HOLD"
 
-            # ── Fetch entry / exit prices ─────────────────────────────────────
+            # -- Fetch entry / exit prices -------------------------------------
             entry_price = fetch_price_at(ticker, test_date)
             exit_price  = fetch_price_at(ticker, outcome_date)
 
             if (np.isnan(entry_price) or np.isnan(exit_price)
                     or entry_price <= 0):
-                print(f"  {ticker:<6}  price data unavailable — skipped")
+                print(f"  {ticker:<6}  price data unavailable HOLD skipped")
                 continue
 
-            # ── Run counterfactual ────────────────────────────────────────────
+            # -- Run counterfactual --------------------------------------------
             cf_result = cf_engine.analyze(
                 actual_decision=decision,
                 decision_price=entry_price,
@@ -343,16 +343,16 @@ def run_window(test_date, outcome_date, label,
 
             # Calibration flag
             cal = cf_result.get("confidence_calibrated")
-            cal_str = "✅" if cal is True else "❌" if cal is False else "~"
+            cal_str = "[OK]" if cal is True else "[BAD]" if cal is False else "~"
 
             # Regret level icon
-            icons = {"NONE":"✅","LOW":"🔵","MODERATE":"🟡","HIGH":"🟠","EXTREME":"🔴"}
+            icons = {"NONE":"[OK]","LOW":"🔵","MODERATE":"🟡","HIGH":"🟠","EXTREME":"🔴"}
             icon  = icons.get(cf_result["regret_level"], "❓")
 
             move_pct_disp = cf_result["move_pct"] * 100
             rgt_disp      = cf_result["regret_score"] * 100
             opt           = cf_result["optimal_decision"]
-            match_marker  = "✓" if decision == opt else " "
+            match_marker  = "+" if decision == opt else " "
 
             print(f"  {ticker:<6} {decision:<8} {arb_conf:>8.4f} "
                   f"{entry_price:>8.2f} {exit_price:>8.2f} "
@@ -379,12 +379,12 @@ def run_window(test_date, outcome_date, label,
         except Exception as e:
             print(f"  {ticker:<6}  ERROR: {e}")
 
-    # ── Window summary ─────────────────────────────────────────────────────────
+    # -- Window summary ---------------------------------------------------------
     summary  = cf_engine.get_regret_summary(window_cf_results)
     miss_bd  = cf_engine.get_miss_type_breakdown(window_cf_results)
     opp_cost = cf_engine.opportunity_cost(window_cf_results, DEFAULT_CAPITAL)
 
-    print(f"\n  ── Window Summary ─────────────────────────────────────────────────")
+    print(f"\n  -- Window Summary -------------------------------------------------")
     if summary:
         lc = summary["level_counts"]
         print(f"     Decisions      : {summary['n']}  ({summary['n_ambiguous']} ambiguous moves)")
@@ -402,12 +402,12 @@ def run_window(test_date, outcome_date, label,
               f"HIGH={lc['HIGH']} EXTREME={lc['EXTREME']}")
     if miss_bd:
         dom = miss_bd["dominant_issue"]
-        dom_icon = "🟡" if dom == "HOLD_BIAS" else "🔴" if dom == "WRONG_DIR" else "✅"
+        dom_icon = "🟡" if dom == "HOLD_BIAS" else "🔴" if dom == "WRONG_DIR" else "[OK]"
         print(f"     Miss breakdown : "
               f"CORRECT={miss_bd['correct']}  "
               f"HOLD_BIAS={miss_bd['hold_bias']}({miss_bd['hold_bias_pct']:.0f}%)  "
               f"WRONG_DIR={miss_bd['wrong_dir']}({miss_bd['wrong_dir_pct']:.0f}%)  "
-              f"→ dominant={dom_icon}{dom}")
+              f"-> dominant={dom_icon}{dom}")
         print(f"     Regret by type : "
               f"HOLD_BIAS=${cf_engine.opportunity_cost([r for r in window_cf_results if cf_engine.classify_miss_type(r)=='HOLD_BIAS'], DEFAULT_CAPITAL):,.0f}  "
               f"WRONG_DIR=${cf_engine.opportunity_cost([r for r in window_cf_results if cf_engine.classify_miss_type(r)=='WRONG_DIR'], DEFAULT_CAPITAL):,.0f}")
@@ -434,53 +434,53 @@ def run_window(test_date, outcome_date, label,
 
 def main():
     print("=" * 116)
-    print("  COUNTERFACTUAL DECISION ENGINE BACKTEST  |  7 Windows × 30 Tickers")
-    print("  Phase 15 v2.1 — Fixed: conf<=0.40 boundary (was <0.40), outlier analysis")
+    print("  COUNTERFACTUAL DECISION ENGINE BACKTEST  |  7 Windows x 30 Tickers")
+    print("  Phase 15 v2.1 HOLD Fixed: conf<=0.40 boundary (was <0.40), outlier analysis")
     print("=" * 116)
     print("\nLoading agents...")
 
     try:
         tech_agent = TechnicalAgent(lstm_model_path=MODEL_PATH, lstm_scaler_path=SCALER_PATH)
-        print(f"  ✅ TechnicalAgent  {tuple(tech_agent.lstm_model.input_shape)}")
+        print(f"  [OK] TechnicalAgent  {tuple(tech_agent.lstm_model.input_shape)}")
     except Exception as e:
-        print(f"  ❌ TechnicalAgent: {e}"); return
+        print(f"  [BAD] TechnicalAgent: {e}"); return
 
     uncertainty_agent = UncertaintyAgent(tech_agent)
 
     try:
         regime_agent = HybridRegimeAgent(hmm_model_path=REGIME_PATH, verbose=False)
-        print(f"  ✅ HybridRegimeAgent  is_fitted={regime_agent.is_fitted}")
+        print(f"  [OK] HybridRegimeAgent  is_fitted={regime_agent.is_fitted}")
     except Exception as e:
-        print(f"  ❌ HybridRegimeAgent: {e}"); return
+        print(f"  [BAD] HybridRegimeAgent: {e}"); return
 
     try:
         fusion_agent = FusionAgent(model_path=FUSION_PATH)
-        print(f"  ✅ FusionAgent  [{fusion_agent._arch}]")
+        print(f"  [OK] FusionAgent  [{fusion_agent._arch}]")
     except Exception as e:
-        print(f"  ❌ FusionAgent: {e}"); return
+        print(f"  [BAD] FusionAgent: {e}"); return
 
     heatmap_agent = HeatmapAgent()
-    print("  ✅ HeatmapAgent")
+    print("  [OK] HeatmapAgent")
 
     conflict_resolver = None
     if _CONFLICT_OK:
         try:
             conflict_resolver = ConflictResolver()
-            print("  ✅ ConflictResolver")
+            print("  [OK] ConflictResolver")
         except Exception as e:
-            print(f"  ⚠️  ConflictResolver: {e}")
+            print(f"  [WARN]  ConflictResolver: {e}")
 
     risk_engine = None
     if _RISK_OK:
         try:
             risk_engine = RiskEngine(default_account_size=DEFAULT_CAPITAL)
-            print(f"  ✅ RiskEngine  (capital=${DEFAULT_CAPITAL:,.0f})")
+            print(f"  [OK] RiskEngine  (capital=${DEFAULT_CAPITAL:,.0f})")
         except Exception as e:
-            print(f"  ⚠️  RiskEngine: {e}")
+            print(f"  [WARN]  RiskEngine: {e}")
 
     cf_engine = CounterfactualEngine()
 
-    # ── Run windows ────────────────────────────────────────────────────────────
+    # -- Run windows ------------------------------------------------------------
     all_stats   = []
     all_rows    = []
     all_cf      = []
@@ -496,14 +496,14 @@ def main():
         all_rows.extend(s["rows"])
         all_cf.extend(s["cf_results"])
 
-    # ── Consolidated ──────────────────────────────────────────────────────────
+    # -- Consolidated ----------------------------------------------------------
     print("\n" + "=" * 116)
     print("  CONSOLIDATED COUNTERFACTUAL RESULTS")
     print("=" * 116)
     print(f"\n  {'Window':<32} {'N':>4} {'OptMatch':>9} {'MeanRgt':>9} "
           f"{'MaxRgt':>8} {'OppCost':>10} {'CalibPct':>9}  {'NONE':>5} "
           f"{'LOW':>5} {'MOD':>5} {'HIGH':>5} {'EXT':>5}")
-    print(f"  {'─'*116}")
+    print(f"  {'-'*116}")
 
     for s in all_stats:
         sm = s["summary"]
@@ -511,7 +511,7 @@ def main():
             print(f"  {s['label']:<32}  (no data)")
             continue
         lc = sm["level_counts"]
-        of = "✅" if sm["optimal_match_rate"] >= 50 else "⚠️ "
+        of = "[OK]" if sm["optimal_match_rate"] >= 50 else "[WARN] "
         print(f"  {s['label']:<32} {sm['n']:>4} "
               f"  {sm['optimal_match_rate']:>7.1f}%{of}"
               f"  {sm['mean_regret_pct']:>7.3f}%"
@@ -526,7 +526,7 @@ def main():
     total_opp   = cf_engine.opportunity_cost(all_cf, DEFAULT_CAPITAL)
     lc_all      = all_summary.get("level_counts", {})
 
-    print(f"  {'─'*116}")
+    print(f"  {'-'*116}")
     print(f"  {'OVERALL':<32} {all_summary.get('n',0):>4} "
           f"  {all_summary.get('optimal_match_rate',0):>7.1f}%  "
           f"  {all_summary.get('mean_regret_pct',0):>7.3f}%"
@@ -537,18 +537,18 @@ def main():
           f"  {lc_all.get('MODERATE',0):>5}  {lc_all.get('HIGH',0):>5}"
           f"  {lc_all.get('EXTREME',0):>5}")
 
-    # ── Miss-type breakdown across all windows ────────────────────────────────
+    # -- Miss-type breakdown across all windows --------------------------------
     all_miss_bd = cf_engine.get_miss_type_breakdown(all_cf)
 
-    # ── Regret level breakdown ─────────────────────────────────────────────────
-    print(f"\n  ── Regret Level Explanation ─────────────────────────────────────────")
-    print(f"  ✅ NONE    : regret ≤ 0.2%  — AI chose optimally")
-    print(f"  🔵 LOW     : 0.2–1.0%       — minor miss, acceptable")
-    print(f"  🟡 MODERATE: 1.0–3.0%       — noticeable miss, review signals")
-    print(f"  🟠 HIGH    : 3.0–7.0%       — significant miss, recalibration recommended")
-    print(f"  🔴 EXTREME : > 7.0%         — major miss, trust penalty applied")
+    # -- Regret level breakdown -------------------------------------------------
+    print(f"\n  -- Regret Level Explanation -----------------------------------------")
+    print(f"  [OK] NONE    : regret ≤ 0.2%  HOLD AI chose optimally")
+    print(f"  🔵 LOW     : 0.2–1.0%       HOLD minor miss, acceptable")
+    print(f"  🟡 MODERATE: 1.0–3.0%       HOLD noticeable miss, review signals")
+    print(f"  🟠 HIGH    : 3.0–7.0%       HOLD significant miss, recalibration recommended")
+    print(f"  🔴 EXTREME : > 7.0%         HOLD major miss, trust penalty applied")
 
-    # ── Root-cause diagnosis ──────────────────────────────────────────────────
+    # -- Root-cause diagnosis --------------------------------------------------
     om   = all_summary.get("optimal_match_rate", 0)
     mr   = all_summary.get("mean_regret_pct", 99)
     cr   = all_summary.get("calib_rate_pct")
@@ -567,20 +567,20 @@ def main():
         [r for r in all_cf if cf_engine.classify_miss_type(r) == "WRONG_DIR"],
         DEFAULT_CAPITAL)
 
-    print(f"\n  ── 🔬 Root-Cause Diagnosis ──────────────────────────────────────────")
-    print(f"  Issue 1 — WRONG_DIR  (LSTM predicted wrong direction on big moves):")
+    print(f"\n  -- 🔬 Root-Cause Diagnosis ------------------------------------------")
+    print(f"  Issue 1 HOLD WRONG_DIR  (LSTM predicted wrong direction on big moves):")
     print(f"    Count  : {wd_total} decisions  ({all_miss_bd.get('wrong_dir_pct',0):.1f}% of all)")
     print(f"    Cost   : ${wd_dollar:,.2f}  ({wd_regret:.2f}% of capital)")
     print(f"    Cause  : LSTM model not trained on extreme momentum events")
-    print(f"    Action : Logged to RegretTracker → MetaAgent recalibration")
+    print(f"    Action : Logged to RegretTracker -> MetaAgent recalibration")
 
-    print(f"\n  Issue 2 — HOLD_BIAS  (system defaulted to HOLD in big-move situations):")
+    print(f"\n  Issue 2 HOLD HOLD_BIAS  (system defaulted to HOLD in big-move situations):")
     print(f"    Count  : {hb_total} decisions  ({all_miss_bd.get('hold_bias_pct',0):.1f}% of all)")
     print(f"    Cost   : ${hb_dollar:,.2f}  ({hb_regret:.2f}% of capital)")
     print(f"    Cause  : Bear-regime hard-block + neutral-zone fell into HOLD")
     print(f"    Fixes applied in v2.2:")
-    print(f"      FIX A: conf >= 0.75 in Bear → BUY  (LSTM overwhelmingly bullish)")
-    print(f"      FIX B: Bear + conf <= 0.60 → SELL  (medium conf in downtrend = lean bearish)")
+    print(f"      FIX A: conf >= 0.75 in Bear -> BUY  (LSTM overwhelmingly bullish)")
+    print(f"      FIX B: Bear + conf <= 0.60 -> SELL  (medium conf in downtrend = lean bearish)")
     print(f"      FIX C: conf <= 0.40 boundary fix   (was `<`, now `<=`)")
 
     # Show top remaining HOLD_BIAS cases after fix
@@ -591,7 +591,7 @@ def main():
         key=lambda x: x.get("regret_score", 0), reverse=True
     )
     if hb_cases[:4]:
-        print(f"\n  Remaining HOLD_BIAS cases (top 4) — need LSTM retraining or higher conf:")
+        print(f"\n  Remaining HOLD_BIAS cases (top 4) HOLD need LSTM retraining or higher conf:")
         for r in hb_cases[:4]:
             print(f"    {r['ticker']:<6} {r['window']:<25}  "
                   f"conf={r['arb_conf']:.3f}  move={r['move_pct']:>+6.2f}%  "
@@ -604,28 +604,28 @@ def main():
         key=lambda x: x.get("regret_score", 0), reverse=True
     )
     if wd_cases[:4]:
-        print(f"\n  Top WRONG_DIR cases — inherent model limitations:")
+        print(f"\n  Top WRONG_DIR cases HOLD inherent model limitations:")
         for r in wd_cases[:4]:
             print(f"    {r['ticker']:<6} {r['window']:<25}  "
                   f"dec={r['decision']:<5}  move={r['move_pct']:>+6.2f}%  "
-                  f"regret={r['regret_score']:.2f}%  → LSTM was wrong")
+                  f"regret={r['regret_score']:.2f}%  -> LSTM was wrong")
 
-    # ── Final verdict ─────────────────────────────────────────────────────────
-    print(f"\n  {'═'*65}")
+    # -- Final verdict ---------------------------------------------------------
+    print(f"\n  {'='*65}")
     print(f"  COUNTERFACTUAL ENGINE VERDICT  (v2.2)")
-    print(f"  {'═'*65}")
+    print(f"  {'='*65}")
     print(f"  Optimal match rate    : {om:.1f}%  "
-          + ("✅ PASS (≥50%)" if om_ok else "⚠️  LOW"))
+          + ("[OK] PASS (≥50%)" if om_ok else "[WARN]  LOW"))
     print(f"  Mean regret           : {mr:.3f}%  "
-          + ("✅ PASS (<3%)" if mr_ok else "⚠️  HIGH"))
+          + ("[OK] PASS (<3%)" if mr_ok else "[WARN]  HIGH"))
     print(f"  Confidence calibration: {cr:.1f}%  "
-          + ("✅ PASS (≥60%)" if cr_ok else "⚠️  LOW") if cr else "  n/a")
+          + ("[OK] PASS (≥60%)" if cr_ok else "[WARN]  LOW") if cr else "  n/a")
     print(f"  Total opportunity cost: ${total_opp:,.2f}")
     print(f"  HOLD_BIAS cost (Issue 2): ${hb_dollar:,.2f}  "
-          + ("✅ Fixed by FIX A/B/C" if hb_total < 10 else
-             f"⚠️  {hb_total} cases remain — consider LSTM retraining"))
+          + ("[OK] Fixed by FIX A/B/C" if hb_total < 10 else
+             f"[WARN]  {hb_total} cases remain HOLD consider LSTM retraining"))
     print(f"  WRONG_DIR cost (Issue 1): ${wd_dollar:,.2f}  "
-          + "⚠️  Inherent — logged to RegretTracker for MetaAgent")
+          + "[WARN]  Inherent HOLD logged to RegretTracker for MetaAgent")
 
     tracker_final = cf_engine.tracker.get_summary()
     print(f"\n  RegretTracker (rolling {tracker_final['n']} decisions):")
@@ -634,7 +634,7 @@ def main():
     print(f"    Extreme rate  : {tracker_final['extreme_rate']*100:.1f}%")
     print(f"    System status : {tracker_final['status']}")
 
-    # ── Per-window bars ────────────────────────────────────────────────────────
+    # -- Per-window bars --------------------------------------------------------
     print(f"\n  Per-window optimal match rate + miss breakdown:")
     for s in all_stats:
         sm = s.get("summary", {})
@@ -643,7 +643,7 @@ def main():
             continue
         rate = sm.get("optimal_match_rate", 0)
         bar  = "█" * int(rate / 5) + "░" * (20 - int(rate / 5))
-        flag = "✅" if rate >= 50 else "⚠️ "
+        flag = "[OK]" if rate >= 50 else "[WARN] "
         hb   = mb.get("hold_bias", 0)
         wd   = mb.get("wrong_dir", 0)
         print(f"  {s['label']:<32} [{bar}] {rate:.1f}%{flag}  "
@@ -651,11 +651,11 @@ def main():
               f"regret={sm.get('mean_regret_pct',0):.2f}%  "
               f"opp=${s['opp_cost']:,.0f}")
 
-    # ── Save ───────────────────────────────────────────────────────────────────
+    # -- Save -------------------------------------------------------------------
     if all_rows:
         df = pd.DataFrame(all_rows)
         df.to_csv("counterfactual_backtest.csv", index=False)
-        print(f"\n  Saved → counterfactual_backtest.csv  ({len(all_rows)} rows)")
+        print(f"\n  Saved -> counterfactual_backtest.csv  ({len(all_rows)} rows)")
 
     print("\nDone.\n")
 

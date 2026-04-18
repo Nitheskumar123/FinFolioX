@@ -1,12 +1,12 @@
 """
-ml_engine/technical_agent.py  —  TechnicalAgent (LSTM-only, single brain)
+ml_engine/technical_agent.py  HOLD  TechnicalAgent (LSTM-only, single brain)
 ==========================================================================
 CHANGES vs previous version:
 
-  FIX — probability stretching consistency with test script
+  FIX HOLD probability stretching consistency with test script
     Problem: test_lstm.py compares raw LSTM output against BUY/SELL thresholds.
     Production predict() applies logit stretching (factor=3.5) before returning.
-    A raw prob of 0.72 becomes ~0.91 after stretching — thresholds mean
+    A raw prob of 0.72 becomes ~0.91 after stretching HOLD thresholds mean
     different things in test vs production.
     Fix: added predict_raw() which returns the unscaled probability for use in
     the test harness and explainability pipeline.
@@ -82,8 +82,8 @@ class TechnicalAgent:
     Single-brain LSTM technical agent.
 
     Two prediction entry-points:
-      predict(df)      — returns STRETCHED probability (for trading decisions).
-      predict_raw(df)  — returns RAW probability (for test harness / expl agent).
+      predict(df)      HOLD returns STRETCHED probability (for trading decisions).
+      predict_raw(df)  HOLD returns RAW probability (for test harness / expl agent).
 
     Use predict_raw() whenever you need the probability BEFORE logit stretching,
     e.g. in the explainability pipeline or the test back-tester, so that
@@ -94,7 +94,7 @@ class TechnicalAgent:
         self,
         lstm_model_path: str,
         lstm_scaler_path: str,
-        # Optional kwargs kept for backward compatibility — silently ignored
+        # Optional kwargs kept for backward compatibility HOLD silently ignored
         trans_model_path: str = None,
         trans_scaler_path: str = None,
         stretch_factor: float = 3.5,
@@ -105,17 +105,17 @@ class TechnicalAgent:
 
         self.lstm_scaler = joblib.load(lstm_scaler_path)
         self.lstm_model  = load_model(lstm_model_path)
-        print("      ✅ Brain 1: Keras LSTM Loaded")
+        print("      [OK] Brain 1: Keras LSTM Loaded")
 
         if trans_model_path is not None:
-            print("      ℹ️  Transformer (Brain 2) disabled — LSTM-only mode active.")
+            print("      ℹ️  Transformer (Brain 2) disabled HOLD LSTM-only mode active.")
 
     # ------------------------------------------------------------------
     # Logit stretching
     # ------------------------------------------------------------------
     def _stretch_probability(self, p: float, factor: float = None) -> float:
         """
-        Logit stretching — pushes mean-hugging probabilities away from 0.5.
+        Logit stretching HOLD pushes mean-hugging probabilities away from 0.5.
         p_stretched = sigmoid(logit(p) * factor)
         """
         if factor is None:
@@ -141,7 +141,7 @@ class TechnicalAgent:
         return scaled, feature_df
 
     # ------------------------------------------------------------------
-    # predict_raw — unscaled output (for test harness & explainability)
+    # predict_raw HOLD unscaled output (for test harness & explainability)
     # ------------------------------------------------------------------
     def predict_raw(self, recent_data_df: pd.DataFrame) -> float:
         """
@@ -159,7 +159,7 @@ class TechnicalAgent:
         return float(np.clip(raw_prob, 0.0, 1.0))
 
     # ------------------------------------------------------------------
-    # predict — stretched output (for production trading decisions)
+    # predict HOLD stretched output (for production trading decisions)
     # ------------------------------------------------------------------
     def predict(self, recent_data_df: pd.DataFrame) -> float:
         """
@@ -176,14 +176,14 @@ class TechnicalAgent:
 
         if self.stretch_enabled:
             stretched = self._stretch_probability(raw_prob)
-            print(f"      - LSTM Brain : {raw_prob:.4f} → Stretched: {stretched:.4f}")
+            print(f"      - LSTM Brain : {raw_prob:.4f} -> Stretched: {stretched:.4f}")
             return float(np.clip(stretched, 0.0, 1.0))
         else:
             print(f"      - LSTM Brain : {raw_prob:.4f} (no stretch)")
             return float(np.clip(raw_prob, 0.0, 1.0))
 
     # ------------------------------------------------------------------
-    # predict_signal — alias for predict() (used by red_team / adversarial)
+    # predict_signal HOLD alias for predict() (used by red_team / adversarial)
     # ------------------------------------------------------------------
     def predict_signal(self, recent_data_df: pd.DataFrame) -> float:
         """

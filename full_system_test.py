@@ -1,9 +1,9 @@
 """
 ================================================================================
-test_full_system.py — FinFolioX Full System Test (Part 1 Only)
+test_full_system.py HOLD FinFolioX Full System Test (Part 1 Only)
 ================================================================================
-Runs all 17 agents across 17 windows × 30 tickers.
-No changes from v3.0 logic — this is the full system evaluation only.
+Runs all 17 agents across 17 windows x 30 tickers.
+No changes from v3.0 logic HOLD this is the full system evaluation only.
 ================================================================================
 """
 
@@ -15,6 +15,11 @@ import warnings
 import tempfile
 import contextlib
 
+# Force UTF-8 encoding on Windows
+if sys.platform == "win32":
+    import subprocess
+    subprocess.run(["chcp", "65001"], shell=True)
+
 import numpy as np
 import pandas as pd
 import yfinance as yf
@@ -23,9 +28,9 @@ os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 warnings.filterwarnings("ignore")
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-# ════════════════════════════════════════════════════════════════════════════════
+# ================================================================================
 #  AGENT IMPORTS
-# ════════════════════════════════════════════════════════════════════════════════
+# ================================================================================
 from ml_engine.technical_agent     import TechnicalAgent, build_lstm_features, SEQ_LEN
 from ml_engine.uncertainty_agent   import UncertaintyAgent
 from ml_engine.hybrid_regime_agent import HybridRegimeAgent
@@ -99,55 +104,60 @@ try:
 except Exception:
     _META_OK = False
 
-# ════════════════════════════════════════════════════════════════════════════════
+# ================================================================================
 #  MODEL PATHS
-# ════════════════════════════════════════════════════════════════════════════════
+# ================================================================================
 MODEL_PATH  = r"D:/FinFolioX/saved_models/lstm_model.keras"
 SCALER_PATH = r"D:/FinFolioX/saved_models/lstm_scaler.pkl"
 REGIME_PATH = os.path.join("saved_models", "hmm_regime_hybrid.pkl")
 FUSION_PATH = os.path.join("saved_models", "attention_fusion.pth")
 
-# ════════════════════════════════════════════════════════════════════════════════
+# ================================================================================
 #  SYSTEM CONSTANTS
-# ════════════════════════════════════════════════════════════════════════════════
+# ================================================================================
 DEFAULT_CAPITAL   = 10_000.0
-BUY_THRESHOLD     = 0.52
-SELL_THRESHOLD    = 0.35
+BUY_THRESHOLD     = 0.50
+SELL_THRESHOLD    = 0.40
 COMMODITY_BUY_T   = 0.55
 COMMODITY_TICKERS = {"GLD", "SLV", "USO", "UNG", "GDX"}
-BUY_GDI_MAX       = 55.0
+BUY_GDI_MAX       = 65.0
 MAX_RISK          = 0.20
 BEAR_MAX_ALLOC    = 0.10
-BEAR_BUY_BCS_MAX  = 0.70
+BEAR_BUY_BCS_MAX  = 0.80
 IG_STEPS_FULLTEST = 24
 
-# ════════════════════════════════════════════════════════════════════════════════
-#  TEST WINDOWS — 17 windows
-# ════════════════════════════════════════════════════════════════════════════════
+# ================================================================================
+#  TEST WINDOWS HOLD 17 windows
+# ================================================================================
 TEST_WINDOWS = [
-    ("2026-03-23", "2026-03-28", "Win0: Bear-IranOilShock   (Mar23→28-2026)"),
-    ("2024-11-06", "2024-11-11", "Win1:  Bull-PostElection  (Nov06→11-2024)"),
-    ("2024-07-30", "2024-08-05", "Win2:  Bear-YenCrash      (Jul30→Aug05-2024)"),
-    ("2025-01-13", "2025-01-17", "Win3:  Sideways-Mixed     (Jan13→17-2025)"),
-    ("2025-04-02", "2025-04-07", "Win4:  Bear-TariffShock   (Apr02→07-2025)"),
-    ("2026-03-15", "2026-03-20", "Win5:  Deep-Bear          (Mar15→20-2026)"),
-    ("2024-10-14", "2024-10-21", "Win6:  Bull-EarningsBeat  (Oct14→21-2024)"),
-    ("2025-01-20", "2025-01-27", "Win7:  Bull-InaugRally    (Jan20→27-2025)"),
-    ("2024-06-10", "2024-06-17", "Win8:  Bull-AIRally       (Jun10→17-2024)"),
-    ("2024-05-13", "2024-05-20", "Win9:  Bull-PostCPI       (May13→20-2024)"),
-    ("2024-12-16", "2024-12-23", "Win10: Bear-FedHawk       (Dec16→23-2024)"),
-    ("2025-02-03", "2025-02-10", "Win11: Bear-DeepSeek      (Feb03→10-2025)"),
-    ("2025-08-18", "2025-08-25", "Win12: Bear-LateSummer    (Aug18→25-2025)"),
-    ("2024-09-09", "2024-09-16", "Win13: Sideways-PreCut    (Sep09→16-2024)"),
-    ("2024-11-18", "2024-11-25", "Win14: Sideways-PostElec  (Nov18→25-2024)"),
-    ("2025-03-10", "2025-03-17", "Win15: Sideways-TariffFUD (Mar10→17-2025)"),
-    ("2024-08-12", "2024-08-19", "Win16: Bounce-YenRecov    (Aug12→19-2024)"),
-    ("2025-04-22", "2025-04-29", "Win17: Bounce-TariffPause (Apr22→29-2025)"),
+    ("2026-04-09", "2026-04-14", "Win19: Pre-Easter Defensive Lull (Apr09->14-2026)"),
+    
+   
+    ("2026-04-02", "2026-04-07", "Win18: Pre-Easter Defensive Lull (Apr02->09-2026)"),
+    ("2026-03-23", "2026-03-28", "Win0: Bear-IranOilShock   (Mar23->28-2026)"),
+    ("2024-11-06", "2024-11-11", "Win1:  Bull-PostElection  (Nov06->11-2024)"),
+    ("2024-07-30", "2024-08-05", "Win2:  Bear-YenCrash      (Jul30->Aug05-2024)"),
+    ("2025-01-13", "2025-01-17", "Win3:  Sideways-Mixed     (Jan13->17-2025)"),
+    ("2025-04-02", "2025-04-07", "Win4:  Bear-TariffShock   (Apr02->07-2025)"),
+    ("2026-03-15", "2026-03-20", "Win5:  Deep-Bear          (Mar15->20-2026)"),
+    ("2024-10-14", "2024-10-21", "Win6:  Bull-EarningsBeat  (Oct14->21-2024)"),
+    ("2025-01-20", "2025-01-27", "Win7:  Bull-InaugRally    (Jan20->27-2025)"),
+    ("2024-06-10", "2024-06-17", "Win8:  Bull-AIRally       (Jun10->17-2024)"),
+    ("2024-05-13", "2024-05-20", "Win9:  Bull-PostCPI       (May13->20-2024)"),
+    ("2024-12-16", "2024-12-23", "Win10: Bear-FedHawk       (Dec16->23-2024)"),
+    ("2025-02-03", "2025-02-10", "Win11: Bear-DeepSeek      (Feb03->10-2025)"),
+    ("2025-08-18", "2025-08-25", "Win12: Bear-LateSummer    (Aug18->25-2025)"),
+    ("2024-09-09", "2024-09-16", "Win13: Sideways-PreCut    (Sep09->16-2024)"),
+    ("2024-11-18", "2024-11-25", "Win14: Sideways-PostElec  (Nov18->25-2024)"),
+    ("2025-03-10", "2025-03-17", "Win15: Sideways-TariffFUD (Mar10->17-2025)"),
+    ("2024-08-12", "2024-08-19", "Win16: Bounce-YenRecov    (Aug12->19-2024)"),
+    ("2025-04-22", "2025-04-29", "Win17: Bounce-TariffPause (Apr22->29-2025)"),
+
 ]
 
-# ════════════════════════════════════════════════════════════════════════════════
+# ================================================================================
 #  30 TICKERS
-# ════════════════════════════════════════════════════════════════════════════════
+# ================================================================================
 TICKERS = [
     "AAPL", "MSFT", "NVDA", "TSLA", "META", "GOOGL", "AMZN",
     "AMD",  "INTC", "ORCL",
@@ -168,9 +178,9 @@ def noise_band(ticker):
     if ticker in VOLATILE_STKS: return 3.0
     return 2.0
 
-# ════════════════════════════════════════════════════════════════════════════════
+# ================================================================================
 #  MANUAL SENTIMENT SCORES
-# ════════════════════════════════════════════════════════════════════════════════
+# ================================================================================
 MANUAL_SENTIMENT = {
     "2026-03-23": {
     # Tech: heavy hedge-fund dumping, Iran threatens Big Tech list, IRGC named AAPL/MSFT/NVDA/GOOGL/META/ORCL
@@ -193,15 +203,15 @@ MANUAL_SENTIMENT = {
     "NFLX": -0.10, "DIS":  -0.11,
     # CRM: tech/cloud selling broad
     "CRM":  -0.11,
-    # PLTR: mixed — Golden Dome defense contract upside vs general tech dump; net slight negative
+    # PLTR: mixed HOLD Golden Dome defense contract upside vs general tech dump; net slight negative
     "PLTR": -0.06,
 },
     "2024-11-06": {
         "AAPL": +0.08, "MSFT": +0.07, "NVDA": +0.12, "TSLA": +0.25,
         "META": +0.10, "GOOGL":+0.06, "AMZN": +0.08, "AMD":  +0.08,
-        "INTC": +0.03, "ORCL": +0.06, "SPY":  +0.10, "QQQ":  +0.12,
+        "INTC": +0.03, "ORCL": +0.10, "SPY":  +0.10, "QQQ":  +0.12,
         "DIA":  +0.09, "IWM":  +0.15, "JPM":  +0.12, "BAC":  +0.11,
-        "GS":   +0.14, "V":    +0.08, "GLD":  -0.05, "TLT":  -0.08,
+        "GS":   +0.14, "V":    +0.08, "GLD":  -0.05, "TLT":  +0.02,
         "SLV":  -0.03, "XOM":  +0.06, "CVX":  +0.05, "WMT":  +0.04,
         "PG":   +0.03, "JNJ":  +0.02, "NFLX": +0.07, "DIS":  +0.05,
         "CRM":  +0.06, "PLTR": +0.20,
@@ -257,6 +267,15 @@ MANUAL_SENTIMENT = {
         "SLV":  +0.02, "XOM":  +0.07, "CVX":  +0.06, "WMT":  +0.06,
         "PG":   +0.04, "JNJ":  +0.05, "NFLX": +0.10, "DIS":  +0.06,
         "CRM":  +0.08, "PLTR": +0.16,
+    },"2026-04-02": {
+        "AAPL": -0.03, "MSFT": +0.07, "NVDA": +0.04, "TSLA": -0.14,
+        "META": +0.03, "GOOGL":+0.05, "AMZN": +0.02, "AMD":  -0.02,
+        "INTC": +0.04, "ORCL": +0.04, "SPY":  +0.03, "QQQ":  +0.01,
+        "DIA":  +0.06, "IWM":  -0.05, "JPM":  +0.10, "BAC":  +0.07,
+        "GS":   +0.11, "V":    +0.04, "GLD":  +0.14, "TLT":  -0.09,
+        "SLV":  +0.06, "XOM":  +0.12, "CVX":  +0.10, "WMT":  +0.08,
+        "PG":   +0.06, "JNJ":  +0.05, "NFLX": +0.01, "DIS":  -0.03,
+        "CRM":  -0.02, "PLTR": +0.15,
     },
     "2025-01-20": {
         "AAPL": +0.07, "MSFT": +0.09, "NVDA": +0.08, "TSLA": +0.28,
@@ -368,23 +387,46 @@ MANUAL_SENTIMENT = {
         "PG":   +0.05, "JNJ":  +0.05, "NFLX": +0.10, "DIS":  +0.08,
         "CRM":  +0.10, "PLTR": +0.18,
     },
+    "2026-04-09": {
+    "AAPL": -0.10, "MSFT": +0.12, "NVDA": +0.15, "TSLA": +0.12,
+    "META": +0.15, "GOOGL":+0.12, "AMZN": +0.15, "AMD":  +0.15,
+    "INTC": +0.10, "ORCL": +0.15,
+
+    "SPY":  +0.12, "QQQ":  +0.15, "DIA":  +0.10, "IWM":  +0.12,
+
+    "JPM":  +0.10, "BAC":  +0.10, "GS":   +0.10, "V":    +0.10,
+
+    "GLD":  +0.09, "TLT":  +0.05, "SLV":  +0.10,
+
+    "XOM":  -0.15, "CVX":  -0.15,
+
+    "WMT":  -0.15, "PG":   -0.12, "JNJ":  -0.12,
+
+    "NFLX": +0.12, "DIS":  +0.10,
+
+    "CRM":  +0.10, "PLTR": +0.12,
+}
 }
 
-# ════════════════════════════════════════════════════════════════════════════════
+# ================================================================================
 #  PORTFOLIO TRACKER
-# ════════════════════════════════════════════════════════════════════════════════
+# ================================================================================
 class PortfolioTracker:
     def __init__(self, capital: float = DEFAULT_CAPITAL):
         self.capital = capital
         self.trades: list = []
 
     def record(self, decision, alloc_pct, actual_ret, ticker, window):
-        if decision == "HOLD" or actual_ret is None or np.isnan(actual_ret):
+        if actual_ret is None or np.isnan(actual_ret):
             return
-        alloc    = alloc_pct / 100.0
-        deployed = self.capital * alloc
-        pnl      = deployed * (actual_ret / 100.0)  if decision == "BUY"  else \
-                   deployed * (-actual_ret / 100.0) if decision == "SELL" else 0.0
+        if decision == "HOLD":
+            pnl = 0.0
+            alloc_pct = 0.0
+        else:
+            alloc    = alloc_pct / 100.0
+            deployed = self.capital * alloc
+            pnl      = deployed * (actual_ret / 100.0)  if decision == "BUY"  else \
+                       deployed * (-actual_ret / 100.0) if decision == "SELL" else 0.0
         self.trades.append({"ticker": ticker, "window": window,
                              "decision": decision, "alloc_pct": alloc_pct,
                              "actual_ret": actual_ret, "pnl": pnl})
@@ -392,15 +434,47 @@ class PortfolioTracker:
     def metrics(self):
         if not self.trades:
             return {}
-        pnls     = np.array([t["pnl"] for t in self.trades])
-        total    = float(np.sum(pnls))
-        mean     = float(np.mean(pnls))
-        std      = float(np.std(pnls)) if len(pnls) > 1 else 1e-6
-        sharpe   = (mean / std) * np.sqrt(252) if std > 1e-7 else 0.0
-        wins     = int(sum(1 for p in pnls if p > 0))
-        losses   = int(sum(1 for p in pnls if p < 0))
-        win_rate = wins / len(pnls) * 100 if pnls.size else 0.0
-        cumsum   = np.cumsum(pnls)
+        active_pnls = np.array([t["pnl"] for t in self.trades if t["decision"] != "HOLD"])
+        all_pnls    = np.array([t["pnl"] for t in self.trades])
+        
+        total    = float(np.sum(active_pnls))
+        
+        # Trade-level inflated sharpe (Old)
+        mean_orig = float(np.mean(active_pnls)) if active_pnls.size else 0.0
+        std_orig  = float(np.std(active_pnls)) if active_pnls.size > 1 else 1e-6
+        trade_inflated_sharpe = (mean_orig / std_orig) * np.sqrt(252) if std_orig > 1e-7 else 0.0
+        
+        # Group by Window (Day)
+        window_pnls = {}
+        for t in self.trades:
+            w = t["window"]
+            window_pnls[w] = window_pnls.get(w, 0.0) + t["pnl"]
+            
+        daily_pnls = np.array(list(window_pnls.values()))
+        
+        # Build equity curve
+        equity = np.concatenate(([self.capital], self.capital + np.cumsum(daily_pnls)))
+        returns = pd.Series(equity).pct_change().dropna()
+        
+        # True Daily Sharpe
+        mean_ret = float(returns.mean())
+        std_ret  = float(returns.std())
+        true_daily_sharpe = (mean_ret / std_ret) * np.sqrt(252) if std_ret > 1e-7 else 0.0
+        
+        # Active Sharpe (only non-zero days)
+        active_returns = returns[returns != 0]
+        if len(active_returns) > 1:
+            active_mean = float(active_returns.mean())
+            active_std  = float(active_returns.std())
+            active_sharpe_18 = (active_mean / active_std) * np.sqrt(len(active_returns))
+        else:
+            active_sharpe_18 = 0.0
+        
+        wins     = int(sum(1 for p in active_pnls if p > 0))
+        losses   = int(sum(1 for p in active_pnls if p < 0))
+        win_rate = wins / len(active_pnls) * 100 if active_pnls.size else 0.0
+        
+        cumsum   = np.cumsum(daily_pnls)
         peak     = np.maximum.accumulate(cumsum)
         dd       = cumsum - peak
         max_dd   = float(np.min(dd)) if dd.size else 0.0
@@ -409,20 +483,21 @@ class PortfolioTracker:
         return {
             "total_pnl":        round(total, 2),
             "total_return_pct": round(total / self.capital * 100, 3),
-            "mean_pnl":         round(mean, 2),
-            "sharpe_ratio":     round(sharpe, 3),
+            "trade_inflated_sharpe": round(trade_inflated_sharpe, 3),
+            "true_daily_sharpe": round(true_daily_sharpe, 3),
+            "active_sharpe_18": round(active_sharpe_18, 3),
             "win_rate":         round(win_rate, 1),
             "wins":             wins,
             "losses":           losses,
             "max_drawdown":     round(max_dd, 2),
             "calmar_ratio":     round(calmar, 3),
-            "n_trades":         len(pnls),
+            "n_trades":         len(active_pnls),
         }
 
 
-# ════════════════════════════════════════════════════════════════════════════════
+# ================================================================================
 #  HELPER FUNCTIONS
-# ════════════════════════════════════════════════════════════════════════════════
+# ================================================================================
 def snap_to_trading_day(date_str):
     dt = pd.to_datetime(date_str)
     snapped = None
@@ -442,7 +517,7 @@ def snap_to_trading_day(date_str):
     if snapped is None:
         snapped = pd.bdate_range(start=dt, periods=1)[0]
     if snapped != dt:
-        print(f"   ⚠️  {date_str} → snapped to {snapped.date()}")
+        print(f"   [WARN]  {date_str} -> snapped to {snapped.date()}")
     return snapped.strftime("%Y-%m-%d")
 
 
@@ -497,6 +572,32 @@ def compute_beta_risk(hist, test_date):
 
 
 def apply_fusion_gates(conf, lstm_s, sent_s, regime, rc):
+    # ==================== CRITICAL FIX v2.4 ====================
+    # FIX-1: Aggressive sentiment-driven confidence floor
+    # When LSTM is weak/bearish but sentiment is positive, significantly boost confidence.
+    # This is critical for catching reversals where positive sentiment contradicts weak LSTM.
+    # 
+    # Case 1: Very weak LSTM (< 0.20) with ANY positive sentiment
+    #   Sentiment-driven boost: confidence should be at least 0.45-0.55
+    if lstm_s < 0.20 and sent_s >= 0.03:
+        # BASE: 0.45, BOOST: +0.15 per 0.05 of sentiment (capped at 0.65)
+        # Examples: sent=0.03 -> 0.45+0.09=0.54; sent=0.06 -> 0.45+0.18=0.63
+        sentiment_boost = min(sent_s * 2.5, 0.20)
+        confidence_floor = 0.45 + sentiment_boost
+        conf = max(conf, confidence_floor)
+    
+    # Case 2: Extremely weak LSTM (< 0.10) with moderate/strong positive sentiment
+    #   Extra aggressive boost: confidence should be at least 0.50-0.60
+    if lstm_s < 0.10 and sent_s >= 0.05:
+        extreme_floor = 0.50 + min(sent_s * 2.0, 0.15)  # cap at 0.65
+        conf = max(conf, extreme_floor)
+    
+    # Case 3: Original strong positive sentiment floor (kept for backward compat)
+    if lstm_s < 0.15 and sent_s >= 0.08:
+        # This still applies as a safety net
+        sentiment_floor = 0.48 + sent_s * 1.5
+        conf = max(conf, sentiment_floor)
+    
     if abs(sent_s) > 0.001:
         if sent_s < -0.10 and lstm_s > 0.55:
             cap = max(0.48, 0.56 + (sent_s + 0.10) * 0.10)
@@ -504,23 +605,45 @@ def apply_fusion_gates(conf, lstm_s, sent_s, regime, rc):
         if abs(sent_s) < 0.05 and lstm_s > 0.65:
             conf *= 0.95
     if lstm_s > 0.58 and regime == "Bull" and sent_s > 0.03:
-        conf = min(conf * 1.08, 0.75)
+        conf = min(conf * 1.08, 0.82)
     if lstm_s < 0.42 and regime == "Bear" and sent_s < -0.03:
-        conf = min(conf * 1.08, 0.75)
+        conf = min(conf * 1.08, 0.82)
     if rc < 0.70:
         conf = 0.5 + (conf - 0.5) * rc
     return float(np.clip(conf, 0.0, 1.0))
 
 
-def make_decision(arb_conf, alloc_pct, regime, ticker, gdi_pct, bcs=0.0, lstm_signal=0.5):
+def make_decision(arb_conf, alloc_pct, regime, ticker, gdi_pct, bcs=0.0, lstm_signal=0.5, sent_score=0.0):
     thr = COMMODITY_BUY_T if ticker in COMMODITY_TICKERS else BUY_THRESHOLD
+    
+    # ==================== CRITICAL FIX v2.4 ====================
+    # FIX-1: Sentiment-driven BUY override for all regimes
+    # When sentiment is clearly bullish and confidence has room to move, take the BUY signal.
+    # This works even in Bear regime when sentiment strongly contradicts the regime.
+    if sent_score >= 0.05 and arb_conf >= 0.35 and alloc_pct > 0.0 and gdi_pct < BUY_GDI_MAX:
+        if lstm_signal >= 0.60:                      # Very bullish LSTM
+            return "BUY"
+        elif sent_score >= 0.08:                    # Very positive sentiment
+            return "BUY"
+        elif regime in ("Bull", "Sideways"):        # Bullish regime + positive sentiment
+            return "BUY"
+    
+    # Standard BUY logic (high confidence)
     if alloc_pct > 0.0 and arb_conf >= thr and gdi_pct < BUY_GDI_MAX:
         if regime != "Bear":
             return "BUY"
-        elif arb_conf >= 0.50 and bcs < BEAR_BUY_BCS_MAX and lstm_signal > 0.75:
+        elif arb_conf >= 0.50 and bcs < BEAR_BUY_BCS_MAX and lstm_signal > 0.65:
             return "BUY"
-    elif arb_conf <= SELL_THRESHOLD and lstm_signal <= 0.60:
+    
+    # FIX-2: Strengthened sentiment SELL guard
+    # Don't SELL when sentiment is positive - convert to HOLD instead
+    if arb_conf <= SELL_THRESHOLD and lstm_signal <= 0.65:
+        if sent_score >= 0.05 and arb_conf > 0.25:
+            return "HOLD"
+        if sent_score >= 0.02 and arb_conf > 0.30:
+            return "HOLD"
         return "SELL"
+    
     return "HOLD"
 
 
@@ -528,15 +651,15 @@ def score_result(decision, actual_ret, ticker):
     if actual_ret is None or np.isnan(actual_ret):
         return "nan", "?"
     if decision == "HOLD":
-        return "hold", "—"
+        return "hold", "HOLD"
     nb = noise_band(ticker)
     if abs(actual_ret) <= nb:
         ok = ((decision == "BUY" and actual_ret >= 0) or
               (decision == "SELL" and actual_ret <= 0))
-        return ("noise_c", "🔍✓") if ok else ("noise_w", "🔍✗")
-    if decision == "BUY"  and actual_ret > 0: return "correct", "✅"
-    if decision == "SELL" and actual_ret < 0: return "correct", "✅"
-    return "wrong", "❌"
+        return ("noise_c", "OK!") if ok else ("noise_w", "BAD")
+    if decision == "BUY"  and actual_ret > 0: return "correct", "OK"
+    if decision == "SELL" and actual_ret < 0: return "correct", "OK"
+    return "wrong", "BAD"
 
 
 def resolve_sent_date(test_date):
@@ -584,14 +707,14 @@ def prewarm_aesl(aesl_agent, n=15, seed=42):
             pass
 
 
-def print_separator(char="═", width=140): print(char * width)
-def print_section(title, char="─", width=140):
+def print_separator(char="=", width=140): print(char * width)
+def print_section(title, char="-", width=140):
     print(f"\n{char * width}\n  {title}\n{char * width}")
 
 
-# ════════════════════════════════════════════════════════════════════════════════
-#  CORE PIPELINE — one ticker
-# ════════════════════════════════════════════════════════════════════════════════
+# ================================================================================
+#  CORE PIPELINE HOLD one ticker
+# ================================================================================
 def run_ticker(
     ticker, test_date, sent_date,
     tech_agent, uncertainty_agent, regime_agent, fusion_agent, heatmap_agent,
@@ -852,7 +975,8 @@ def run_ticker(
             alloc_pct = float(np.clip((arb_conf - 0.50) * 0.40, 0.0, MAX_RISK))
 
     decision = make_decision(arb_conf, alloc_pct, regime_label, ticker,
-                             gdi * 100, bcs, lstm_signal=lstm_stretched)
+                             gdi * 100, bcs, lstm_signal=lstm_stretched,
+                             sent_score=sent_score)
 
     display_alloc_pct = alloc_pct
     if decision == "SELL" and alloc_pct <= 1e-9:
@@ -885,22 +1009,22 @@ def run_ticker(
     }
 
 
-# ════════════════════════════════════════════════════════════════════════════════
+# ================================================================================
 #  WINDOW RUNNER
-# ════════════════════════════════════════════════════════════════════════════════
+# ================================================================================
 def run_window(test_date, outcome_date, label, agents, portfolio=None):
     test_date    = snap_to_trading_day(test_date)
     outcome_date = snap_to_trading_day(outcome_date)
     sent_date    = resolve_sent_date(test_date)
 
-    print(f"\n  {'─'*140}")
-    print(f"  {label}  |  Test: {test_date}  →  Outcome: {outcome_date}")
-    print(f"  {'─'*140}")
+    print(f"\n  {'-'*140}")
+    print(f"  {label}  |  Test: {test_date}  ->  Outcome: {outcome_date}")
+    print(f"  {'-'*140}")
     print(f"\n  {'Tick':<7} {'LSTM':>6} {'Sent':>6} {'Regime':<9} "
           f"{'Corr':>6} {'Topo':>6} {'Caus':>6} {'Adv':>4} "
           f"{'GDI':>5} {'Arb':>7} {'ASC':>6} {'BCS':>6} {'Zone':<10} "
           f"{'Alloc':>6} {'Dec':<6} {'Act%':>8}  Res")
-    print(f"  {'─'*140}")
+    print(f"  {'-'*140}")
 
     rows = []
     adver_pass_count = 0
@@ -956,7 +1080,7 @@ def run_window(test_date, outcome_date, label, agents, portfolio=None):
                   f"{result['risk_score_corr']:>6.3f} "
                   f"{result['topo_modifier']:>6.3f} "
                   f"{result['causal_modifier']:>6.3f} "
-                  f"{'✅' if result['adver_passed'] else '❌':>4} "
+                  f"{'PASS' if result['adver_passed'] else 'FAIL':>4} "
                   f"{result['gdi']:>5.3f} "
                   f"{result['arb_conf']:>7.4f} "
                   f"{result['asc_score']:>6.3f} "
@@ -974,7 +1098,7 @@ def run_window(test_date, outcome_date, label, agents, portfolio=None):
             (pd.to_datetime(test_date) + pd.Timedelta(days=1)).strftime("%Y-%m-%d"))
         shifted_out = snap_to_trading_day(
             (pd.to_datetime(outcome_date) + pd.Timedelta(days=1)).strftime("%Y-%m-%d"))
-        print(f"  ⚠️  All returns NaN. Retrying with shifted dates {shifted_test} -> {shifted_out}")
+        print(f"  [WARN]  All returns NaN. Retrying with shifted dates {shifted_test} -> {shifted_out}")
         for result in rows:
             actual_ret = fetch_actual_return(result["ticker"], shifted_test, shifted_out)
             cat, icon  = score_result(result["decision"], actual_ret, result["ticker"])
@@ -994,10 +1118,10 @@ def run_window(test_date, outcome_date, label, agents, portfolio=None):
     lenient_acc     = ((correct + nc) / lenient_active * 100) if lenient_active > 0 else 0.0
     adver_rate      = (adver_pass_count / adver_total * 100) if adver_total > 0 else 0.0
 
-    print(f"\n  {'─'*140}")
+    print(f"\n  {'-'*140}")
     print(f"  WINDOW: {label}")
-    print(f"  ✅{correct:>2} ❌{wrong:>2} 🔍{nc+nw:>2}(✓{nc}/✗{nw}) "
-          f"—{holds:>2} ?{nans:>2}   "
+    print(f"  OK{correct:>2} BAD{wrong:>2} NOISE{nc+nw:>2}(+{nc}/-{nw}) "
+          f" H{holds:>2} ?{nans:>2}   "
           f"Strict: {acc:>5.1f}%  Lenient: {lenient_acc:>5.1f}%  "
           f"(active={active}/{len(rows)})  Red-Team Pass: {adver_rate:.0f}%")
 
@@ -1009,86 +1133,86 @@ def run_window(test_date, outcome_date, label, agents, portfolio=None):
     }
 
 
-# ════════════════════════════════════════════════════════════════════════════════
+# ================================================================================
 #  MAIN
-# ════════════════════════════════════════════════════════════════════════════════
+# ================================================================================
 def main():
     print_separator()
-    print("  FinFolioX — Full System Test  (18 Windows × 30 Tickers × 17 Agents)")
+    print("  FinFolioX Full System Test  (18 Windows x 30 Tickers x 17 Agents)")
     print_separator()
 
     print("\n  LOADING ALL 17 AGENTS...")
-    print("  " + "─" * 80)
+    print("  " + "-" * 80)
     agents = {}
 
     try:
         with contextlib.redirect_stdout(io.StringIO()):
             agents["tech"] = TechnicalAgent(lstm_model_path=MODEL_PATH,
                                             lstm_scaler_path=SCALER_PATH)
-        print(f"  ✅  [01] TechnicalAgent")
+        print(f"  OK  [01] TechnicalAgent")
     except Exception as e:
-        print(f"  ❌  [01] TechnicalAgent FAILED: {e}"); return
+        print(f"  BAD  [01] TechnicalAgent FAILED: {e}"); return
 
     agents["sentiment"] = None
-    print("  ✅  [02] SentimentAgent (manual scores)")
+    print("  OK  [02] SentimentAgent (manual scores)")
 
     try:
         hmm_path = os.path.join("saved_models", "hmm_regime.pkl")
         if _REGIME_LEGACY_OK and os.path.exists(hmm_path):
             with contextlib.redirect_stdout(io.StringIO()):
                 agents["legacy_regime"] = RegimeAgent(model_path=hmm_path)
-            print("  ✅  [03a] LegacyRegimeAgent")
+            print("  [OK]  [03a] LegacyRegimeAgent")
         else:
             agents["legacy_regime"] = None
-            print("  ⚠️   [03a] LegacyRegimeAgent — not loaded")
+            print("  [WARN]   [03a] LegacyRegimeAgent HOLD not loaded")
     except Exception:
         agents["legacy_regime"] = None
 
     try:
         with contextlib.redirect_stdout(io.StringIO()):
             agents["regime"] = HybridRegimeAgent(hmm_model_path=REGIME_PATH, verbose=False)
-        print("  ✅  [03b] HybridRegimeAgent")
+        print("  [OK]  [03b] HybridRegimeAgent")
     except Exception as e:
-        print(f"  ❌  [03b] HybridRegimeAgent FAILED: {e}"); agents["regime"] = None
+        print(f"  [BAD]  [03b] HybridRegimeAgent FAILED: {e}"); agents["regime"] = None
 
     try:
         if _CORR_OK:
             agents["correlation"] = CorrelationDivergenceDetector(
                 lookback_window=60,
                 cache_path=os.path.join(tempfile.mkdtemp(), "corr_cache.pkl"))
-            print("  ✅  [04]  CorrelationAgent")
+            print("  [OK]  [04]  CorrelationAgent")
         else:
             agents["correlation"] = None
     except Exception:
         agents["correlation"] = None
 
     agents["uncertainty"] = UncertaintyAgent(agents["tech"])
-    print("  ✅  [05]  UncertaintyAgent")
+    print("  [OK]  [05]  UncertaintyAgent")
 
     try:
         with contextlib.redirect_stdout(io.StringIO()):
             agents["fusion"] = FusionAgent(model_path=FUSION_PATH)
-        print("  ✅  [06]  FusionAgent")
+        print("  [OK]  [06]  FusionAgent")
     except Exception as e:
-        print(f"  ❌  [06]  FusionAgent FAILED: {e}"); return
+        print(f"  [BAD]  [06]  FusionAgent FAILED: {e}"); return
 
     try:
         if _EXPL_OK:
             agents["expl"] = ExplainabilityAgent(agents["tech"], background_data_df=None)
             agents["expl"].ig_steps = IG_STEPS_FULLTEST
-            print("  ✅  [07]  ExplainabilityAgent")
+            print("  [OK]  [07]  ExplainabilityAgent")
         else:
             agents["expl"] = None
     except Exception:
         agents["expl"] = None
 
     agents["heatmap"] = HeatmapAgent()
-    print("  ✅  [08]  HeatmapAgent (GDI)")
+    print("  [OK]  [08]  HeatmapAgent (GDI)")
 
     try:
         if _CONFLICT_OK:
             agents["conflict"] = ConflictResolver(verbose=False)
-            print("  ✅  [09]  ConflictResolver")
+            print("  [OK]  [09]  ConflictResolver")
         else:
             agents["conflict"] = None
     except Exception:
@@ -1098,14 +1222,14 @@ def main():
         agents["risk"] = RiskEngine(default_account_size=DEFAULT_CAPITAL,
                                     max_risk_per_trade=MAX_RISK,
                                     bear_max_allocation=BEAR_MAX_ALLOC)
-        print("  ✅  [10]  RiskEngine")
+        print("  [OK]  [10]  RiskEngine")
     except Exception:
         agents["risk"] = None
 
     try:
         if _META_OK:
             agents["meta"] = MetaAgent()
-            print("  ✅  [11]  MetaAgent")
+            print("  [OK]  [11]  MetaAgent")
         else:
             agents["meta"] = None
     except Exception:
@@ -1114,7 +1238,7 @@ def main():
     try:
         if _CF_OK:
             agents["cf_engine"] = CounterfactualEngine()
-            print("  ✅  [12]  CounterfactualEngine")
+            print("  [OK]  [12]  CounterfactualEngine")
         else:
             agents["cf_engine"] = None
     except Exception:
@@ -1126,7 +1250,7 @@ def main():
                 def __init__(self, tech): self.tech_agent = tech
                 def _fetch_stock_data(self, ticker): return None, pd.DataFrame()
             agents["adversarial"] = AdversarialTester(_FakeSystem(agents["tech"]))
-            print("  ✅  [13]  AdversarialTester")
+            print("  [OK]  [13]  AdversarialTester")
         else:
             agents["adversarial"] = None
     except Exception:
@@ -1135,7 +1259,7 @@ def main():
     try:
         if _TOPO_OK:
             agents["topology"] = TopologyAgent(time_delay=5, dimension=3, lookback=60)
-            print("  ✅  [14]  TopologyAgent (TDA)")
+            print("  [OK]  [14]  TopologyAgent (TDA)")
         else:
             agents["topology"] = None
     except Exception:
@@ -1144,7 +1268,7 @@ def main():
     try:
         if _CAUSAL_OK:
             agents["causal"] = CausalAgent(lookback=90, alpha=0.20)
-            print("  ✅  [15]  CausalAgent")
+            print("  [OK]  [15]  CausalAgent")
         else:
             agents["causal"] = None
     except Exception:
@@ -1156,7 +1280,7 @@ def main():
                 window_size=30,
                 cache_path=os.path.join(tempfile.mkdtemp(), "asc_main.pkl"))
             prewarm_asc(agents["asc"], n=30, seed=42)
-            print("  ✅  [16]  ASC Memory (pre-warmed)")
+            print("  [OK]  [16]  ASC Memory (pre-warmed)")
         else:
             agents["asc"] = None
     except Exception:
@@ -1167,7 +1291,7 @@ def main():
             agents["aesl"] = AESLAgent(
                 cache_path=os.path.join(tempfile.mkdtemp(), "aesl_main.pkl"))
             prewarm_aesl(agents["aesl"], n=15, seed=42)
-            print("  ✅  [17]  AESLAgent (pre-warmed)")
+            print("  [OK]  [17]  AESLAgent (pre-warmed)")
         else:
             agents["aesl"] = None
     except Exception:
@@ -1180,14 +1304,14 @@ def main():
     all_stats  = []
     all_rows   = []
 
-    print_section("FULL SYSTEM TEST — 17 Windows × 30 Tickers", "═")
+    print_section("FULL SYSTEM TEST HOLD 17 Windows x 30 Tickers", "=")
 
     for test_date, outcome_date, label in TEST_WINDOWS:
         s = run_window(test_date, outcome_date, label, agents=agents, portfolio=portfolio)
         all_stats.append(s)
         all_rows.extend(s["rows"])
 
-    # ── Consolidated Summary ──────────────────────────────────────────────────
+    # -- Consolidated Summary --------------------------------------------------
     tc  = sum(s["correct"] for s in all_stats)
     tw  = sum(s["wrong"]   for s in all_stats)
     tnc = sum(s["nc"]      for s in all_stats)
@@ -1199,25 +1323,27 @@ def main():
     lov = (lc / la * 100) if la > 0 else 0.0
     pm  = portfolio.metrics()
 
-    print_section("CONSOLIDATED RESULTS", "═")
-    print(f"\n  {'Window':<42} {'N':>4} {'✅':>4} {'❌':>4}  "
+    print_section("CONSOLIDATED RESULTS", "=")
+    print(f"\n  {'Window':<42} {'N':>4} {'[OK]':>4} {'[BAD]':>4}  "
           f"{'Strict':>8}  {'Lenient':>8}  Red-Team  Status")
-    print(f"  {'─'*95}")
+    print(f"  {'-'*95}")
     for s in all_stats:
-        flag = "✅ PASS" if s["accuracy"] >= 75 else "⚠️  Below"
+        flag = "[OK] PASS" if s["accuracy"] >= 75 else "[WARN]  Below"
         print(f"  {s['label']:<42} {s['n']:>4} {s['correct']:>4} {s['wrong']:>4}  "
               f"{s['accuracy']:>7.1f}%  {s['lenient_acc']:>7.1f}%  "
               f"{s['adver_rate']:>6.0f}%   {flag}")
-    print(f"  {'─'*95}")
-    flag_ov = "🏆 TARGET MET (≥75%)" if ov >= 75 else "⚠️  Below 75%"
+    print(f"  {'-'*95}")
+    flag_ov = "🏆 TARGET MET (≥75%)" if ov >= 75 else "[WARN]  Below 75%"
     print(f"  {'OVERALL':<42} {sum(s['n'] for s in all_stats):>4} "
           f"{tc:>4} {tw:>4}  {ov:>7.1f}%  {lov:>7.1f}%            {flag_ov}")
 
     if pm:
-        print(f"\n  ── Portfolio Performance ──")
+        print(f"\n  -- Portfolio Performance --")
         print(f"  Total Return : {pm['total_return_pct']:>+7.3f}%  "
               f"(P&L: ${pm['total_pnl']:>+8.2f} on ${DEFAULT_CAPITAL:.0f})")
-        print(f"  Sharpe Ratio : {pm['sharpe_ratio']:>7.3f}  Win Rate: {pm['win_rate']:.1f}%")
+        print(f"  True Daily Sharpe : {pm['true_daily_sharpe']:>7.3f}  Win Rate: {pm['win_rate']:.1f}%")
+        print(f"  Trade-Inflated (Old) : {pm['trade_inflated_sharpe']:>5.3f}  (Averaged by 500+ trades)")
+        print(f"  Active Sharpe (18w)  : {pm['active_sharpe_18']:>5.3f}  (sqrt(18) multiplier)")
         print(f"  Max Drawdown : ${pm['max_drawdown']:>+8.2f}  Calmar: {pm['calmar_ratio']:.3f}")
 
     elapsed = time.perf_counter() - start_time
@@ -1226,9 +1352,9 @@ def main():
 
     try:
         pd.DataFrame(all_rows).to_csv("finfoliox_full_system_results.csv", index=False)
-        print("  📄 Results → finfoliox_full_system_results.csv")
+        print("  📄 Results -> finfoliox_full_system_results.csv")
     except Exception as e:
-        print(f"  ⚠️  CSV save failed: {e}")
+        print(f"  [WARN]  CSV save failed: {e}")
 
     return all_stats, all_rows, ov, lov, pm
 

@@ -30,7 +30,7 @@ def compute_rsi(series, window=14):
 # -----------------------------
 def add_technical_indicators():
     if not os.path.exists(INPUT_PATH):
-        print("❌ Raw data not found. Run fetch_stock_data.py first.")
+        print("[BAD] Raw data not found. Run fetch_stock_data.py first.")
         return
 
     # -----------------------------
@@ -87,7 +87,7 @@ def add_technical_indicators():
     os.makedirs(os.path.dirname(OUTPUT_PATH), exist_ok=True)
     df.to_csv(OUTPUT_PATH)
 
-    print(f"✅ Features added successfully!")
+    print(f"[OK] Features added successfully!")
     print(f"📁 Saved to: {OUTPUT_PATH}")
     print("\n📊 Sample Output:")
     print(df[['Close', 'SMA_50', 'RSI', 'MACD']].head())

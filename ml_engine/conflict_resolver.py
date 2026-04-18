@@ -1,30 +1,30 @@
 """
-ml_engine/conflict_resolver.py  —  Conflict Resolution Engine v2.5
+ml_engine/conflict_resolver.py  HOLD  Conflict Resolution Engine v2.5
 ====================================================================
 PHASE 13: NEURO-SYMBOLIC ARBITRATOR
 
 CHANGELOG v2.5 (production-activation fixes):
 
-  ROOT CAUSE 1 FIXED — Raw spread was catching false conflicts:
-    lstm=0.0 (bearish) + sent=-0.08 → sent_norm=0.46 (neutral) → spread=0.46
-    Old code: spread > 0.35 → CONFLICT → Bear regime → HOLD
+  ROOT CAUSE 1 FIXED HOLD Raw spread was catching false conflicts:
+    lstm=0.0 (bearish) + sent=-0.08 -> sent_norm=0.46 (neutral) -> spread=0.46
+    Old code: spread > 0.35 -> CONFLICT -> Bear regime -> HOLD
     WRONG: that converts a correct SELL into HOLD, hurting accuracy.
     FIX: Replace raw spread with DIRECTIONAL conflict detection.
     Conflict only fires when LSTM and sentiment point in OPPOSING directions:
-      • LSTM > 0.55 (bullish) AND sent_norm < 0.45 (bearish) → CONFLICT
-      • LSTM < 0.45 (bearish) AND sent_norm > 0.55 (bullish) → CONFLICT
-      • Either is NEUTRAL (0.45–0.55) → NO conflict (let fusion decide)
+      • LSTM > 0.55 (bullish) AND sent_norm < 0.45 (bearish) -> CONFLICT
+      • LSTM < 0.45 (bearish) AND sent_norm > 0.55 (bullish) -> CONFLICT
+      • Either is NEUTRAL (0.45–0.55) -> NO conflict (let fusion decide)
     Backup: spread ≥ 0.55 still fires as extreme-case safety net.
 
-  ROOT CAUSE 2 FIXED — Material mild adjustments not counted as arbitrated:
-    In no-conflict path, GLD conf 0.83→0.71 (Δ-0.12), BAC 0.93→0.79 (Δ-0.14)
-    were happening but arbitrated=False → 1.4% rate even with real conf changes.
+  ROOT CAUSE 2 FIXED HOLD Material mild adjustments not counted as arbitrated:
+    In no-conflict path, GLD conf 0.83->0.71 (Δ-0.12), BAC 0.93->0.79 (Δ-0.14)
+    were happening but arbitrated=False -> 1.4% rate even with real conf changes.
     FIX: Any |conf_change| > MATERIAL_CHANGE_THRESHOLD (0.02) in mild path
     sets arbitrated=True with ruling="MILD_ADJUST".
 
-  UNCERTAINTY_HIGH = 0.15   (v2.3 fix — kept)
+  UNCERTAINTY_HIGH = 0.15   (v2.3 fix HOLD kept)
   Systemic veto: only fires when regime != "Bull" AND tech bearish  (v2.3 kept)
-  Mild penalty floor: 0.85× max  (v2.3 kept)
+  Mild penalty floor: 0.85x max  (v2.3 kept)
   Regime discount thresholds: Bull > 0.40, Sideways > 0.55  (v2.4)
 
 Expected arbitration rate after these fixes:
@@ -33,10 +33,10 @@ Expected arbitration rate after these fixes:
   Combined           : ~15–30% per window (vs 1.4% before)
 
 Tie-Breaker priority (unchanged):
-  C. Systemic Veto      — blocks if macro toxic AND bearish AND not Bull
-  A. Bayesian Certainty — favours lower-uncertainty agent
-  B. Regime Context     — aligns with prevailing market regime
-     B.5 Trust Scores   — Phase 14 MetaAgent if trust gap ≥ 0.10
+  C. Systemic Veto      HOLD blocks if macro toxic AND bearish AND not Bull
+  A. Bayesian Certainty HOLD favours lower-uncertainty agent
+  B. Regime Context     HOLD aligns with prevailing market regime
+     B.5 Trust Scores   HOLD Phase 14 MetaAgent if trust gap ≥ 0.10
 """
 
 import numpy as np
@@ -49,8 +49,8 @@ logger = logging.getLogger("ConflictResolver")
 # CONFIGURATION
 # ==============================================================================
 
-# Directional thresholds — calibrated for real FinBERT scale (±0.10 to ±0.24)
-# FinBERT -0.12 → sent_norm 0.44 → BEAR.  FinBERT +0.12 → sent_norm 0.56 → BULL.
+# Directional thresholds HOLD calibrated for real FinBERT scale (±0.10 to ±0.24)
+# FinBERT -0.12 -> sent_norm 0.44 -> BEAR.  FinBERT +0.12 -> sent_norm 0.56 -> BULL.
 BULL_DIR_THRESHOLD       = 0.55   # sent_norm or tech_score above this = BULL direction
 BEAR_DIR_THRESHOLD       = 0.45   # sent_norm or tech_score below this = BEAR direction
 EXTREME_SPREAD_BACKUP    = 0.65   # tighter backup for truly extreme mismatch only
@@ -62,9 +62,9 @@ MATERIAL_CHANGE_THRESHOLD= 0.02   # min |Δconf| to flag mild path as arbitrated
 
 # Regime-aware risk discount (v2.4 calibrated thresholds)
 REGIME_RISK_DISCOUNT = {
-    "Bull":     (0.40, 0.50),   # risk > 0.40 in Bull → halved
-    "Sideways": (0.55, 0.75),   # risk > 0.55 in Sideways → 25% cut
-    "Bear":     (1.01, 1.00),   # Bear → no discount
+    "Bull":     (0.40, 0.50),   # risk > 0.40 in Bull -> halved
+    "Sideways": (0.55, 0.75),   # risk > 0.55 in Sideways -> 25% cut
+    "Bear":     (1.01, 1.00),   # Bear -> no discount
 }
 
 VALID_RULINGS = frozenset({
@@ -80,7 +80,7 @@ class ConflictResolver:
     """
     Neuro-Symbolic Arbitrator v2.5.
 
-    Uses DIRECTIONAL conflict detection — only fires when LSTM and
+    Uses DIRECTIONAL conflict detection HOLD only fires when LSTM and
     sentiment point in genuinely opposing directions.  This prevents
     the false-conflict problem where lstm=0 + slightly-negative sentiment
     (both bearish) was being detected as a conflict and converting correct
@@ -112,15 +112,15 @@ class ConflictResolver:
         self.verbose                 = verbose
         self._history: list          = []
 
-        print("   ✅ Phase 13: Conflict Resolution Engine v2.5 (Arbitrator) Initialized.")
+        print("   [OK] Phase 13: Conflict Resolution Engine v2.5 (Arbitrator) Initialized.")
         print(f"      Directional: bull>{bull_dir_threshold}  bear<{bear_dir_threshold}  "
               f"spread_backup≥{extreme_spread_backup}")
         print(f"      unc_high={uncertainty_high}  veto={systemic_veto_threshold}  "
               f"material_Δ>{MATERIAL_CHANGE_THRESHOLD}")
 
-    # ──────────────────────────────────────────────────────────────────────────
+    # --------------------------------------------------------------------------
     # MAIN ENTRY POINT
-    # ──────────────────────────────────────────────────────────────────────────
+    # --------------------------------------------------------------------------
     def arbitrate(self,
                   tech_score:        float,
                   sent_score:        float,
@@ -137,7 +137,7 @@ class ConflictResolver:
         regime_discounted = False
         self._trust       = trust_scores or {}
 
-        # ── Step 0: Regime-aware risk discount ────────────────────────────────
+        # -- Step 0: Regime-aware risk discount --------------------------------
         risk_score, regime_discounted, discount_note = self._apply_regime_risk_discount(
             risk_score, regime_label
         )
@@ -145,10 +145,10 @@ class ConflictResolver:
             reasoning.append(discount_note)
             arbitrated = True
 
-        # ── Step 1: Normalise sentiment to [0, 1] ─────────────────────────────
+        # -- Step 1: Normalise sentiment to [0, 1] -----------------------------
         sent_norm = float(np.clip((sent_score + 1.0) / 2.0, 0.0, 1.0))
 
-        # ── Step 2: Directional conflict detection (v2.5 core fix) ───────────
+        # -- Step 2: Directional conflict detection (v2.5 core fix) -----------
         lstm_dir = self._classify_direction(tech_score)
         sent_dir = self._classify_direction(sent_norm)
         spread   = abs(tech_score - sent_norm)
@@ -158,7 +158,7 @@ class ConflictResolver:
             (lstm_dir == "BULL" and sent_dir == "BEAR") or
             (lstm_dir == "BEAR" and sent_dir == "BULL")
         )
-        # Extreme spread backup — catches very high spread even without clear direction
+        # Extreme spread backup HOLD catches very high spread even without clear direction
         extreme_spread = (
             spread >= self.extreme_spread_backup
             and abs(sent_score) > 0.15
@@ -173,10 +173,10 @@ class ConflictResolver:
             f"directional={directional_conflict}  extreme={extreme_spread}"
         )
 
-        # ══════════════════════════════════════════════════════════════════════
+        # ======================================================================
         # TIE-BREAKER C: SYSTEMIC VETO (highest priority)
         # Only fires: risk high AND tech bearish AND not Bull regime
-        # ══════════════════════════════════════════════════════════════════════
+        # ======================================================================
         tech_is_bearish = tech_score < 0.45
         veto_eligible   = (risk_score > self.systemic_veto_threshold
                            and tech_is_bearish
@@ -195,12 +195,12 @@ class ConflictResolver:
                 lstm_dir, sent_dir, spread
             )
 
-        # ══════════════════════════════════════════════════════════════════════
+        # ======================================================================
         # NO CONFLICT PATH (mild adjustments only)
-        # ══════════════════════════════════════════════════════════════════════
+        # ======================================================================
         if not conflict_triggered:
             reasoning.append(
-                f"✅ No directional conflict — applying mild adjustments."
+                f"[OK] No directional conflict HOLD applying mild adjustments."
             )
             adj_before    = fusion_confidence
             adjusted_conf = self._apply_mild_adjustments(
@@ -213,7 +213,7 @@ class ConflictResolver:
                 ruling     = "MILD_ADJUST"
                 reasoning.append(
                     f"ℹ️  Material adjustment Δ={adjusted_conf-adj_before:+.4f} "
-                    f"→ flagged MILD_ADJUST."
+                    f"-> flagged MILD_ADJUST."
                 )
             return self._build_and_record(
                 arbitrated, fusion_confidence, adjusted_conf,
@@ -221,33 +221,33 @@ class ConflictResolver:
                 lstm_dir, sent_dir, spread
             )
 
-        # ══════════════════════════════════════════════════════════════════════
+        # ======================================================================
         # CONFLICT DETECTED (directional or extreme spread)
-        # ══════════════════════════════════════════════════════════════════════
+        # ======================================================================
         conflict_type = "DIRECTIONAL" if directional_conflict else "EXTREME_SPREAD"
         reasoning.append(
             f"🚨 CONFLICT ({conflict_type}): "
-            f"{lstm_dir} LSTM vs {sent_dir} Sentiment → Arbitration."
+            f"{lstm_dir} LSTM vs {sent_dir} Sentiment -> Arbitration."
         )
         arbitrated = True
 
-        # ── TIE-BREAKER A: Bayesian Certainty ─────────────────────────────────
+        # -- TIE-BREAKER A: Bayesian Certainty ---------------------------------
         if mc_std > self.uncertainty_high:
             reasoning.append(
                 f"🎲 Bayesian: mc_std={mc_std:.4f} > {self.uncertainty_high} "
-                f"→ Technical UNCERTAIN. Deferring to Sentiment."
+                f"-> Technical UNCERTAIN. Deferring to Sentiment."
             )
             if sent_norm < 0.40:
                 adjusted_conf = min(fusion_confidence, 0.35)
                 ruling        = "ALIGN_BEAR"
-                reasoning.append("   Sentiment bearish + uncertain → capped 0.35.")
+                reasoning.append("   Sentiment bearish + uncertain -> capped 0.35.")
             else:
                 adjusted_conf = max(fusion_confidence, sent_norm)
                 ruling        = "ALIGN_BULL"
-                reasoning.append(f"   Sentiment bullish + uncertain → raised to {adjusted_conf:.4f}.")
+                reasoning.append(f"   Sentiment bullish + uncertain -> raised to {adjusted_conf:.4f}.")
         else:
             reasoning.append(
-                f"🎲 Bayesian: mc_std={mc_std:.4f} ≤ {self.uncertainty_high} → Both confident."
+                f"🎲 Bayesian: mc_std={mc_std:.4f} ≤ {self.uncertainty_high} -> Both confident."
             )
             adjusted_conf, ruling = self._trust_or_regime_tiebreak(
                 tech_score, sent_norm, regime_label, fusion_confidence, reasoning
@@ -259,36 +259,36 @@ class ConflictResolver:
             lstm_dir, sent_dir, spread
         )
 
-    # ──────────────────────────────────────────────────────────────────────────
+    # --------------------------------------------------------------------------
     # DIRECTIONAL CLASSIFIER (v2.5 new)
-    # ──────────────────────────────────────────────────────────────────────────
+    # --------------------------------------------------------------------------
     def _classify_direction(self, score: float) -> str:
         """
         Classify a 0–1 probability as BULL, BEAR, or NEUTRAL.
-        Calibrated for FinBERT range: ±0.10–0.24 → sent_norm ∈ [0.38, 0.62].
+        Calibrated for FinBERT range: ±0.10–0.24 -> sent_norm ∈ [0.38, 0.62].
         """
         if score > self.bull_dir_threshold:  return "BULL"
         if score < self.bear_dir_threshold:  return "BEAR"
         return "NEUTRAL"
 
-    # ──────────────────────────────────────────────────────────────────────────
+    # --------------------------------------------------------------------------
     # REGIME-AWARE RISK DISCOUNT
-    # ──────────────────────────────────────────────────────────────────────────
+    # --------------------------------------------------------------------------
     def _apply_regime_risk_discount(self, risk_score: float,
                                     regime_label: str) -> tuple:
         threshold, factor = REGIME_RISK_DISCOUNT.get(regime_label, (1.01, 1.00))
         if risk_score > threshold:
             discounted = risk_score * factor
             note = (
-                f"Regime={regime_label}: risk {risk_score:.3f}→{discounted:.3f} "
-                f"(×{factor:.2f} discount)"
+                f"Regime={regime_label}: risk {risk_score:.3f}->{discounted:.3f} "
+                f"(x{factor:.2f} discount)"
             )
             return discounted, True, note
         return risk_score, False, ""
 
-    # ──────────────────────────────────────────────────────────────────────────
+    # --------------------------------------------------------------------------
     # TRUST SCORES + REGIME TIE-BREAKER
-    # ──────────────────────────────────────────────────────────────────────────
+    # --------------------------------------------------------------------------
     def _trust_or_regime_tiebreak(self, tech_score, sent_norm, regime_label,
                                   fusion_confidence, reasoning) -> tuple:
         tech_trust = self._trust.get("technical", 1.0)
@@ -310,9 +310,9 @@ class ConflictResolver:
                 return max(fusion_confidence, sent_norm * 0.90), "TRUST_SENTIMENT_BULL"
         else:
             if self._trust:
-                reasoning.append(f"📊 Trust gap ({trust_gap:.2f}) < 0.10 → Regime.")
+                reasoning.append(f"📊 Trust gap ({trust_gap:.2f}) < 0.10 -> Regime.")
             else:
-                reasoning.append("📊 No trust data → Regime.")
+                reasoning.append("📊 No trust data -> Regime.")
             return self._regime_tiebreak(
                 tech_score, sent_norm, regime_label, fusion_confidence, reasoning
             )
@@ -321,25 +321,25 @@ class ConflictResolver:
                          fusion_confidence, reasoning) -> tuple:
         if regime_label == "Bear":
             reasoning.append(
-                "⛈️  Regime=Bear → pessimism wins. Forcing HOLD (don't trade conflict)."
+                "⛈️  Regime=Bear -> pessimism wins. Forcing HOLD (don't trade conflict)."
             )
             return HOLD_CONFIDENCE * 0.80, "HOLD"
         elif regime_label == "Bull":
             bullish_val = max(tech_score, sent_norm)
             reasoning.append(
-                f"☀️  Regime=Bull → optimism wins → aligning to {bullish_val:.4f}."
+                f"☀️  Regime=Bull -> optimism wins -> aligning to {bullish_val:.4f}."
             )
             return max(fusion_confidence, bullish_val * 0.90), "ALIGN_BULL"
         else:
             reasoning.append(
-                "🌥️  Regime=Sideways → preserve directional lean (soft HOLD)."
+                "🌥️  Regime=Sideways -> preserve directional lean (soft HOLD)."
             )
             blend = max(fusion_confidence * 0.85, 0.48)
             return blend, "HOLD"
 
-    # ──────────────────────────────────────────────────────────────────────────
+    # --------------------------------------------------------------------------
     # MILD ADJUSTMENTS (risk + uncertainty penalties)
-    # ──────────────────────────────────────────────────────────────────────────
+    # --------------------------------------------------------------------------
     def _apply_mild_adjustments(self, confidence: float, risk_score: float,
                                 mc_std: float, reasoning: list) -> float:
         adj = confidence
@@ -349,20 +349,20 @@ class ConflictResolver:
             penalty     = max(raw_penalty, 0.60)
             adj        *= penalty
             if self.verbose:
-                reasoning.append(f"⚠️  Risk penalty: ×{penalty:.2f} → {adj:.4f}")
+                reasoning.append(f"[WARN]  Risk penalty: x{penalty:.2f} -> {adj:.4f}")
 
         if mc_std > 0.05:
             raw_penalty = 1.0 - (mc_std - 0.05) * 2.0
             penalty     = max(raw_penalty, _UNC_PENALTY_FLOOR)
             adj        *= penalty
             if self.verbose:
-                reasoning.append(f"⚠️  Unc penalty: ×{penalty:.2f} → {adj:.4f}")
+                reasoning.append(f"[WARN]  Unc penalty: x{penalty:.2f} -> {adj:.4f}")
 
         return float(adj)
 
-    # ──────────────────────────────────────────────────────────────────────────
+    # --------------------------------------------------------------------------
     # RESULT BUILDER + HISTORY LOG
-    # ──────────────────────────────────────────────────────────────────────────
+    # --------------------------------------------------------------------------
     def _build_and_record(self, arbitrated, original, adjusted,
                           ruling, reasoning, regime_discounted,
                           lstm_dir="?", sent_dir="?", spread=0.0) -> dict:
@@ -387,9 +387,9 @@ class ConflictResolver:
         })
         return result
 
-    # ──────────────────────────────────────────────────────────────────────────
+    # --------------------------------------------------------------------------
     # BATCH STATS
-    # ──────────────────────────────────────────────────────────────────────────
+    # --------------------------------------------------------------------------
     def get_stats(self) -> dict:
         if not self._history:
             return {}
@@ -423,14 +423,14 @@ class ConflictResolver:
     def reset_history(self):
         self._history.clear()
 
-    # ──────────────────────────────────────────────────────────────────────────
+    # --------------------------------------------------------------------------
     # DISPLAY
-    # ──────────────────────────────────────────────────────────────────────────
+    # --------------------------------------------------------------------------
     @staticmethod
     def print_report(result: dict):
         print("\n   ⚖️  [Conflict Arbitrator v2.5] Decision Audit")
-        print("   " + "─" * 60)
-        tag = "✅ NO_CONFLICT" if result["ruling"] == "NO_CONFLICT" else f"🚨 {result['ruling']}"
+        print("   " + "-" * 60)
+        tag = "[OK] NO_CONFLICT" if result["ruling"] == "NO_CONFLICT" else f"🚨 {result['ruling']}"
         print(f"      Ruling   : {tag}")
         if result.get("regime_discounted"):
             print(f"      🎯 Regime risk discount applied")
@@ -440,11 +440,11 @@ class ConflictResolver:
         print(f"      Reasoning:")
         for i, r in enumerate(result["reasoning"], 1):
             print(f"        {i}. {r}")
-        print("   " + "─" * 60)
+        print("   " + "-" * 60)
 
-    # ──────────────────────────────────────────────────────────────────────────
+    # --------------------------------------------------------------------------
     # LEGACY COMPAT
-    # ──────────────────────────────────────────────────────────────────────────
+    # --------------------------------------------------------------------------
     def get_regret_penalty(self, regret_score: float) -> float:
         if regret_score <= 0.01: return 0.0
         if regret_score <= 0.05: return -0.15

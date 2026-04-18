@@ -1,33 +1,33 @@
 """
-test_aesl.py  —  Agent Epistemic State Ledger (AESL) Backtest v2.2
+test_aesl.py  HOLD  Agent Epistemic State Ledger (AESL) Backtest v2.2
 ====================================================================
-FinFolioX — Phase 27  |  4 Windows × 30 Tickers  |  Research Paper Version
+FinFolioX HOLD Phase 27  |  4 Windows x 30 Tickers  |  Research Paper Version
 
 WHAT CHANGED FROM v2.1:
   FIX-10: BCS zone boundaries restructured (HARMONY<0.25, MILD<0.38).
     Unit test 16: verifies all new boundary values exactly.
 
-  FIX-11: Force-hold threshold 0.70→0.75. H4 uses directional error counting.
-    Unit test 17a: BCS=0.749 → no force_hold. BCS=0.750 → force_hold fires.
+  FIX-11: Force-hold threshold 0.70->0.75. H4 uses directional error counting.
+    Unit test 17a: BCS=0.749 -> no force_hold. BCS=0.750 -> force_hold fires.
     Unit test 17b: is_directionally_wrong() helper validated 6 cases.
     Integration: H4 counts every SELL+rise or BUY+fall in HIGH/CRITICAL zone,
     regardless of noise_band magnitude.
 
   FIX-12: BUY signal expansion.
-    BUY_THRESHOLD 0.52→0.50. apply_gates cap 0.58→0.62. Bear BUY: ≥0.55 / <0.62.
+    BUY_THRESHOLD 0.52->0.50. apply_gates cap 0.58->0.62. Bear BUY: ≥0.55 / <0.62.
     Unit test 18: 8 scenarios covering new thresholds and gates.
 
-  FIX-13: Override guard raised 2.0→3.0.
-    When force_hold fires, revert adj_dec→raw_dec if evidence_score<3.0.
+  FIX-13: Override guard raised 2.0->3.0.
+    When force_hold fires, revert adj_dec->raw_dec if evidence_score<3.0.
     Protects correct SELLs on TLT (score=2.8,−1.6%), SLV (score=2.8,−16%),
     MSFT (score=2.8,−4.1%).
     Unit test 19: 6 cases including exact boundary (3.0 = keep HOLD).
 
   Unit test 14 CORRECTED: Evidence gate test expectations fixed to match
     actual two-step gate logic:
-      CRITICAL+n_full=2 → HIGH (one downgrade, then HIGH holds at BCS≥0.65)
-      CRITICAL+n_full=1 → MODERATE (two downgrades: CRITICAL→HIGH→MODERATE)
-      HIGH+n_full=1     → MODERATE (n_full gate fires regardless of BCS)
+      CRITICAL+n_full=2 -> HIGH (one downgrade, then HIGH holds at BCS≥0.65)
+      CRITICAL+n_full=1 -> MODERATE (two downgrades: CRITICAL->HIGH->MODERATE)
+      HIGH+n_full=1     -> MODERATE (n_full gate fires regardless of BCS)
     Previous v2.1 test expectations were wrong for these cases.
 
   Unit test 7 CORRECTED: force_hold threshold test uses BCS=0.76 (≥0.75).
@@ -35,7 +35,7 @@ WHAT CHANGED FROM v2.1:
 
 HYPOTHESES:
   H1: AESL P&L delta positive (saves capital on wrong decisions).
-  H2: Directional accuracy monotonically decreases HARMONY→CRITICAL.
+  H2: Directional accuracy monotonically decreases HARMONY->CRITICAL.
   H3: Bear regime has higher mean BCS than Sideways.
   H4: HIGH/CRITICAL warning precision ≥50% (directional error rate).
   H5: LSTM↔Regime share of dominant conflicts < 70%.
@@ -205,7 +205,7 @@ def fetch_actual_return(ticker: str, test_date: str, outcome_date: str) -> float
 def apply_gates(conf: float, lstm: float, sent: float,
                 regime: str, rc: float) -> float:
     """
-    FIX-12: cap raised 0.58→0.62 for sent<−0.05 and lstm>0.55.
+    FIX-12: cap raised 0.58->0.62 for sent<−0.05 and lstm>0.55.
     Strong LSTM signal deserves higher confidence ceiling even with mild
     negative sentiment, enabling it to reach BUY_THRESHOLD in non-Bear.
     """
@@ -252,9 +252,9 @@ def is_directionally_wrong(decision: str, actual_ret: float) -> bool:
     """
     FIX-11: H4 directional error.
     Returns True if the decision direction is wrong regardless of magnitude.
-    SELL + actual_ret > 0 → wrong direction.
-    BUY  + actual_ret < 0 → wrong direction.
-    HOLD or NaN → always False.
+    SELL + actual_ret > 0 -> wrong direction.
+    BUY  + actual_ret < 0 -> wrong direction.
+    HOLD or NaN -> always False.
     """
     if np.isnan(actual_ret) or decision == "HOLD":
         return False
@@ -266,12 +266,12 @@ def is_directionally_wrong(decision: str, actual_ret: float) -> bool:
 
 
 # ==============================================================================
-# PART 1 — UNIT TESTS  (19 tests in v2.2)
+# PART 1 HOLD UNIT TESTS  (19 tests in v2.2)
 # ==============================================================================
 
 def run_unit_tests() -> bool:
     print("\n" + "=" * 80)
-    print("  PART 1 — UNIT TESTS v2.2  (FIX-1..13 validation, 19 test blocks)")
+    print("  PART 1 HOLD UNIT TESTS v2.2  (FIX-1..13 validation, 19 test blocks)")
     print("=" * 80)
 
     passed = failed = 0
@@ -285,13 +285,13 @@ def run_unit_tests() -> bool:
         else:
             print(f"  \u274c {name}  {detail}"); failed += 1
 
-    # ── Test 1: Perfect agreement ──────────────────────────────────────────
-    print("\n── Test 1: Perfect Agreement ───────────────────────────────────────")
+    # -- Test 1: Perfect agreement ------------------------------------------
+    print("\n-- Test 1: Perfect Agreement ---------------------------------------")
     r = aesl.analyze(lstm_signal=0.82, sent_score=0.20, regime_label="Bull",
                      mc_std=0.04, causal_modifier=1.05, topology_chaos=0.25,
                      regime_confidence=0.88)
     check("BCS in [0, 1]",               0.0 <= r.bcs <= 1.0,            f"got {r.bcs}")
-    check("Agreement → HARMONY or MILD", r.zone in ("HARMONY","MILD"),   f"got {r.zone}")
+    check("Agreement -> HARMONY or MILD", r.zone in ("HARMONY","MILD"),   f"got {r.zone}")
     check("Multiplier ≥ 0.90",           r.position_multiplier >= 0.90,  f"got {r.position_multiplier}")
     check("Returns AESLResult",          isinstance(r, AESLResult))
     check("beliefs ≥ 4",                 len(r.beliefs) >= 4)
@@ -306,8 +306,8 @@ def run_unit_tests() -> bool:
     print(f"    BCS={r.bcs:.4f}  Zone={r.zone}  Mult={r.position_multiplier}  "
           f"Composite={r.composite_multiplier}")
 
-    # ── Test 2: Full contradiction ─────────────────────────────────────────
-    print("\n── Test 2: Full Contradiction ──────────────────────────────────────")
+    # -- Test 2: Full contradiction -----------------------------------------
+    print("\n-- Test 2: Full Contradiction --------------------------------------")
     r2 = aesl.analyze(lstm_signal=0.88, sent_score=-0.45, regime_label="Bear",
                       mc_std=0.09, causal_modifier=0.82, topology_chaos=0.75,
                       regime_confidence=0.85)
@@ -319,8 +319,8 @@ def run_unit_tests() -> bool:
     print(f"    BCS={r2.bcs:.4f}  Zone={r2.zone}  FullContrads={r2.n_full_contradict}  "
           f"evidence_score={r2.evidence_score}")
 
-    # ── Test 3: Monotonicity ───────────────────────────────────────────────
-    print("\n── Test 3: BCS Monotonicity ────────────────────────────────────────")
+    # -- Test 3: Monotonicity -----------------------------------------------
+    print("\n-- Test 3: BCS Monotonicity ----------------------------------------")
     r_low  = aesl.analyze(0.75,  0.15, "Bull",     0.03, regime_confidence=0.85)
     r_mid  = aesl.analyze(0.60, -0.08, "Sideways", 0.10, regime_confidence=0.72)
     r_high = aesl.analyze(0.85, -0.50, "Bear",     0.12, regime_confidence=0.88)
@@ -328,8 +328,8 @@ def run_unit_tests() -> bool:
     check("mid ≤ high BCS", r_mid.bcs  <= r_high.bcs, f"mid={r_mid.bcs:.4f}  high={r_high.bcs:.4f}")
     print(f"    low={r_low.bcs:.4f}  mid={r_mid.bcs:.4f}  high={r_high.bcs:.4f}")
 
-    # ── Test 4: Zone table (FIX-10 boundaries) ────────────────────────────
-    print("\n── Test 4: Zone Table — FIX-10 boundaries ──────────────────────────")
+    # -- Test 4: Zone table (FIX-10 boundaries) ----------------------------
+    print("\n-- Test 4: Zone Table HOLD FIX-10 boundaries --------------------------")
     eng = aesl.bcs_engine
     cases = [
         (0.00, "HARMONY"), (0.10, "HARMONY"), (0.20, "HARMONY"), (0.24, "HARMONY"),
@@ -340,60 +340,60 @@ def run_unit_tests() -> bool:
     ]
     for bv, exp in cases:
         z, m = eng.get_zone(bv)
-        check(f"BCS={bv} → {exp}", z == exp, f"got {z}")
+        check(f"BCS={bv} -> {exp}", z == exp, f"got {z}")
         check(f"  mult ∈ [0.30,1.00]", 0.30 <= m <= 1.00, f"got {m}")
 
-    # ── Test 5: Contradiction table ────────────────────────────────────────
-    print("\n── Test 5: Contradiction Scores ────────────────────────────────────")
+    # -- Test 5: Contradiction table ----------------------------------------
+    print("\n-- Test 5: Contradiction Scores ------------------------------------")
     check("UP\u2194DOWN = 1.0",  CONTRADICTION_TABLE[(DIR_UP,   DIR_DOWN)]  == 1.0)
     check("DOWN\u2194UP = 1.0",  CONTRADICTION_TABLE[(DIR_DOWN, DIR_UP)]    == 1.0)
     check("UP\u2194UP = 0.0",    CONTRADICTION_TABLE[(DIR_UP,   DIR_UP)]    == 0.0)
     check("UP\u2194FLAT = 0.4",  CONTRADICTION_TABLE[(DIR_UP,   DIR_FLAT)]  == 0.4)
     check("FLAT\u2194DOWN = 0.4",CONTRADICTION_TABLE[(DIR_FLAT, DIR_DOWN)]  == 0.4)
 
-    # ── Test 6: Belief extraction (FIX-2, FIX-3) ──────────────────────────
-    print("\n── Test 6: Belief Extraction (FIX-2 LSTM, FIX-3 Sigmoid Sent) ─────")
+    # -- Test 6: Belief extraction (FIX-2, FIX-3) --------------------------
+    print("\n-- Test 6: Belief Extraction (FIX-2 LSTM, FIX-3 Sigmoid Sent) -----")
     ext = aesl.extractor
-    check("LSTM 0.80 → UP",            ext.extract_trend_belief(0.80).direction == DIR_UP)
-    check("LSTM 0.20 → DOWN",          ext.extract_trend_belief(0.20).direction == DIR_DOWN)
-    check("LSTM 0.50 → FLAT",          ext.extract_trend_belief(0.50).direction == DIR_FLAT)
-    check("FIX-2: LSTM 0.56 → UP",    ext.extract_trend_belief(0.56).direction == DIR_UP,
+    check("LSTM 0.80 -> UP",            ext.extract_trend_belief(0.80).direction == DIR_UP)
+    check("LSTM 0.20 -> DOWN",          ext.extract_trend_belief(0.20).direction == DIR_DOWN)
+    check("LSTM 0.50 -> FLAT",          ext.extract_trend_belief(0.50).direction == DIR_FLAT)
+    check("FIX-2: LSTM 0.56 -> UP",    ext.extract_trend_belief(0.56).direction == DIR_UP,
           f"got {ext.extract_trend_belief(0.56).direction}")
-    check("FIX-2: LSTM 0.44 → DOWN",  ext.extract_trend_belief(0.44).direction == DIR_DOWN,
+    check("FIX-2: LSTM 0.44 -> DOWN",  ext.extract_trend_belief(0.44).direction == DIR_DOWN,
           f"got {ext.extract_trend_belief(0.44).direction}")
 
     bs_weak = ext.extract_sentiment_belief(-0.08)
     bs_str  = ext.extract_sentiment_belief(-0.45)
     bs_flat = ext.extract_sentiment_belief( 0.02)
-    check("FIX-3: sent=−0.08 → DOWN",       bs_weak.direction == DIR_DOWN)
+    check("FIX-3: sent=−0.08 -> DOWN",       bs_weak.direction == DIR_DOWN)
     check("FIX-3: sent=−0.08 conf > 0.25",  bs_weak.confidence > 0.25,
           f"got {bs_weak.confidence:.3f}")
     check("FIX-3: sent=−0.45 conf > 0.60",  bs_str.confidence  > 0.60,
           f"got {bs_str.confidence:.3f}")
-    check("sent=+0.02 → FLAT",              bs_flat.direction == DIR_FLAT)
+    check("sent=+0.02 -> FLAT",              bs_flat.direction == DIR_FLAT)
     print(f"    Sigmoid: −0.08={bs_weak.confidence:.3f}  "
           f"−0.45={bs_str.confidence:.3f}  +0.02={bs_flat.confidence:.3f}")
-    check("Regime Bull → UP",      ext.extract_regime_belief("Bull").direction   == DIR_UP)
-    check("Regime Bear → DOWN",    ext.extract_regime_belief("Bear").direction   == DIR_DOWN)
-    check("Regime Sideways → FLAT",ext.extract_regime_belief("Sideways").direction == DIR_FLAT)
+    check("Regime Bull -> UP",      ext.extract_regime_belief("Bull").direction   == DIR_UP)
+    check("Regime Bear -> DOWN",    ext.extract_regime_belief("Bear").direction   == DIR_DOWN)
+    check("Regime Sideways -> FLAT",ext.extract_regime_belief("Sideways").direction == DIR_FLAT)
 
-    # ── Test 7: Controller (FIX-1 floors, FIX-4/11 threshold=0.75) ────────
-    print("\n── Test 7: Controller FIX-1 (floors) + FIX-4/11 (threshold=0.75) ─")
+    # -- Test 7: Controller (FIX-1 floors, FIX-4/11 threshold=0.75) --------
+    print("\n-- Test 7: Controller FIX-1 (floors) + FIX-4/11 (threshold=0.75) -")
     ctrl = aesl.controller
 
     r2_high = copy.deepcopy(r2)
     r2_high.bcs = 0.76                    # above new 0.75 threshold
-    check(f"FIX-4/11: BCS=0.76 ≥ 0.75 + low_conf → force_hold",
+    check(f"FIX-4/11: BCS=0.76 ≥ 0.75 + low_conf -> force_hold",
           ctrl.should_force_hold(r2_high, fusion_confidence=0.45),
           f"BCS={r2_high.bcs:.4f}")
 
     r2_below = copy.deepcopy(r2)
     r2_below.bcs = 0.74                   # below threshold
-    check("FIX-11: BCS=0.74 < 0.75 → no force_hold",
+    check("FIX-11: BCS=0.74 < 0.75 -> no force_hold",
           not ctrl.should_force_hold(r2_below, fusion_confidence=0.45),
           f"BCS={r2_below.bcs:.4f}")
 
-    check("HARMONY + ok conf → no force_hold",
+    check("HARMONY + ok conf -> no force_hold",
           not ctrl.should_force_hold(r_low, fusion_confidence=0.60))
 
     raw_alloc = 0.15
@@ -407,8 +407,8 @@ def run_unit_tests() -> bool:
           f"adj={adj_high:.4f}")
     check("FIX-1: apply() ∈ [0,1]", 0.0 <= adj_high <= 1.0)
 
-    # ── Test 8: FIX-7 Temporal Analyzer ───────────────────────────────────
-    print("\n── Test 8: FIX-7 Temporal Analyzer ────────────────────────────────")
+    # -- Test 8: FIX-7 Temporal Analyzer -----------------------------------
+    print("\n-- Test 8: FIX-7 Temporal Analyzer --------------------------------")
     from ml_engine.aesl_agent import TemporalAnalyzer, EpistemicLedger
     ta = TemporalAnalyzer()
 
@@ -416,38 +416,38 @@ def run_unit_tests() -> bool:
     for v in [0.20, 0.25, 0.30, 0.38, 0.45, 0.52, 0.60, 0.68, 0.75, 0.80, 0.85]:
         led_r.record(v)
     tr_r = ta.get_bcs_trend(led_r)
-    check("Rising BCS → RISING trend", tr_r == "RISING", f"got {tr_r}")
+    check("Rising BCS -> RISING trend", tr_r == "RISING", f"got {tr_r}")
     tf_r, _ = ta.get_temporal_factor(led_r)
-    check("Rising trend → factor < 1.0", tf_r < 1.0, f"got {tf_r}")
+    check("Rising trend -> factor < 1.0", tf_r < 1.0, f"got {tf_r}")
     print(f"    Rising: trend={tr_r}  factor={tf_r:.3f}")
 
     led_f = EpistemicLedger(cache_path=os.path.join(tempfile.mkdtemp(), "led_f.pkl"))
     for v in [0.80, 0.75, 0.68, 0.60, 0.52, 0.45, 0.38, 0.30, 0.25, 0.20, 0.15]:
         led_f.record(v)
     tr_f = ta.get_bcs_trend(led_f)
-    check("Falling BCS → FALLING trend", tr_f == "FALLING", f"got {tr_f}")
+    check("Falling BCS -> FALLING trend", tr_f == "FALLING", f"got {tr_f}")
     tf_f, _ = ta.get_temporal_factor(led_f)
-    check("Falling trend → factor > 1.0", tf_f > 1.0, f"got {tf_f}")
+    check("Falling trend -> factor > 1.0", tf_f > 1.0, f"got {tf_f}")
     print(f"    Falling: trend={tr_f}  factor={tf_f:.3f}")
 
-    # ── Test 9: FIX-6 Adaptive zones ──────────────────────────────────────
-    print("\n── Test 9: FIX-6 Adaptive Zone Engine ─────────────────────────────")
+    # -- Test 9: FIX-6 Adaptive zones --------------------------------------
+    print("\n-- Test 9: FIX-6 Adaptive Zone Engine -----------------------------")
     eng9       = aesl.bcs_engine
     stats_bear = {"n": 20, "mean_bcs": 0.65, "std_bcs": 0.10}
     stats_calm = {"n": 20, "mean_bcs": 0.25, "std_bcs": 0.08}
     z_bear, m_bear, _ = eng9.get_zone_adaptive(0.65, stats_bear)
     z_calm, m_calm, _ = eng9.get_zone_adaptive(0.65, stats_calm)
-    check("FIX-6: BCS=0.65 in bear baseline → MILD or MODERATE",
+    check("FIX-6: BCS=0.65 in bear baseline -> MILD or MODERATE",
           z_bear in ("MILD","MODERATE"), f"got {z_bear}")
-    check("FIX-6: BCS=0.65 in calm baseline → HIGH or CRITICAL",
+    check("FIX-6: BCS=0.65 in calm baseline -> HIGH or CRITICAL",
           z_calm in ("HIGH","CRITICAL"),  f"got {z_calm}")
     check("FIX-6: bear mult ≥ calm mult", m_bear >= m_calm,
           f"bear={m_bear:.2f}  calm={m_calm:.2f}")
-    print(f"    bear-baseline → {z_bear} ({m_bear:.2f}x)  "
-          f"calm-baseline → {z_calm} ({m_calm:.2f}x)")
+    print(f"    bear-baseline -> {z_bear} ({m_bear:.2f}x)  "
+          f"calm-baseline -> {z_calm} ({m_calm:.2f}x)")
 
-    # ── Test 10: FIX-2 Confidence Damping ─────────────────────────────────
-    print("\n── Test 10: FIX-2 Confidence Damping ──────────────────────────────")
+    # -- Test 10: FIX-2 Confidence Damping ---------------------------------
+    print("\n-- Test 10: FIX-2 Confidence Damping ------------------------------")
     from ml_engine.aesl_agent import ContradictionEngine, Belief
     ce    = ContradictionEngine()
     b_lo_a = Belief("A", DIM_TREND,  DIR_UP,   0.10, 0.0)
@@ -456,18 +456,18 @@ def run_unit_tests() -> bool:
     b_hi_b = Belief("B", DIM_REGIME, DIR_DOWN, 0.88, 0.0)
     rec_lo = ce.compute(b_lo_a, b_lo_b, 0.28)
     rec_hi = ce.compute(b_hi_a, b_hi_b, 0.28)
-    check("FIX-2: both low-conf → effective_weight damped",
+    check("FIX-2: both low-conf -> effective_weight damped",
           rec_lo.effective_weight < rec_hi.effective_weight,
           f"low={rec_lo.effective_weight:.4f}  hi={rec_hi.effective_weight:.4f}")
-    check("FIX-2: low-conf eff_weight = pair_weight × LOW_CONF_DAMP_FACTOR",
+    check("FIX-2: low-conf eff_weight = pair_weight x LOW_CONF_DAMP_FACTOR",
           abs(rec_lo.effective_weight - 0.28 * LOW_CONF_DAMP_FACTOR) < 1e-6)
     check("FIX-2: high-conf eff_weight = pair_weight",
           abs(rec_hi.effective_weight - 0.28) < 1e-6)
     print(f"    Low-conf: eff={rec_lo.effective_weight:.4f}  contrib={rec_lo.weighted_contrib:.6f}")
     print(f"    High-conf: eff={rec_hi.effective_weight:.4f}  contrib={rec_hi.weighted_contrib:.6f}")
 
-    # ── Test 11: Ledger stats ──────────────────────────────────────────────
-    print("\n── Test 11: Ledger Rolling Statistics ──────────────────────────────")
+    # -- Test 11: Ledger stats ----------------------------------------------
+    print("\n-- Test 11: Ledger Rolling Statistics ------------------------------")
     ls = aesl.get_ledger_stats()
     check("n > 0",             ls["n"] > 0)
     check("mean_bcs ∈ [0,1]",  0.0 <= ls["mean_bcs"] <= 1.0)
@@ -477,8 +477,8 @@ def run_unit_tests() -> bool:
     print(f"    n={ls['n']}  mean={ls['mean_bcs']:.4f}  std={ls['std_bcs']:.4f}  "
           f"trend={ls['trend']}")
 
-    # ── Test 12: FIX-5 P&L Delta ──────────────────────────────────────────
-    print("\n── Test 12: FIX-5 P&L Delta Computation ───────────────────────────")
+    # -- Test 12: FIX-5 P&L Delta ------------------------------------------
+    print("\n-- Test 12: FIX-5 P&L Delta Computation ---------------------------")
     ctrl12        = aesl.controller
     delta_saved   = ctrl12.compute_pnl_delta(10.0, 3.0, -5.0, "BUY",  10000)
     delta_cost    = ctrl12.compute_pnl_delta(10.0, 3.0,  5.0, "BUY",  10000)
@@ -489,11 +489,11 @@ def run_unit_tests() -> bool:
           f"delta={delta_cost:.4f}")
     check("Correct SELL: AESL costs capital (negative delta)", delta_sell_ok < 0,
           f"delta={delta_sell_ok:.4f}")
-    print(f"    Wrong BUY   → delta=${delta_saved:+.2f}  (saved)")
-    print(f"    Correct BUY → delta=${delta_cost:+.2f}  (cost)")
+    print(f"    Wrong BUY   -> delta=${delta_saved:+.2f}  (saved)")
+    print(f"    Correct BUY -> delta=${delta_cost:+.2f}  (cost)")
 
-    # ── Test 13: to_dict completeness ─────────────────────────────────────
-    print("\n── Test 13: to_dict() completeness ─────────────────────────────────")
+    # -- Test 13: to_dict completeness -------------------------------------
+    print("\n-- Test 13: to_dict() completeness ---------------------------------")
     d = r2.to_dict()
     for k in ["bcs","zone","adaptive_zone","position_multiplier","composite_multiplier",
               "temporal_factor","percentile_rank","bcs_zscore",
@@ -504,59 +504,59 @@ def run_unit_tests() -> bool:
     check("evidence_score ≥ 0",           d["evidence_score"] >= 0.0)
     check("dominant_pair_share ∈ [0,1]",  0.0 <= d["dominant_pair_share"] <= 1.0)
 
-    # ── Test 14: FIX-8 Evidence Gate ──────────────────────────────────────
+    # -- Test 14: FIX-8 Evidence Gate --------------------------------------
     # CORRECTED expectations (v2.2): gate is a two-step sequential process.
-    #   Step 1: CRITICAL → HIGH if n_full < 3
-    #   Step 2: HIGH     → MODERATE if n_full < 2 OR bcs < 0.65
+    #   Step 1: CRITICAL -> HIGH if n_full < 3
+    #   Step 2: HIGH     -> MODERATE if n_full < 2 OR bcs < 0.65
     # Therefore:
-    #   CRITICAL + n_full=2 → HIGH (step 1), then HIGH+n_full=2+BCS=0.85 → stays HIGH
-    #   CRITICAL + n_full=1 → HIGH (step 1), then HIGH+n_full=1<2 → MODERATE (step 2)
-    #   HIGH     + n_full=1 → MODERATE (n_full gate fires regardless of BCS value)
-    print("\n── Test 14: FIX-8 Evidence Gate (corrected expectations) ───────────")
+    #   CRITICAL + n_full=2 -> HIGH (step 1), then HIGH+n_full=2+BCS=0.85 -> stays HIGH
+    #   CRITICAL + n_full=1 -> HIGH (step 1), then HIGH+n_full=1<2 -> MODERATE (step 2)
+    #   HIGH     + n_full=1 -> MODERATE (n_full gate fires regardless of BCS value)
+    print("\n-- Test 14: FIX-8 Evidence Gate (corrected expectations) -----------")
     eng14 = aesl.bcs_engine
 
     za, ga = eng14.apply_evidence_gate("CRITICAL", n_full=2, bcs=0.85)
-    check("CRITICAL+n_full=2+BCS=0.85 → HIGH (step-1 downgrade, step-2 passes)",
+    check("CRITICAL+n_full=2+BCS=0.85 -> HIGH (step-1 downgrade, step-2 passes)",
           za == "HIGH" and ga,
           f"got zone={za}  gated={ga}")
 
     zb, gb = eng14.apply_evidence_gate("CRITICAL", n_full=3, bcs=0.85)
-    check("CRITICAL+n_full=3+BCS=0.85 → stays CRITICAL (both steps pass)",
+    check("CRITICAL+n_full=3+BCS=0.85 -> stays CRITICAL (both steps pass)",
           zb == "CRITICAL" and not gb,
           f"got zone={zb}  gated={gb}")
 
     zc, gc = eng14.apply_evidence_gate("CRITICAL", n_full=1, bcs=0.85)
-    check("CRITICAL+n_full=1 → MODERATE (two-step: CRITICAL→HIGH→MODERATE)",
+    check("CRITICAL+n_full=1 -> MODERATE (two-step: CRITICAL->HIGH->MODERATE)",
           zc == "MODERATE" and gc,
           f"got zone={zc}  gated={gc}")
 
     zd, gd = eng14.apply_evidence_gate("HIGH", n_full=0, bcs=0.70)
-    check("HIGH+n_full=0 → MODERATE (n_full gate)",
+    check("HIGH+n_full=0 -> MODERATE (n_full gate)",
           zd == "MODERATE" and gd,
           f"got zone={zd}  gated={gd}")
 
     ze, ge = eng14.apply_evidence_gate("HIGH", n_full=1, bcs=0.75)
-    check("HIGH+n_full=1 → MODERATE (n_full<2 gate fires; BCS irrelevant)",
+    check("HIGH+n_full=1 -> MODERATE (n_full<2 gate fires; BCS irrelevant)",
           ze == "MODERATE" and ge,
           f"got zone={ze}  gated={ge}")
 
     zf, gf = eng14.apply_evidence_gate("HIGH", n_full=2, bcs=EVIDENCE_GATE_HIGH_BCS + 0.01)
-    check(f"HIGH+n_full=2+BCS\u2265{EVIDENCE_GATE_HIGH_BCS} → stays HIGH",
+    check(f"HIGH+n_full=2+BCS\u2265{EVIDENCE_GATE_HIGH_BCS} -> stays HIGH",
           zf == "HIGH" and not gf,
           f"got zone={zf}  gated={gf}")
 
     zg, gg = eng14.apply_evidence_gate("HIGH", n_full=2, bcs=EVIDENCE_GATE_HIGH_BCS - 0.01)
-    check(f"HIGH+n_full=2+BCS<{EVIDENCE_GATE_HIGH_BCS} → MODERATE (BCS gate)",
+    check(f"HIGH+n_full=2+BCS<{EVIDENCE_GATE_HIGH_BCS} -> MODERATE (BCS gate)",
           zg == "MODERATE" and gg,
           f"got zone={zg}  gated={gg}")
 
     zh, gh = eng14.apply_evidence_gate("MODERATE", n_full=0, bcs=0.50)
-    check("MODERATE → gate never applies (only HIGH/CRITICAL affected)",
+    check("MODERATE -> gate never applies (only HIGH/CRITICAL affected)",
           zh == "MODERATE" and not gh,
           f"got zone={zh}  gated={gh}")
 
     zi, gi = eng14.apply_evidence_gate("HIGH", n_full=2, bcs=0.75, n_partial=5)
-    check("HIGH+n_full=2+n_partial=5 (>n_full×2) → MODERATE (partial-heavy)",
+    check("HIGH+n_full=2+n_partial=5 (>n_fullx2) -> MODERATE (partial-heavy)",
           zi == "MODERATE" and gi,
           f"got zone={zi}  gated={gi}")
 
@@ -573,8 +573,8 @@ def run_unit_tests() -> bool:
     print(f"    Gate constants: CRITICAL_MIN={EVIDENCE_GATE_CRITICAL_MIN_FULL}  "
           f"HIGH_MIN={EVIDENCE_GATE_HIGH_MIN_FULL}  HIGH_BCS={EVIDENCE_GATE_HIGH_BCS}")
 
-    # ── Test 15: FIX-9 Pair Dominance Damping ─────────────────────────────
-    print("\n── Test 15: FIX-9 Pair Dominance Damping ───────────────────────────")
+    # -- Test 15: FIX-9 Pair Dominance Damping -----------------------------
+    print("\n-- Test 15: FIX-9 Pair Dominance Damping ---------------------------")
     from ml_engine.aesl_agent import OntologyMapper
     ce15 = ContradictionEngine()
     m15  = OntologyMapper()
@@ -604,7 +604,7 @@ def run_unit_tests() -> bool:
           f"post={damp_share:.3f}  pre={raw_share:.3f}")
     dr = next((r for r in damp_recs if r.dominance_damped), None)
     if dr:
-        check("FIX-9: damped eff_weight = pair_weight × DOMINANCE_DAMP",
+        check("FIX-9: damped eff_weight = pair_weight x DOMINANCE_DAMP",
               abs(dr.effective_weight - dr.pair_weight * DOMINANCE_DAMP) < 1e-5,
               f"got {dr.effective_weight:.6f}  expected {dr.pair_weight * DOMINANCE_DAMP:.6f}")
     else:
@@ -623,7 +623,7 @@ def run_unit_tests() -> bool:
     print(f"    Dominated: pre={raw_share:.3f}  post={damp_share:.3f}  damped={any_dd}")
     print(f"    Balanced:  top={bal_share:.3f}  damped={bal_dd}")
     if bal_share <= DOMINANCE_CAP:
-        check("FIX-9: balanced scenario → no damping",
+        check("FIX-9: balanced scenario -> no damping",
               not bal_dd, f"bal_dd={bal_dd}")
 
     r_dom = aesl.analyze(0.92, 0.15, "Bear", 0.04, regime_confidence=0.90)
@@ -631,38 +631,38 @@ def run_unit_tests() -> bool:
           0.0 <= r_dom.dominant_pair_share <= 1.0,
           f"got {r_dom.dominant_pair_share}")
 
-    # ── Test 16: FIX-10 Zone Boundary Restructuring ───────────────────────
-    print("\n── Test 16: FIX-10 Zone Boundary Restructuring ─────────────────────")
+    # -- Test 16: FIX-10 Zone Boundary Restructuring -----------------------
+    print("\n-- Test 16: FIX-10 Zone Boundary Restructuring ---------------------")
     eng16 = aesl.bcs_engine
     # HARMONY widened to <0.25
     for bv, exp in [(0.19,"HARMONY"),(0.24,"HARMONY")]:
         z, _ = eng16.get_zone(bv)
-        check(f"FIX-10: BCS={bv} → HARMONY (widened from 0.20)", z == exp, f"got {z}")
+        check(f"FIX-10: BCS={bv} -> HARMONY (widened from 0.20)", z == exp, f"got {z}")
     # MILD boundary at 0.25–0.38
     z25, _ = eng16.get_zone(0.25)
     z37, _ = eng16.get_zone(0.37)
-    check("FIX-10: BCS=0.25 → MILD (first MILD value)", z25 == "MILD", f"got {z25}")
-    check("FIX-10: BCS=0.37 → MILD (last MILD value)",  z37 == "MILD", f"got {z37}")
+    check("FIX-10: BCS=0.25 -> MILD (first MILD value)", z25 == "MILD", f"got {z25}")
+    check("FIX-10: BCS=0.37 -> MILD (last MILD value)",  z37 == "MILD", f"got {z37}")
     # MILD boundary narrows to 0.38
     z38, _ = eng16.get_zone(0.38)
     z39, _ = eng16.get_zone(0.39)
-    check("FIX-10: BCS=0.38 → MODERATE (MILD closed at 0.38)", z38 == "MODERATE", f"got {z38}")
-    check("FIX-10: BCS=0.39 → MODERATE (was MILD in v2.1)",    z39 == "MODERATE", f"got {z39}")
+    check("FIX-10: BCS=0.38 -> MODERATE (MILD closed at 0.38)", z38 == "MODERATE", f"got {z38}")
+    check("FIX-10: BCS=0.39 -> MODERATE (was MILD in v2.1)",    z39 == "MODERATE", f"got {z39}")
     # Upper thresholds unchanged
     z60, _ = eng16.get_zone(0.60)
     z80, _ = eng16.get_zone(0.80)
-    check("FIX-10: BCS=0.60 → HIGH (MODERATE threshold unchanged)",   z60 == "HIGH",     f"got {z60}")
-    check("FIX-10: BCS=0.80 → CRITICAL (HIGH threshold unchanged)",   z80 == "CRITICAL", f"got {z80}")
+    check("FIX-10: BCS=0.60 -> HIGH (MODERATE threshold unchanged)",   z60 == "HIGH",     f"got {z60}")
+    check("FIX-10: BCS=0.80 -> CRITICAL (HIGH threshold unchanged)",   z80 == "CRITICAL", f"got {z80}")
     # Verify low-BCS Bear SELL lands in HARMONY (key H2 fix)
     r_low_bcs = aesl.analyze(0.00, -0.08, "Bear", 0.08, regime_confidence=0.75)
-    check("FIX-10: LSTM=0 Bear ticker → HARMONY (BCS<0.25)",
+    check("FIX-10: LSTM=0 Bear ticker -> HARMONY (BCS<0.25)",
           r_low_bcs.zone == "HARMONY",
           f"zone={r_low_bcs.zone}  bcs={r_low_bcs.bcs:.4f}")
     print(f"    Low-LSTM Bear: BCS={r_low_bcs.bcs:.4f}  zone={r_low_bcs.zone}")
     print(f"    Boundaries: HARMONY<0.25  MILD<0.38  MODERATE<0.60  HIGH<0.80  CRITICAL≥0.80")
 
-    # ── Test 17: FIX-11 Force-Hold @ 0.75 + directional H4 error ─────────
-    print("\n── Test 17: FIX-11 Force-Hold 0.75 + H4 Directional Error ─────────")
+    # -- Test 17: FIX-11 Force-Hold @ 0.75 + directional H4 error ---------
+    print("\n-- Test 17: FIX-11 Force-Hold 0.75 + H4 Directional Error ---------")
     ctrl17 = aesl.controller
     check(f"FORCE_HOLD_BCS_THRESHOLD == 0.75",
           FORCE_HOLD_BCS_THRESHOLD == 0.75, f"got {FORCE_HOLD_BCS_THRESHOLD}")
@@ -670,117 +670,117 @@ def run_unit_tests() -> bool:
     r17_below = copy.deepcopy(r2); r17_below.bcs = 0.749; r17_below.evidence_score = 3.5
     r17_at    = copy.deepcopy(r2); r17_at.bcs    = 0.750; r17_at.evidence_score    = 3.5
     r17_above = copy.deepcopy(r2); r17_above.bcs = 0.800; r17_above.evidence_score = 3.5
-    check("BCS=0.749 → no force_hold (below threshold)",
+    check("BCS=0.749 -> no force_hold (below threshold)",
           not ctrl17.should_force_hold(r17_below, 0.40), f"BCS={r17_below.bcs}")
-    check("BCS=0.750 → force_hold fires (at threshold)",
+    check("BCS=0.750 -> force_hold fires (at threshold)",
           ctrl17.should_force_hold(r17_at,    0.40), f"BCS={r17_at.bcs}")
-    check("BCS=0.800 → force_hold fires (above threshold)",
+    check("BCS=0.800 -> force_hold fires (above threshold)",
           ctrl17.should_force_hold(r17_above, 0.40), f"BCS={r17_above.bcs}")
 
-    check("is_directionally_wrong: SELL + ret=+0.3% → True",
+    check("is_directionally_wrong: SELL + ret=+0.3% -> True",
           is_directionally_wrong("SELL",  0.3))
-    check("is_directionally_wrong: BUY  + ret=−0.3% → True",
+    check("is_directionally_wrong: BUY  + ret=−0.3% -> True",
           is_directionally_wrong("BUY",  -0.3))
-    check("is_directionally_wrong: SELL + ret=−0.3% → False",
+    check("is_directionally_wrong: SELL + ret=−0.3% -> False",
           not is_directionally_wrong("SELL", -0.3))
-    check("is_directionally_wrong: BUY  + ret=+0.3% → False",
+    check("is_directionally_wrong: BUY  + ret=+0.3% -> False",
           not is_directionally_wrong("BUY",   0.3))
-    check("is_directionally_wrong: HOLD → always False",
+    check("is_directionally_wrong: HOLD -> always False",
           not is_directionally_wrong("HOLD",  0.5))
-    check("is_directionally_wrong: NaN  → always False",
+    check("is_directionally_wrong: NaN  -> always False",
           not is_directionally_wrong("SELL",  float("nan")))
 
-    # ── Test 18: FIX-12 BUY Signal Expansion ──────────────────────────────
-    print("\n── Test 18: FIX-12 BUY Signal Expansion ───────────────────────────")
+    # -- Test 18: FIX-12 BUY Signal Expansion ------------------------------
+    print("\n-- Test 18: FIX-12 BUY Signal Expansion ---------------------------")
     check("BUY_THRESHOLD module constant == 0.50",
           BUY_THRESHOLD == 0.50, f"got {BUY_THRESHOLD}")
 
-    check("Bull + arb=0.51 → BUY (threshold=0.50)",
+    check("Bull + arb=0.51 -> BUY (threshold=0.50)",
           make_decision(0.51, 0.15, "Bull",     "AAPL", 0.3, 0.10) == "BUY")
-    check("Sideways + arb=0.51 → BUY (was HOLD at old 0.52 threshold)",
+    check("Sideways + arb=0.51 -> BUY (was HOLD at old 0.52 threshold)",
           make_decision(0.51, 0.15, "Sideways", "AAPL", 0.3, 0.10) == "BUY")
-    check("Bear + arb=0.56 + bcs=0.58 → BUY (gate: ≥0.55 and <0.62)",
+    check("Bear + arb=0.56 + bcs=0.58 -> BUY (gate: ≥0.55 and <0.62)",
           make_decision(0.56, 0.15, "Bear",     "NVDA", 0.3, 0.58) == "BUY")
-    check("Bear + arb=0.60 + bcs=0.63 → not BUY (bcs≥0.62)",
+    check("Bear + arb=0.60 + bcs=0.63 -> not BUY (bcs≥0.62)",
           make_decision(0.60, 0.15, "Bear",     "NVDA", 0.3, 0.63) != "BUY")
-    check("Bear + arb=0.54 + bcs=0.50 → not BUY (arb<0.55)",
+    check("Bear + arb=0.54 + bcs=0.50 -> not BUY (arb<0.55)",
           make_decision(0.54, 0.15, "Bear",     "NVDA", 0.3, 0.50) != "BUY")
-    check("Commodity GLD + arb=0.51 → not BUY (commodity threshold 0.55)",
+    check("Commodity GLD + arb=0.51 -> not BUY (commodity threshold 0.55)",
           make_decision(0.51, 0.15, "Bull",     "GLD",  0.3, 0.10) != "BUY")
-    check("Commodity GLD + arb=0.56 → BUY (≥0.55)",
+    check("Commodity GLD + arb=0.56 -> BUY (≥0.55)",
           make_decision(0.56, 0.15, "Bull",     "GLD",  0.3, 0.10) == "BUY")
     # apply_gates cap at 0.62
     gated_cap    = apply_gates(0.70, lstm=0.60, sent=-0.06, regime="Sideways", rc=1.0)
     gated_nocap  = apply_gates(0.70, lstm=0.50, sent=-0.06, regime="Sideways", rc=1.0)
-    check("apply_gates: lstm=0.60 sent<−0.05 → capped at 0.62",
+    check("apply_gates: lstm=0.60 sent<−0.05 -> capped at 0.62",
           abs(gated_cap - 0.62) < 0.001,
           f"got {gated_cap:.4f}")
-    check("apply_gates: lstm=0.50 → NOT capped (lstm≤0.55)",
+    check("apply_gates: lstm=0.50 -> NOT capped (lstm≤0.55)",
           gated_nocap > 0.62,
           f"got {gated_nocap:.4f}")
     print(f"    BUY_THRESHOLD={BUY_THRESHOLD}  Bear gate: arb≥0.55 bcs<0.62  "
           f"apply_gates cap=0.62")
 
-    # ── Test 19: FIX-13 Override Guard (threshold=3.0) ────────────────────
-    print("\n── Test 19: FIX-13 Override Guard (OVERRIDE_GUARD_MIN_EVIDENCE=3.0) ")
+    # -- Test 19: FIX-13 Override Guard (threshold=3.0) --------------------
+    print("\n-- Test 19: FIX-13 Override Guard (OVERRIDE_GUARD_MIN_EVIDENCE=3.0) ")
     ctrl19 = aesl.controller
     check("OVERRIDE_GUARD_MIN_EVIDENCE == 3.0",
           OVERRIDE_GUARD_MIN_EVIDENCE == 3.0, f"got {OVERRIDE_GUARD_MIN_EVIDENCE}")
 
     r19 = copy.deepcopy(r2)
 
-    # score=2.8 < 3.0 → guard fires → revert SELL
+    # score=2.8 < 3.0 -> guard fires -> revert SELL
     r19.evidence_score = 2.8; r19.bcs = 0.76
-    check("evidence=2.8 < 3.0 + adj=HOLD + raw=SELL → guard fires (revert)",
+    check("evidence=2.8 < 3.0 + adj=HOLD + raw=SELL -> guard fires (revert)",
           ctrl19.should_override_hold(r19, "SELL", "HOLD"),
           f"evidence={r19.evidence_score}")
 
-    # score=3.0 (boundary) → guard does NOT fire → keep HOLD
+    # score=3.0 (boundary) -> guard does NOT fire -> keep HOLD
     r19.evidence_score = 3.0
-    check("evidence=3.0 (at threshold) → guard does NOT fire (keep HOLD)",
+    check("evidence=3.0 (at threshold) -> guard does NOT fire (keep HOLD)",
           not ctrl19.should_override_hold(r19, "SELL", "HOLD"),
           f"evidence={r19.evidence_score}")
 
-    # score=3.5 > 3.0 → guard does NOT fire → keep HOLD
+    # score=3.5 > 3.0 -> guard does NOT fire -> keep HOLD
     r19.evidence_score = 3.5
-    check("evidence=3.5 > 3.0 → guard does NOT fire (keep HOLD)",
+    check("evidence=3.5 > 3.0 -> guard does NOT fire (keep HOLD)",
           not ctrl19.should_override_hold(r19, "SELL", "HOLD"),
           f"evidence={r19.evidence_score}")
 
-    # adj not HOLD → guard never fires
+    # adj not HOLD -> guard never fires
     r19.evidence_score = 1.0
-    check("adj=SELL → guard never fires (no conversion to revert)",
+    check("adj=SELL -> guard never fires (no conversion to revert)",
           not ctrl19.should_override_hold(r19, "SELL", "SELL"))
-    check("adj=BUY  → guard never fires",
+    check("adj=BUY  -> guard never fires",
           not ctrl19.should_override_hold(r19, "SELL", "BUY"))
 
-    # raw already HOLD → guard never fires (nothing to revert to)
-    check("adj=HOLD + raw=HOLD → guard never fires",
+    # raw already HOLD -> guard never fires (nothing to revert to)
+    check("adj=HOLD + raw=HOLD -> guard never fires",
           not ctrl19.should_override_hold(r19, "HOLD", "HOLD"))
 
     # BUY also reverts correctly
     r19.evidence_score = 1.5
-    check("evidence=1.5 + adj=HOLD + raw=BUY → guard fires (revert BUY)",
+    check("evidence=1.5 + adj=HOLD + raw=BUY -> guard fires (revert BUY)",
           ctrl19.should_override_hold(r19, "BUY", "HOLD"),
           f"evidence={r19.evidence_score}")
 
-    print(f"    Threshold: evidence_score < {OVERRIDE_GUARD_MIN_EVIDENCE} → revert to raw_dec")
+    print(f"    Threshold: evidence_score < {OVERRIDE_GUARD_MIN_EVIDENCE} -> revert to raw_dec")
     print(f"    Protects: TLT (score~2.8, −1.6%), SLV (score~2.8, −16%), "
           f"MSFT (score~2.8, −4.1%)")
 
-    # ── Summary ────────────────────────────────────────────────────────────
-    print(f"\n  {'═'*60}")
+    # -- Summary ------------------------------------------------------------
+    print(f"\n  {'='*60}")
     print(f"  UNIT TEST RESULTS v2.2: {passed} passed / {failed} failed")
     if failed == 0:
         print("  \u2705 ALL UNIT TESTS PASSED (19 test blocks)")
     else:
-        print(f"  \u26a0\ufe0f  {failed} FAILURES — review above")
-    print(f"  {'═'*60}")
+        print(f"  \u26a0\ufe0f  {failed} FAILURES HOLD review above")
+    print(f"  {'='*60}")
     return failed == 0
 
 
 # ==============================================================================
-# PART 2 — INTEGRATION TEST
+# PART 2 HOLD INTEGRATION TEST
 # ==============================================================================
 
 def run_window(test_date, outcome_date, label,
@@ -808,7 +808,7 @@ def run_window(test_date, outcome_date, label,
            f"{'RawDec':<6} {'AdjDec':<6} {'RawA%':>6} {'AdjA%':>6} "
            f"{'Dom Conflict':<22} {'Act%':>8}  {'Raw':<6} {'Adj'}")
     print(hdr)
-    print(f"  {'─'*160}")
+    print(f"  {'-'*160}")
 
     rows           = []
     bcs_by_zone    = defaultdict(list)
@@ -867,7 +867,7 @@ def run_window(test_date, outcome_date, label,
                 except Exception:
                     arb_conf = gated_conf
 
-            # ── AESL v2.2 ──────────────────────────────────────────────────
+            # -- AESL v2.2 --------------------------------------------------
             aesl_result = aesl_agent.analyze(
                 lstm_signal       = lstm_stretched,
                 sent_score        = sent_score,
@@ -914,7 +914,7 @@ def run_window(test_date, outcome_date, label,
                 adj_dec_pre   = make_decision(arb_conf, adj_alloc, regime_label, ticker, gdi, bcs)
                 adj_alloc_pre = adj_alloc
 
-            # FIX-13: Override guard — revert to raw_dec if evidence insufficient
+            # FIX-13: Override guard HOLD revert to raw_dec if evidence insufficient
             if aesl_agent.controller.should_override_hold(aesl_result, raw_dec, adj_dec_pre):
                 adj_dec   = raw_dec
                 adj_alloc = raw_alloc
@@ -1003,7 +1003,7 @@ def run_window(test_date, outcome_date, label,
         except Exception as e:
             print(f"  {ticker:<6}  ERROR: {e}")
 
-    # ── Window summary ─────────────────────────────────────────────────────
+    # -- Window summary -----------------------------------------------------
     all_bcs   = [r["bcs"] for r in rows]
     raw_c  = sum(1 for r in rows if r["raw_result"] == "correct")
     raw_w  = sum(1 for r in rows if r["raw_result"] == "wrong")
@@ -1028,18 +1028,18 @@ def run_window(test_date, outcome_date, label,
               f"mean={np.mean(all_bcs):.4f}  std={np.std(all_bcs):.4f}")
     print(f"     Raw accuracy   : {raw_c}\u2705/{raw_w}\u274c  \u2192 {raw_acc:.1f}%")
     print(f"     Adj accuracy   : {adj_c}\u2705/{adj_w}\u274c  \u2192 {adj_acc:.1f}%")
-    print(f"     Accuracy lift  : {lift:+.1f}%  {'✅' if lift >= 0 else '⚠️'}")
+    print(f"     Accuracy lift  : {lift:+.1f}%  {'[OK]' if lift >= 0 else '[WARN]'}")
     print(f"     FIX-5 P&L     : saved=${aesl_saved:+.2f}  cost=${aesl_cost:+.2f}  "
-          f"net=${net_pnl:+.2f}  {'✅' if net_pnl >= 0 else '⚠️'}")
+          f"net=${net_pnl:+.2f}  {'[OK]' if net_pnl >= 0 else '[WARN]'}")
     print(f"     H4 precision   : {h4_wrong}/{h4_warned} directional errors = "
-          f"{h4_prec:.0f}%  {'✅' if h4_prec >= 50 else '⚠️ (target ≥50%)'}")
+          f"{h4_prec:.0f}%  {'[OK]' if h4_prec >= 50 else '[WARN] (target ≥50%)'}")
     print(f"     BUY signals    : {n_buy_signals}")
     print(f"     Override guard : {n_override_g} force_hold reversions (FIX-13)")
     print(f"     FIX-8 events   : {n_gated} zones downgraded by evidence gate")
     print(f"     FIX-9 events   : {n_damped} dominant pairs damped  "
           f"mean_share={np.mean(dom_share_vals):.3f}" if dom_share_vals else "")
     print(f"     LSTM\u2194Regime %  : {lr_count}/{total_conf} = {lr_share:.0%}  "
-          f"{'✅' if lr_share < 0.70 else '⚠️'}")
+          f"{'[OK]' if lr_share < 0.70 else '[WARN]'}")
 
     print(f"\n     BCS by Adaptive Zone (accuracy includes noise_c/noise_w):")
     for _, zone_name, mult in BCS_ZONES:
@@ -1106,7 +1106,7 @@ def validate_hypotheses(all_stats: list, all_rows: list) -> dict:
     print("=" * 80)
 
     # H1
-    print("\n── H1: AESL P&L Delta Positive ─────────────────────────────────────")
+    print("\n-- H1: AESL P&L Delta Positive -------------------------------------")
     ts  = sum(s["aesl_saved"] for s in all_stats)
     tc  = sum(s["aesl_cost"]  for s in all_stats)
     net = ts + tc
@@ -1114,10 +1114,10 @@ def validate_hypotheses(all_stats: list, all_rows: list) -> dict:
     print(f"  Saved on WRONG decisions : ${ts:+.2f}")
     print(f"  Cost  on CORRECT decisions: ${tc:+.2f}")
     print(f"  Net P&L delta            : ${net:+.2f}")
-    print(f"  H1: {'✅ CONFIRMED' if h1 else '⚠️ Net negative'}")
+    print(f"  H1: {'[OK] CONFIRMED' if h1 else '[WARN] Net negative'}")
 
     # H2
-    print("\n── H2: Accuracy Monotonically Decreases HARMONY→CRITICAL ───────────")
+    print("\n-- H2: Accuracy Monotonically Decreases HARMONY->CRITICAL -----------")
     print("     FIX-10: HARMONY<0.25, MILD<0.38 restores monotonicity.")
     zone_order = ["HARMONY","MILD","MODERATE","HIGH","CRITICAL"]
     zone_acc   = defaultdict(lambda: {"c":0,"tot":0})
@@ -1130,7 +1130,7 @@ def validate_hypotheses(all_stats: list, all_rows: list) -> dict:
     h2_checks = 0
     h2_ok     = True
     print(f"  {'Zone':<12} {'N':>4}  {'Accuracy':>9}  Bar")
-    print(f"  {'─'*52}")
+    print(f"  {'-'*52}")
     for zone in zone_order:
         za = zone_acc.get(zone, {})
         n  = za.get("tot", 0)
@@ -1142,16 +1142,16 @@ def validate_hypotheses(all_stats: list, all_rows: list) -> dict:
         flag = ""
         if prev_acc is not None:
             if acc <= prev_acc:
-                flag = "✅ ↓"; h2_checks += 1
+                flag = "[OK] ↓"; h2_checks += 1
             else:
-                flag = "⚠️ ↑"; h2_ok = False
+                flag = "[WARN] ↑"; h2_ok = False
         print(f"  {zone:<12} {n:>4}  {acc:>7.1f}%  [{bar}]  {flag}")
         prev_acc = acc
-    print(f"\n  H2: {'✅ CONFIRMED' if h2_ok else '⚠️ PARTIAL'} — "
+    print(f"\n  H2: {'[OK] CONFIRMED' if h2_ok else '[WARN] PARTIAL'} HOLD "
           f"{h2_checks} monotone transitions")
 
     # H3
-    print("\n── H3: Bear Mean BCS > Sideways Mean BCS ───────────────────────────")
+    print("\n-- H3: Bear Mean BCS > Sideways Mean BCS ---------------------------")
     regime_bcs = defaultdict(list)
     for r in all_rows:
         regime_bcs[r["regime"]].append(r["bcs"])
@@ -1166,11 +1166,11 @@ def validate_hypotheses(all_stats: list, all_rows: list) -> dict:
     bear_m = means.get("Bear", float("nan"))
     side_m = means.get("Sideways", float("nan"))
     h3     = not any(np.isnan(v) for v in [bear_m, side_m]) and bear_m >= side_m
-    print(f"\n  H3: {'✅ CONFIRMED' if h3 else '⚠️ PARTIAL'} — "
+    print(f"\n  H3: {'[OK] CONFIRMED' if h3 else '[WARN] PARTIAL'} HOLD "
           f"Bear={bear_m:.4f}  Sideways={side_m:.4f}")
 
     # H4
-    print("\n── H4: HIGH/CRITICAL Precision ≥50% (directional error, FIX-11) ────")
+    print("\n-- H4: HIGH/CRITICAL Precision ≥50% (directional error, FIX-11) ----")
     h4_total = sum(s["h4_warned"] for s in all_stats)
     h4_wrong = sum(s["h4_wrong"]  for s in all_stats)
     h4_prec  = h4_wrong / h4_total * 100 if h4_total > 0 else 0.0
@@ -1180,10 +1180,10 @@ def validate_hypotheses(all_stats: list, all_rows: list) -> dict:
     print(f"  Directionally wrong            : {h4_wrong}")
     print(f"  Precision                      : {h4_prec:.1f}%  (target ≥50%)")
     print(f"  FIX-8 gate downgrades          : {total_g}")
-    print(f"  H4: {'✅ CONFIRMED' if h4 else '⚠️ BELOW 50%'}")
+    print(f"  H4: {'[OK] CONFIRMED' if h4 else '[WARN] BELOW 50%'}")
 
     # H5
-    print("\n── H5: LSTM↔Regime Share < 70% (multi-agent balance) ───────────────")
+    print("\n-- H5: LSTM↔Regime Share < 70% (multi-agent balance) ---------------")
     total_conf   = sum(sum(s["conflict_pairs"].values()) for s in all_stats)
     lr_count     = sum(s["conflict_pairs"].get("LSTM\u2194Regime", 0) for s in all_stats)
     lr_pct       = lr_count / total_conf * 100 if total_conf > 0 else 0.0
@@ -1200,10 +1200,10 @@ def validate_hypotheses(all_stats: list, all_rows: list) -> dict:
         pct = cnt / total_conf * 100 if total_conf > 0 else 0
         bar = "█" * int(pct / 2)
         print(f"    {pair:<28} {cnt:>3}  {pct:>5.1f}%  [{bar}]")
-    print(f"\n  H5: {'✅ CONFIRMED' if h5 else '⚠️ STILL DOMINANT'} — {lr_pct:.1f}%")
+    print(f"\n  H5: {'[OK] CONFIRMED' if h5 else '[WARN] STILL DOMINANT'} HOLD {lr_pct:.1f}%")
 
     # H6
-    print("\n── H6: Accuracy Lift ≥0% in All Windows (FIX-13 override guard) ────")
+    print("\n-- H6: Accuracy Lift ≥0% in All Windows (FIX-13 override guard) ----")
     total_og  = sum(s.get("n_override_guard", 0) for s in all_stats)
     total_buy = sum(s.get("n_buy", 0)            for s in all_stats)
     wins_ok   = [s for s in all_stats if s["acc_lift"] >= 0]
@@ -1211,13 +1211,13 @@ def validate_hypotheses(all_stats: list, all_rows: list) -> dict:
     print(f"  FIX-13 override guard reversions: {total_og}")
     print(f"  FIX-12 BUY signals:               {total_buy}")
     for s in all_stats:
-        flag = "✅" if s["acc_lift"] >= 0 else "⚠️"
+        flag = "[OK]" if s["acc_lift"] >= 0 else "[WARN]"
         print(f"    {s['label']:<32}  lift={s['acc_lift']:+.1f}%  {flag}")
-    print(f"\n  H6: {'✅ CONFIRMED' if h6 else '⚠️ PARTIAL'} — "
+    print(f"\n  H6: {'[OK] CONFIRMED' if h6 else '[WARN] PARTIAL'} HOLD "
           f"{len(wins_ok)}/{len(all_stats)} windows ≥0%")
 
     # FIX-7 temporal distribution
-    print("\n── FIX-7: Temporal Factor Distribution ──────────────────────────────")
+    print("\n-- FIX-7: Temporal Factor Distribution ------------------------------")
     tf_arr = np.array([r["temporal_factor"] for r in all_rows])
     print(f"  Mean={np.mean(tf_arr):.4f}  Min={np.min(tf_arr):.4f}  Max={np.max(tf_arr):.4f}")
     print(f"  Penalised(<0.95)={int((tf_arr<0.95).sum())}  "
@@ -1233,8 +1233,8 @@ def validate_hypotheses(all_stats: list, all_rows: list) -> dict:
 
 def main():
     print("=" * 130)
-    print("  AESL v2.2 BACKTEST — 13 Fixes Applied")
-    print("  Phase 27 | Research Paper Version | 4 Windows × 30 Tickers")
+    print("  AESL v2.2 BACKTEST HOLD 13 Fixes Applied")
+    print("  Phase 27 | Research Paper Version | 4 Windows x 30 Tickers")
     print("  FIX-10:Zones  FIX-11:ForceHold+H4  FIX-12:BUY  FIX-13:OverrideGuard")
     print("  H1(P&L) H2(ZoneAcc) H3(Regime) H4(Precision) H5(MultiAgent) H6(Lift)")
     print("=" * 130)
@@ -1307,11 +1307,11 @@ def main():
     print(f"\n  {'Window':<32} {'N':>4} {'BCS':>7} {'RawAcc':>8} {'AdjAcc':>8} "
           f"{'Lift':>7} {'Saved$':>8} {'Cost$':>7} {'Net$':>7}  "
           f"{'H4%':>5} {'BUY':>4} {'OvrG':>5} {'Gated':>6} {'Damped':>7}")
-    print(f"  {'─'*140}")
+    print(f"  {'-'*140}")
     for s in all_stats:
-        lf  = "✅" if s["acc_lift"] >= 0 else "⚠️"
-        nlf = "✅" if s["net_pnl"]  >= 0 else "⚠️"
-        h4f = "✅" if s["h4_prec"]  >= 50 else "⚠️"
+        lf  = "[OK]" if s["acc_lift"] >= 0 else "[WARN]"
+        nlf = "[OK]" if s["net_pnl"]  >= 0 else "[WARN]"
+        h4f = "[OK]" if s["h4_prec"]  >= 50 else "[WARN]"
         print(f"  {s['label']:<32} {s['n']:>4} {s['mean_bcs']:>7.4f} "
               f"{s['raw_acc']:>7.1f}% {s['adj_acc']:>7.1f}% "
               f"{s['acc_lift']:>+6.1f}%{lf} "
@@ -1336,9 +1336,9 @@ def main():
     ov_og   = sum(s.get("n_override_guard",0) for s in all_stats)
     mb_all  = np.mean([s["mean_bcs"] for s in all_stats])
 
-    print(f"  {'─'*140}")
-    lf  = "✅" if ov_lift >= 0 else "⚠️"
-    nlf = "✅" if ov_net  >= 0 else "⚠️"
+    print(f"  {'-'*140}")
+    lf  = "[OK]" if ov_lift >= 0 else "[WARN]"
+    nlf = "[OK]" if ov_net  >= 0 else "[WARN]"
     print(f"  {'OVERALL':<32} {sum(s['n'] for s in all_stats):>4} "
           f"{mb_all:>7.4f} "
           f"{ov_raw:>7.1f}% {ov_adj:>7.1f}% {ov_lift:>+6.1f}%{lf} "
@@ -1369,36 +1369,36 @@ def main():
         print(f"\n  Saved \u2192 aesl_backtest_v22.csv ({len(all_rows)} rows)")
 
     # Final verdict
-    print(f"\n  {'═'*80}")
+    print(f"\n  {'='*80}")
     print(f"  AESL v2.2 FINAL VERDICT  (Research Paper Readiness)")
-    print(f"  {'═'*80}")
-    print(f"  Unit tests (19 tests)      : {'✅ ALL PASSED' if unit_ok else '⚠️ FAILURES'}")
+    print(f"  {'='*80}")
+    print(f"  Unit tests (19 tests)      : {'[OK] ALL PASSED' if unit_ok else '[WARN] FAILURES'}")
     print(f"  Directional acc (raw)      : {ov_raw:.1f}%")
     print(f"  Directional acc (adj)      : {ov_adj:.1f}%")
-    print(f"  Accuracy lift              : {ov_lift:+.1f}%  {'✅' if ov_lift>=0 else '⚠️'}")
-    print(f"  Net P&L delta              : ${ov_net:+.2f}  {'✅' if ov_net>=0 else '⚠️'}")
+    print(f"  Accuracy lift              : {ov_lift:+.1f}%  {'[OK]' if ov_lift>=0 else '[WARN]'}")
+    print(f"  Net P&L delta              : ${ov_net:+.2f}  {'[OK]' if ov_net>=0 else '[WARN]'}")
     print(f"  BUY signals (4 windows)    : {ov_buy}  (target 12+)")
     print(f"  FIX-13 override reversions : {ov_og}")
     print(f"  Mean BCS                   : {mb_all:.4f}")
     print(f"  Evidence gate events       : {ov_g}")
     print(f"  Dominance damp events      : {ov_d}")
-    print(f"  H1 (P&L positive)          : {'✅ CONFIRMED' if hyp['h1'] else '⚠️ PARTIAL'}")
-    print(f"  H2 (acc↓ with zone)        : {'✅ CONFIRMED' if hyp['h2'] else '⚠️ PARTIAL'}")
-    print(f"  H3 (Bear→high BCS)         : {'✅ CONFIRMED' if hyp['h3'] else '⚠️ PARTIAL'}")
-    print(f"  H4 (precision ≥50%)        : {'✅ CONFIRMED' if hyp['h4'] else '⚠️ PARTIAL'}")
-    print(f"  H5 (multi-agent <70%)      : {'✅ CONFIRMED' if hyp['h5'] else '⚠️ PARTIAL'}")
-    print(f"  H6 (acc lift ≥0%)          : {'✅ CONFIRMED' if hyp['h6'] else '⚠️ PARTIAL'}")
+    print(f"  H1 (P&L positive)          : {'[OK] CONFIRMED' if hyp['h1'] else '[WARN] PARTIAL'}")
+    print(f"  H2 (acc↓ with zone)        : {'[OK] CONFIRMED' if hyp['h2'] else '[WARN] PARTIAL'}")
+    print(f"  H3 (Bear->high BCS)         : {'[OK] CONFIRMED' if hyp['h3'] else '[WARN] PARTIAL'}")
+    print(f"  H4 (precision ≥50%)        : {'[OK] CONFIRMED' if hyp['h4'] else '[WARN] PARTIAL'}")
+    print(f"  H5 (multi-agent <70%)      : {'[OK] CONFIRMED' if hyp['h5'] else '[WARN] PARTIAL'}")
+    print(f"  H6 (acc lift ≥0%)          : {'[OK] CONFIRMED' if hyp['h6'] else '[WARN] PARTIAL'}")
     h_ok = sum(1 for v in hyp.values() if v)
     print(f"\n  Hypotheses confirmed: {h_ok}/6")
     if h_ok == 6:
-        print("  \U0001f3c6 AESL v2.2 RESEARCH-PAPER-READY — ALL 6 HYPOTHESES CONFIRMED")
+        print("  \U0001f3c6 AESL v2.2 RESEARCH-PAPER-READY HOLD ALL 6 HYPOTHESES CONFIRMED")
     elif h_ok == 5:
-        print("  \U0001f947 NEAR-COMPLETE — verify remaining hypothesis on live data")
+        print("  \U0001f947 NEAR-COMPLETE HOLD verify remaining hypothesis on live data")
     elif h_ok == 4:
-        print("  \U0001f948 STRONG — 2 more needed for full paper readiness")
+        print("  \U0001f948 STRONG HOLD 2 more needed for full paper readiness")
     else:
         print("  \u26a0\ufe0f  MORE CALIBRATION NEEDED")
-    print(f"  {'═'*80}\n")
+    print(f"  {'='*80}\n")
 
 
 if __name__ == "__main__":
