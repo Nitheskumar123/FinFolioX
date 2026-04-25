@@ -94,8 +94,7 @@ class AgentDecisionMemory:
     mutual information, and maps (ASC, dissent_sensitivity) to a
     confidence penalty multiplier applied before the Conflict Resolver.
 
-    v2.3 changes: 4 bug fixes (saturation threshold, DS usage,
-    box alignment, n<25 hardcode).
+    
     """
 
     def __init__(self, window_size: int = WINDOW_SIZE, cache_path: Optional[str] = None):

@@ -7,9 +7,7 @@ __pycache__/
 *.pyc
 *.pyo
 
-# ML artifacts (optional – you can keep models if you want)
-*.pth
-*.pkl
+
 
 # OS files
 .DS_Store

@@ -77,6 +77,7 @@ class AgentState(TypedDict):
     sent_score: float
     sent_label: str
     sent_bias_warning: bool
+    sentiment_articles: Optional[List[Dict[str, Any]]]  # MCP news article details
 
     # Phase 24: Topology
     topology_result: Optional[Dict[str, Any]]
@@ -246,8 +247,28 @@ class FinFolioGraphOrchestrator:
         sent_score        = 0.0
         sent_label        = "neutral"
         sent_bias_warning = False
+        articles          = []
 
         try:
+            # Capture individual article data from MCP payload before analysis
+            if hasattr(self.master, 'sent_agent') and self.master.sent_agent:
+                try:
+                    mcp_payload = self.master.sent_agent.mcp_server.get_global_context_payload(state["ticker"])
+                    for item in mcp_payload:
+                        if not item.get("future_event") and len(item.get("text", "").strip()) >= 10:
+                            text = item.get("text", "")
+                            source = item.get("source", "Unknown")
+                            label_i, score_i, _ = self.master.sent_agent.get_sentiment(text)
+                            articles.append({
+                                "source": source,
+                                "headline": text[:120],
+                                "label": label_i,
+                                "score": round(float(score_i), 4),
+                                "tier": item.get("tier", 3),
+                            })
+                except Exception:
+                    pass  # Fall through to normal analysis
+
             result = self.master._analyze_sentiment_module(
                 state["ticker"], state["stock_obj"], state["lstm_signal"]
             )
@@ -267,9 +288,10 @@ class FinFolioGraphOrchestrator:
             print(f"      [WARN] Sentiment pipeline error: {e} HOLD using neutral (0.0)")
 
         return {
-            "sent_score":        sent_score,
-            "sent_label":        sent_label,
-            "sent_bias_warning": sent_bias_warning,
+            "sent_score":          sent_score,
+            "sent_label":          sent_label,
+            "sent_bias_warning":   sent_bias_warning,
+            "sentiment_articles":  articles,
         }
 
     # -------------------------------------------------------------------------

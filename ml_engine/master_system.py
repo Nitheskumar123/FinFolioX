@@ -469,6 +469,10 @@ class FinFolioSystem:
 
         risk_score, div_status = self._analyze_correlation_module(ticker)
 
+        # Re-fetch trust scores with regime context for stronger influence
+        if self.meta_agent:
+            trust_scores = self.meta_agent.get_trust_scores(ticker=ticker, regime=regime_label)
+
         # -- Phase 24: Topological Analysis -----------------------------------
         topo_modifier  = 1.0
         topo_signal    = "UNKNOWN"

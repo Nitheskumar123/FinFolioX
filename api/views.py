@@ -158,7 +158,7 @@ class HistoryView(APIView):
                 status=status.HTTP_404_NOT_FOUND,
             )
         try:
-            df = pd.read_csv(ledger_path, encoding="utf-8")
+            df = pd.read_csv(ledger_path, encoding="utf-8", on_bad_lines="skip")
             records = json.loads(df.to_json(orient="records"))
             return Response({"count": len(records), "decisions": records}, status=status.HTTP_200_OK)
         except Exception as e:
@@ -209,7 +209,7 @@ class EvaluateView(APIView):
             ledger_path = os.path.join(BASE_DIR, "data", "meta", "decision_ledger.csv")
             evaluated   = []
             if os.path.exists(ledger_path):
-                df = pd.read_csv(ledger_path, encoding="utf-8")
+                df = pd.read_csv(ledger_path, encoding="utf-8", on_bad_lines="skip")
                 evaluated_df = df[df["evaluated"] == "YES"]
                 evaluated = json.loads(evaluated_df.to_json(orient="records"))
 
@@ -439,6 +439,9 @@ def _state_to_json(state, ticker):
         },
         "sentiment": {
             "score": _safe_float(state.get("sent_score", 0)),
+            "label": state.get("sent_label", "neutral"),
+            "bias_warning": bool(state.get("sent_bias_warning", False)),
+            "articles": state.get("sentiment_articles", []),
         },
         "systemic_risk": {
             "risk_score": _safe_float(state.get("risk_score", 0)),
@@ -470,6 +473,9 @@ def _state_to_json(state, ticker):
             "passed": state.get("red_team_passed", True),
             "delta":  _safe_float(state.get("red_team_delta", 0)),
         },
+
+        # Counterfactual & Causal Intelligence
+        "counterfactual_verdict": state.get("counterfactual_verdict", ""),
 
         # -- Phase 26: Ensemble Health (ASC) --------------------------------
         "ensemble_health": {

@@ -7,7 +7,8 @@ import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
     Search, TrendingUp, TrendingDown, Minus, Brain, Shield,
-    BarChart3, AlertTriangle, Layers, Target, Activity, Cpu, ArrowRight
+    BarChart3, AlertTriangle, Layers, Target, Activity, Cpu, ArrowRight,
+    Newspaper, Sparkles, Zap
 } from 'lucide-react';
 import { analyzeStock } from '../services/api';
 import EnsembleHealthPanel from '../components/EnsembleHealthPanel';
@@ -58,18 +59,21 @@ export default function LiveInference() {
         return 'badge-normal';
     };
 
-    // --- NEW: Calculate the "Raw" Pre-ASC Decision ---
+    const getSentimentBadge = (label) => {
+        const l = (label || '').toLowerCase();
+        if (l === 'bullish') return 'badge-buy';
+        if (l === 'bearish') return 'badge-sell';
+        return 'badge-hold';
+    };
+
+    // --- Calculate the "Raw" Pre-ASC Decision ---
     const getOriginalDecision = (res) => {
         if (!res) return "UNKNOWN";
         const adjConf = res.fusion?.confidence || 0;
         const penalty = res.ensemble_health?.asc_penalty_multiplier || 1.0;
-
-        // Reverse-engineer the raw confidence before the penalty was applied
         const rawConf = penalty > 0 ? (adjConf / penalty) : adjConf;
         const regime = res.regime?.label;
         const gdi = res.disagreement?.gdi || 0;
-
-        // Apply standard strategy rules
         if (rawConf >= 0.50 && regime !== 'Bear' && gdi < 55.0) {
             return "BUY 🟢";
         } else if (rawConf < 0.40) {
@@ -151,7 +155,7 @@ export default function LiveInference() {
                                 <Target /> The Verdict
                             </div>
 
-                            {/* --- NEW: Side-by-Side Decision Comparison --- */}
+                            {/* Side-by-Side Decision Comparison */}
                             <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', justifyContent: 'center', width: '100%', marginTop: '0.5rem' }}>
 
                                 {/* Raw Agent Signal */}
@@ -262,6 +266,19 @@ export default function LiveInference() {
                                     {result.sentiment?.score?.toFixed(4)}
                                 </span>
                             </div>
+                            <div style={{ marginTop: '0.5rem', display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                <span className={`badge ${getSentimentBadge(result.sentiment?.label)}`}>
+                                    {result.sentiment?.label || 'neutral'}
+                                </span>
+                                {result.sentiment?.bias_warning && (
+                                    <span className="badge badge-sell" style={{ fontSize: '0.6rem' }}>⚠ BIAS</span>
+                                )}
+                            </div>
+                            {result.sentiment?.articles?.length > 0 && (
+                                <div style={{ marginTop: '0.5rem', fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+                                    {result.sentiment.articles.length} articles analyzed
+                                </div>
+                            )}
                         </div>
 
                         <div className="card">
@@ -389,6 +406,161 @@ export default function LiveInference() {
                             <EnsembleHealthPanel data={result.ensemble_health} />
                         </motion.div>
                     )}
+
+                    {/* ================================================================
+                        Row 5: NEW — Market News Feed + AI Intelligence Layer
+                        ================================================================ */}
+                    <motion.div
+                        initial={{ opacity: 0, y: 15 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.3 }}
+                    >
+                        <div className="grid-2" style={{ marginBottom: '1.5rem' }}>
+
+                            {/* — Market News Feed — */}
+                            <div className="card">
+                                <div className="card-header">
+                                    <Newspaper size={16} /> Market News Feed (MCP)
+                                </div>
+                                {result.sentiment?.articles?.length > 0 ? (
+                                    <div className="news-feed">
+                                        {result.sentiment.articles.slice(0, 8).map((article, idx) => (
+                                            <div key={idx} className="news-item">
+                                                <div className="news-item-header">
+                                                    <span className="news-source">{article.source}</span>
+                                                    <span className={`badge ${getSentimentBadge(article.label)}`}
+                                                          style={{ fontSize: '0.6rem', padding: '2px 6px' }}>
+                                                        {article.label}
+                                                    </span>
+                                                </div>
+                                                <p className="news-headline">{article.headline}</p>
+                                                <div className="news-score-bar">
+                                                    <div className="news-score-track">
+                                                        <div className="news-score-fill" style={{
+                                                            width: `${Math.min(Math.abs(article.score) * 100 + 50, 100)}%`,
+                                                            background: article.score > 0.05
+                                                                ? 'var(--accent-green)'
+                                                                : article.score < -0.05
+                                                                    ? 'var(--accent-red)'
+                                                                    : 'var(--accent-amber)',
+                                                        }} />
+                                                    </div>
+                                                    <span className="news-score-value"
+                                                          style={{
+                                                              color: article.score > 0.05
+                                                                  ? 'var(--accent-green)'
+                                                                  : article.score < -0.05
+                                                                      ? 'var(--accent-red)'
+                                                                      : 'var(--accent-amber)',
+                                                          }}>
+                                                        {article.score > 0 ? '+' : ''}{article.score.toFixed(3)}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>
+                                        <Newspaper size={32} style={{ opacity: 0.3, marginBottom: '0.5rem' }} />
+                                        <p style={{ fontSize: '0.8rem' }}>No news articles captured for this analysis.</p>
+                                        <p style={{ fontSize: '0.7rem', marginTop: '0.25rem' }}>
+                                            MCP news data will appear here when available.
+                                        </p>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* — AI Intelligence Layer — */}
+                            <div className="card">
+                                <div className="card-header">
+                                    <Sparkles size={16} /> AI Intelligence Layer
+                                </div>
+
+                                {/* Counterfactual Verdict */}
+                                {result.counterfactual_verdict && (
+                                    <div className="intel-section">
+                                        <div className="intel-label">
+                                            <Zap size={12} /> Causal Counterfactual Verdict
+                                        </div>
+                                        <div className="intel-box">
+                                            <span className={`badge ${
+                                                result.counterfactual_verdict.includes('CONFIRMED') ? 'badge-buy'
+                                                    : result.counterfactual_verdict.includes('WARNED') ? 'badge-sell'
+                                                        : 'badge-hold'
+                                            }`} style={{ marginBottom: '6px' }}>
+                                                {result.counterfactual_verdict.split('--')[0]?.trim()}
+                                            </span>
+                                            <p className="intel-text">
+                                                {result.counterfactual_verdict.split('--')[1]?.trim() || result.counterfactual_verdict}
+                                            </p>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Conflict Reasoning */}
+                                {result.conflict?.reasoning && (
+                                    <div className="intel-section">
+                                        <div className="intel-label">
+                                            <Shield size={12} /> Arbitration Reasoning
+                                        </div>
+                                        <div className="intel-box">
+                                            <p className="intel-text">{result.conflict.reasoning}</p>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Attention Weights */}
+                                {result.fusion?.attention_weights && Object.keys(result.fusion.attention_weights).length > 0 && (
+                                    <div className="intel-section">
+                                        <div className="intel-label">
+                                            <Brain size={12} /> Fusion Attention Weights
+                                        </div>
+                                        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '6px' }}>
+                                            {Object.entries(result.fusion.attention_weights).map(([key, val]) => (
+                                                <div key={key} style={{
+                                                    background: 'var(--bg-secondary)',
+                                                    border: '1px solid var(--border-subtle)',
+                                                    borderRadius: '8px',
+                                                    padding: '6px 10px',
+                                                    textAlign: 'center',
+                                                    minWidth: '70px',
+                                                }}>
+                                                    <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '2px' }}>
+                                                        {key}
+                                                    </div>
+                                                    <div style={{
+                                                        fontSize: '0.9rem', fontWeight: 700,
+                                                        color: val > 0.4 ? 'var(--accent-blue)' : 'var(--text-secondary)',
+                                                    }}>
+                                                        {(val * 100).toFixed(1)}%
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Systemic Risk */}
+                                <div className="intel-section">
+                                    <div className="intel-label">
+                                        <AlertTriangle size={12} /> Systemic Risk Assessment
+                                    </div>
+                                    <div style={{ display: 'flex', gap: '12px', alignItems: 'center', marginTop: '6px' }}>
+                                        <span className={`badge ${
+                                            result.systemic_risk?.div_status === 'DIVERSIFIED' ? 'badge-buy'
+                                                : result.systemic_risk?.div_status === 'CONCENTRATED' ? 'badge-sell'
+                                                    : 'badge-hold'
+                                        }`}>
+                                            {result.systemic_risk?.div_status || 'N/A'}
+                                        </span>
+                                        <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                                            Risk Score: {result.systemic_risk?.risk_score?.toFixed(3) || '0.000'}
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </motion.div>
 
                 </motion.div>
             )}

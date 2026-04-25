@@ -128,6 +128,91 @@ class SyntheticMarketGenerator:
         print(f"   [Twin] GBM synthetic data generated: {len(df)} days for {ticker}")
         return df
 
+    @staticmethod
+    def generate_trending(
+        ticker="SYNTH",
+        days=504,
+        start_price=100.0,
+        seed=42,
+    ):
+        """
+        Generates synthetic data with EXPLOITABLE regime patterns.
+        Instead of random walk, creates trending segments:
+          - Bull runs  (positive drift, low vol)
+          - Bear drops (negative drift, high vol)
+          - Sideways   (near-zero drift, moderate vol)
+          - Mean-reversion pullbacks within trends
+
+        This gives the LSTM/Fusion models actual patterns to detect.
+        """
+        np.random.seed(seed)
+        dt = 1 / 252
+
+        # Define regime segments
+        regimes = []
+        remaining = days
+        while remaining > 0:
+            seg_len = min(np.random.randint(30, 80), remaining)
+            regime_type = np.random.choice(["bull", "bear", "sideways"], p=[0.45, 0.25, 0.30])
+            regimes.append((regime_type, seg_len))
+            remaining -= seg_len
+
+        prices = [start_price]
+        regime_params = {
+            "bull":     {"mu": 0.25, "sigma": 0.12, "pullback_prob": 0.08},
+            "bear":     {"mu": -0.20, "sigma": 0.25, "rally_prob": 0.10},
+            "sideways": {"mu": 0.02, "sigma": 0.15, "revert_prob": 0.15},
+        }
+
+        for regime_type, seg_len in regimes:
+            params = regime_params[regime_type]
+            mu = params["mu"]
+            sigma = params["sigma"]
+
+            for j in range(seg_len):
+                # Base trend
+                shock = np.random.normal()
+                daily_return = (mu - 0.5 * sigma**2) * dt + sigma * np.sqrt(dt) * shock
+
+                # Mean-reversion events (pullbacks in bull, rallies in bear)
+                if regime_type == "bull" and np.random.random() < params["pullback_prob"]:
+                    daily_return -= np.random.uniform(0.01, 0.03)  # pullback
+                elif regime_type == "bear" and np.random.random() < params["rally_prob"]:
+                    daily_return += np.random.uniform(0.01, 0.025)  # bear rally
+                elif regime_type == "sideways" and np.random.random() < params["revert_prob"]:
+                    # Mean revert toward segment start
+                    seg_start = prices[-1]
+                    if len(prices) > 5:
+                        dev = (prices[-1] - prices[-5]) / prices[-5]
+                        daily_return -= dev * 0.3  # pull back toward mean
+
+                new_price = prices[-1] * np.exp(daily_return)
+                prices.append(max(new_price, 1.0))  # floor at $1
+
+        prices = prices[:days]  # trim to exact length
+
+        dates = pd.bdate_range(start="2023-01-02", periods=len(prices))
+        df = pd.DataFrame(index=dates)
+        df["Close"] = prices
+        df["Open"] = df["Close"].shift(1).fillna(start_price)
+        df["High"] = df[["Open", "Close"]].max(axis=1) * (
+            1 + np.random.uniform(0, 0.02, len(prices))
+        )
+        df["Low"] = df[["Open", "Close"]].min(axis=1) * (
+            1 - np.random.uniform(0, 0.02, len(prices))
+        )
+        df["Volume"] = np.random.randint(1_000_000, 50_000_000, len(prices))
+
+        df["SMA_50"] = df["Close"].rolling(window=50).mean()
+        df["SMA_200"] = df["Close"].rolling(window=200).mean()
+        df["RSI"] = _calculate_rsi(df["Close"])
+        df["MACD"] = _calculate_macd(df["Close"])
+        df.dropna(inplace=True)
+
+        print(f"   [Twin] Trending synthetic data generated: {len(df)} days for {ticker}")
+        print(f"   [Twin] Regime segments: {[(r, l) for r, l in regimes]}")
+        return df
+
 
 # ==============================================================================
 # SCENARIO INJECTOR
@@ -168,25 +253,33 @@ class SimulationPortfolio:
         self.starting_capital = starting_capital
         self.cash = starting_capital
         self.shares = 0
+        self.avg_cost = 0.0
         self.trades = []
         self.daily_values = []
 
     def execute_decision(self, decision, price, alloc_pct, day_date):
         action_taken = "HOLD"
+        pnl = 0.0
+        is_profitable = False
 
         if "BUY" in decision.upper() and alloc_pct > 0 and price > 0:
             invest_amount = self.cash * alloc_pct
             new_shares = int(invest_amount / price)
             if new_shares > 0:
                 cost = new_shares * price
-                self.cash -= cost
+                total_cost = (self.shares * self.avg_cost) + cost
                 self.shares += new_shares
+                self.avg_cost = total_cost / self.shares
+                self.cash -= cost
                 action_taken = "BUY"
 
         elif "SELL" in decision.upper() and self.shares > 0:
             revenue = self.shares * price
+            pnl = (price - self.avg_cost) * self.shares
+            is_profitable = price > self.avg_cost
             self.cash += revenue
             self.shares = 0
+            self.avg_cost = 0.0
             action_taken = "SELL"
 
         portfolio_value = self.cash + (self.shares * price)
@@ -204,6 +297,8 @@ class SimulationPortfolio:
             "price": round(price, 2),
             "shares": self.shares,
             "portfolio_value": round(portfolio_value, 2),
+            "pnl": round(pnl, 2),
+            "is_profitable": is_profitable,
         })
 
     def record_idle_day(self, price, day_date):
@@ -248,18 +343,12 @@ class SimulationPortfolio:
         if len(returns) > 1 and returns.std() > 0:
             sharpe = (returns.mean() / returns.std()) * np.sqrt(252)
 
-        # FIX v2: Correct win rate HOLD compare entry vs exit price per round-trip
+        # FIX v3: Track average cost basis to properly calculate win_rate on SELL even with pyramiding
         buy_trades = [t for t in self.trades if t["action"] == "BUY"]
-        sell_trades = [t for t in self.trades if t["action"] == "SELL"]
+        sell_trades = [t for t in self.trades if t["action"] == "SELL" and "is_profitable" in t]
 
-        profitable = 0
-        completed_pairs = min(len(buy_trades), len(sell_trades))
-
-        for i in range(completed_pairs):
-            buy_price = buy_trades[i]["price"]
-            sell_price = sell_trades[i]["price"]
-            if sell_price > buy_price:
-                profitable += 1
+        completed_pairs = len(sell_trades)
+        profitable = sum(1 for t in sell_trades if t["is_profitable"])
 
         win_rate = (profitable / completed_pairs * 100) if completed_pairs > 0 else 0.0
 
@@ -301,6 +390,7 @@ class DigitalTwinSimulator:
         self.trust_evolution = []
         self._buy_price = 0.0
         self._peak_price = 0.0
+        self._hold_intervals = 0  # track how long position held
 
     def run_simulation(
         self,
@@ -332,6 +422,15 @@ class DigitalTwinSimulator:
                 start_price=params.get("start_price", 150.0),
                 mu=params.get("mu", 0.08),
                 sigma=params.get("sigma", 0.20),
+                seed=params.get("seed", 42),
+            )
+            sim_start_idx = 200
+        elif data_mode == "trending":
+            params = gbm_params or {}
+            full_data = SyntheticMarketGenerator.generate_trending(
+                ticker=ticker,
+                days=params.get("days", 504),
+                start_price=params.get("start_price", 150.0),
                 seed=params.get("seed", 42),
             )
             sim_start_idx = 200
@@ -368,6 +467,7 @@ class DigitalTwinSimulator:
         self.trust_evolution = []
         self._buy_price = 0.0
         self._peak_price = 0.0
+        self._hold_intervals = 0
 
         total_sim_days = len(full_data) - sim_start_idx
         print(f"\n   [Twin] Simulating {total_sim_days} trading days...")
@@ -399,9 +499,13 @@ class DigitalTwinSimulator:
                     if decision == "BUY":
                         self._buy_price = current_price
                         self._peak_price = current_price
+                        self._hold_intervals = 0
                     elif decision == "SELL":
                         self._buy_price = 0.0
                         self._peak_price = 0.0
+                        self._hold_intervals = 0
+                    elif portfolio.shares > 0:
+                        self._hold_intervals += 1
 
                     self.decisions_log.append({
                         "day": day_index,
@@ -512,8 +616,12 @@ class DigitalTwinSimulator:
         recent_prices = data_slice["Close"].tail(5)
         momentum_5d = float((recent_prices.iloc[-1] / recent_prices.iloc[0]) - 1)
 
-        # 4. Synthetic Sentiment (proxy from momentum)
-        sent_score = float(np.clip(momentum_5d * 15, -1.0, 1.0))
+        # 4. Synthetic Sentiment (independent RSI + mean-reversion based)
+        # Decoupled from momentum to avoid circular dependency
+        rsi_sent = (rsi_now - 50.0) / 50.0  # RSI>50 → bullish, RSI<50 → bearish
+        # Mean-reversion signal: price vs SMA_50
+        price_vs_sma = (current_price - sma_50) / sma_50 if sma_50 > 0 else 0.0
+        sent_score = float(np.clip(rsi_sent * 0.6 + price_vs_sma * 0.4, -1.0, 1.0))
 
         # 5. Fusion
         vol_input = (
@@ -548,46 +656,68 @@ class DigitalTwinSimulator:
             regime=regime_label,
         )
 
-        # 8. Decision Logic
+        # ================================================================
+        # 8. DECISION LOGIC v3 — Fixed over-filtering and missing sells
+        # ================================================================
         decision = "HOLD"
-        dynamic_stop_loss = max(0.10, current_vol * 3.0)
         is_invested = portfolio.shares > 0
 
         if is_invested:
+            # --- SELL LOGIC (when holding shares) ---
             pnl_pct = (
                 (current_price - self._buy_price) / self._buy_price
-                if self._buy_price > 0
-                else 0
+                if self._buy_price > 0 else 0
             )
             drawdown_from_peak = (
                 (self._peak_price - current_price) / self._peak_price
-                if self._peak_price > 0
-                else 0
+                if self._peak_price > 0 else 0
             )
 
-            # Tighten stop only after substantial gain
-            if pnl_pct > 0.15:
-                dynamic_stop_loss = 0.06
+            # Dynamic stop-loss (widens with volatility)
+            dynamic_stop_loss = max(0.06, current_vol * 2.0)
+            if pnl_pct > 0.08:
+                dynamic_stop_loss = 0.04  # tighten after decent gain
 
+            # Sell trigger 1: Stop-loss hit
             if drawdown_from_peak >= dynamic_stop_loss:
                 decision = "SELL"
-                alloc_pct = 0.0
+            # Sell trigger 2: Profit-taking (>2% unrealized gain — lock in profits)
+            elif pnl_pct > 0.02:
+                decision = "SELL"
+            # Sell trigger 3: Regime flips to Bear with low confidence
             elif regime_label == "Bear" and confidence < 0.50:
                 decision = "SELL"
-                alloc_pct = 0.0
-            elif pnl_pct > 0.05 and confidence >= 0.70 and regime_label == "Bull":
-                # Pyramid into winning position
+            # Sell trigger 4: LSTM flips bearish while holding
+            elif lstm_signal < 0.45 and confidence < 0.50:
+                decision = "SELL"
+            # Sell trigger 5: Held too long with no gain (stale position)
+            elif self._hold_intervals >= 4 and pnl_pct < 0.005:
+                decision = "SELL"
+            # Pyramid: scale into winners (only in strong trends)
+            elif pnl_pct > 0.03 and confidence >= 0.60 and regime_label == "Bull":
                 decision = "BUY"
                 alloc_pct = min(alloc_pct, 0.15)
+
+            if decision == "SELL":
+                alloc_pct = 0.0
+
         else:
-            base_confidence_needed = 0.60 if regime_label == "Bull" else 0.70
-            if (
-                confidence >= base_confidence_needed
-                and regime_label != "Bear"
-                and gdi < 45
-            ):
+            # --- BUY LOGIC (when not holding) ---
+            # Aggressive entry: exploit every signal worth following
+            base_conf = 0.45 if regime_label == "Bull" else 0.52
+
+            if regime_label == "Bear":
+                # Enter Bear only with strong bullish LSTM divergence
+                if confidence >= 0.62 and lstm_signal > 0.55 and gdi < 50:
+                    decision = "BUY"
+                    alloc_pct = min(alloc_pct * 0.5, 0.10)  # half size
+            elif confidence >= base_conf and gdi < 60:
                 decision = "BUY"
                 alloc_pct = min(alloc_pct * 1.5, 0.30)
+            # Fallback: LSTM very bullish → override moderate confidence
+            elif lstm_signal > 0.75 and confidence >= 0.40:
+                decision = "BUY"
+                alloc_pct = min(alloc_pct, 0.15)  # smaller cautious position
 
         return {
             "decision": decision,

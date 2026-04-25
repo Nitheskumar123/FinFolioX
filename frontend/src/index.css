@@ -515,6 +515,181 @@ body {
 .heat-diag { background: rgba(255,255,255,0.02); color: var(--text-muted); }
 
 /* ======================================================================
+   NEWS FEED
+   ====================================================================== */
+
+.news-feed {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-height: 400px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.news-feed::-webkit-scrollbar {
+  width: 4px;
+}
+
+.news-feed::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.news-feed::-webkit-scrollbar-thumb {
+  background: var(--border-subtle);
+  border-radius: 2px;
+}
+
+.news-item {
+  padding: 10px 12px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  transition: all 0.2s ease;
+}
+
+.news-item:hover {
+  border-color: var(--border-glow);
+  background: var(--bg-card-hover);
+}
+
+.news-item-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.news-source {
+  font-size: 0.65rem;
+  font-weight: 700;
+  color: var(--accent-cyan);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.news-headline {
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  line-height: 1.5;
+  margin-bottom: 8px;
+}
+
+.news-score-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.news-score-track {
+  flex: 1;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.news-score-fill {
+  height: 100%;
+  border-radius: 2px;
+  transition: width 0.6s ease;
+}
+
+.news-score-value {
+  font-size: 0.7rem;
+  font-weight: 700;
+  min-width: 45px;
+  text-align: right;
+}
+
+/* ======================================================================
+   AI INTELLIGENCE SECTION
+   ====================================================================== */
+
+.intel-section {
+  margin-bottom: 1rem;
+}
+
+.intel-section:last-child {
+  margin-bottom: 0;
+}
+
+.intel-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 6px;
+}
+
+.intel-label svg {
+  color: var(--accent-purple);
+}
+
+.intel-box {
+  background: rgba(99, 102, 241, 0.06);
+  border: 1px solid rgba(99, 102, 241, 0.12);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+}
+
+.intel-text {
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  line-height: 1.6;
+}
+
+/* ======================================================================
+   META AGENT STATS
+   ====================================================================== */
+
+.stats-row {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.stat-chip {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 12px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  text-align: center;
+}
+
+.stat-chip-label {
+  font-size: 0.65rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-weight: 600;
+}
+
+.stat-chip-value {
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+
+/* Spin animation for refresh button */
+.spin {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ======================================================================
    RESPONSIVE
    ====================================================================== */
 
@@ -529,4 +704,5 @@ body {
   .page-container { padding: 1rem; }
   .search-container { flex-direction: column; }
   .search-input { max-width: 100%; }
+  .stats-row { flex-direction: column; }
 }
