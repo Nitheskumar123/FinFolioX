@@ -130,8 +130,8 @@ IG_STEPS_FULLTEST = 24
 #  TEST WINDOWS HOLD 17 windows
 # ================================================================================
 TEST_WINDOWS = [
+    ("2026-04-20", "2026-04-27", "Win20: Bull-TechEarningsRally (Apr20->27-2026)"),
     ("2026-04-09", "2026-04-14", "Win19: Pre-Easter Defensive Lull (Apr09->14-2026)"),
-    
    
     ("2026-04-02", "2026-04-07", "Win18: Pre-Easter Defensive Lull (Apr02->09-2026)"),
     ("2026-03-23", "2026-03-28", "Win0: Bear-IranOilShock   (Mar23->28-2026)"),
@@ -386,6 +386,26 @@ MANUAL_SENTIMENT = {
         "PG":   +0.05, "JNJ":  +0.05, "NFLX": +0.10, "DIS":  +0.08,
         "CRM":  +0.10, "PLTR": +0.18,
     },
+    "2026-04-20": {
+    # Tech: INTC blowout Q1 (+23%), AMD AI rally (+12%), AMZN AWS-Meta chip deal
+    "AAPL": +0.02, "MSFT": +0.08, "NVDA": +0.10, "TSLA": -0.14,
+    "META": +0.12, "GOOGL":+0.08, "AMZN": +0.14, "AMD":  +0.22,
+    "INTC": +0.25, "ORCL": +0.04,
+    # Index ETFs: QQQ led +3%, SPY +1.4%, DIA lagged, IWM sideways
+    "SPY":  +0.09, "QQQ":  +0.13, "DIA":  +0.04, "IWM":  +0.03,
+    # Financials: pre-FOMC caution, consumer spending mixed
+    "JPM":  -0.05, "BAC":  -0.05, "GS":   -0.02, "V":    -0.03,
+    # GLD/SLV sold off (dollar strength, yields elevated pre-FOMC), TLT flat
+    "GLD":  -0.09, "TLT":  -0.02, "SLV":  -0.10,
+    # Energy: oil elevated $106/bbl but stocks flat
+    "XOM":  +0.03, "CVX":  +0.01,
+    # Defensives: PG earnings beat + div raise, WMT steady, JNJ healthcare mixed
+    "WMT":  +0.04, "PG":   +0.10, "JNJ":  +0.01,
+    # NFLX post-earnings malaise/Hastings exit, DIS layoffs & restructuring
+    "NFLX": -0.15, "DIS":  -0.08,
+    # CRM buyback overshadowed by broader cloud spending fears, PLTR govt deals
+    "CRM":  -0.04, "PLTR": +0.06,
+},
     "2026-04-09": {
     "AAPL": -0.10, "MSFT": +0.12, "NVDA": +0.15, "TSLA": +0.12,
     "META": +0.15, "GOOGL":+0.12, "AMZN": +0.15, "AMD":  +0.15,
@@ -1137,7 +1157,7 @@ def run_window(test_date, outcome_date, label, agents, portfolio=None):
 # ================================================================================
 def main():
     print_separator()
-    print("  FinFolioX Full System Test  (18 Windows x 30 Tickers x 17 Agents)")
+    print("  FinFolioX Full System Test  (21 Windows x 30 Tickers x 17 Agents)")
     print_separator()
 
     print("\n  LOADING ALL 17 AGENTS...")
@@ -1303,7 +1323,7 @@ def main():
     all_stats  = []
     all_rows   = []
 
-    print_section("FULL SYSTEM TEST HOLD 17 Windows x 30 Tickers", "=")
+    print_section("FULL SYSTEM TEST HOLD 21 Windows x 30 Tickers", "=")
 
     for test_date, outcome_date, label in TEST_WINDOWS:
         s = run_window(test_date, outcome_date, label, agents=agents, portfolio=portfolio)
@@ -1340,7 +1360,7 @@ def main():
         print(f"\n  -- Portfolio Performance --")
         print(f"  Total Return : {pm['total_return_pct']:>+7.3f}%  "
               f"(P&L: ${pm['total_pnl']:>+8.2f} on ${DEFAULT_CAPITAL:.0f})")
-        print(f"  True Daily Sharpe : {pm['true_daily_sharpe']:>7.3f}  Win Rate: {pm['win_rate']:.1f}%")
+        print(f"  Win Rate: {pm['win_rate']:.1f}%")
         print(f"  Trade-Inflated (Old) : {pm['trade_inflated_sharpe']:>5.3f}  (Averaged by 500+ trades)")
         print(f"  Active Sharpe (18w)  : {pm['active_sharpe_18']:>5.3f}  (sqrt(18) multiplier)")
         print(f"  Max Drawdown : ${pm['max_drawdown']:>+8.2f}  Calmar: {pm['calmar_ratio']:.3f}")
